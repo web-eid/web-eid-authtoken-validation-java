@@ -1,0 +1,78 @@
+/*
+ * Copyright (c) 2020 The Web eID Project
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+package org.webeid.security.testutil;
+
+import org.webeid.security.validator.AuthTokenValidator;
+import org.webeid.security.validator.AuthTokenValidatorBuilder;
+
+import javax.cache.Cache;
+import java.net.URI;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.time.LocalDateTime;
+
+public final class AuthTokenValidators {
+
+    private static final String TOKEN_ORIGIN_URL = "https://ria.ee";
+
+    public static AuthTokenValidator getAuthTokenValidator(Cache<String, LocalDateTime> cache) throws CertificateException {
+        return getAuthTokenValidator(TOKEN_ORIGIN_URL, cache);
+    }
+
+    public static AuthTokenValidator getAuthTokenValidator(String url, Cache<String, LocalDateTime> cache) throws CertificateException {
+        return getAuthTokenValidator(url, cache, getCACertificates());
+    }
+
+    public static AuthTokenValidator getAuthTokenValidator(String url, Cache<String, LocalDateTime> cache, X509Certificate... certificates) {
+        return getAuthTokenValidatorBuilder(url, cache, certificates)
+            .withoutUserCertificateRevocationCheckWithOcsp()
+            .build();
+    }
+
+    public static AuthTokenValidator getAuthTokenValidator(Cache<String, LocalDateTime> cache, String certFingerprint) throws CertificateException {
+        return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, cache, getCACertificates())
+            .withSiteCertificateSha256Fingerprint(certFingerprint)
+            .withoutUserCertificateRevocationCheckWithOcsp()
+            .build();
+    }
+
+    public static AuthTokenValidator getAuthTokenValidatorWithOcspCheck(Cache<String, LocalDateTime> cache) throws CertificateException {
+        return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, cache, getCACertificates()).build();
+    }
+
+    public static AuthTokenValidator getAuthTokenValidatorWithWrongTrustedCA(Cache<String, LocalDateTime> cache) throws CertificateException {
+        return getAuthTokenValidator(TOKEN_ORIGIN_URL, cache,
+            CertificateLoader.loadCertificatesFromResources("ESTEID2018.cer"));
+    }
+
+    private static AuthTokenValidatorBuilder getAuthTokenValidatorBuilder(String uri, Cache<String, LocalDateTime> cache, X509Certificate[] certificates) {
+        return new AuthTokenValidatorBuilder()
+            .withSiteOrigin(URI.create(uri))
+            .withNonceCache(cache)
+            .withTrustedCertificateAuthorities(certificates);
+    }
+
+    private static X509Certificate[] getCACertificates() throws CertificateException {
+        return CertificateLoader.loadCertificatesFromResources("TEST_of_ESTEID2018.cer");
+    }
+}
