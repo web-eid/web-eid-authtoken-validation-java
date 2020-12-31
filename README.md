@@ -188,6 +188,44 @@ try {
     ...
 ```
 
+# Table of contents
+
+- [Quickstart](#quickstart)
+  - [1. Add the library to your project](#1-add-the-library-to-your-project)
+  - [2. Add cache support](#2-add-cache-support)
+  - [3. Configure the nonce generator](#3-configure-the-nonce-generator)
+  - [4. Add trusted certificate authority certificates](#4-add-trusted-certificate-authority-certificates)
+  - [5. Configure the authentication token validator](#5-configure-the-authentication-token-validator)
+  - [6. Add a REST endpoint for issuing challenge nonces](#6-add-a-rest-endpoint-for-issuing-challenge-nonces)
+  - [7. Implement authentication](#7-implement-authentication)
+- [Introduction](#introduction)
+- [Token validation](#token-validation)
+  - [Basic usage](#basic-usage)
+  - [Configuration](#configuration)
+    - [Certificate fingerprint](#certificate-fingerprint)
+  - [What gets validated](#what-gets-validated)
+  - [Possible validation errors](#possible-validation-errors)
+      - [NonceNotFoundException](#noncenotfoundexception)
+      - [NonceExpiredException](#nonceexpiredexception)
+      - [OriginMismatchException](#originmismatchexception)
+      - [ServiceCertificateFingerprintValidationException](#servicecertificatefingerprintvalidationexception)
+      - [TokenExpiredException](#tokenexpiredexception)
+      - [TokenParseException](#tokenparseexception)
+      - [TokenSignatureValidationException](#tokensignaturevalidationexception)
+      - [UserCertificateExpiredException](#usercertificateexpiredexception)
+      - [UserCertificateMissingPurposeException](#usercertificatemissingpurposeexception)
+      - [UserCertificateNotTrustedException](#usercertificatenottrustedexception)
+      - [UserCertificateNotYetValidException](#usercertificatenotyetvalidexception)
+      - [UserCertificateParseException](#usercertificateparseexception)
+      - [UserCertificateRevocationCheckFailException](#usercertificaterevocationcheckfailexception)
+      - [UserCertificateRevokedException](#usercertificaterevokedexception)
+      - [UserCertificateWrongPurposeException](#usercertificatewrongpurposeexception)
+  - [Create your own validator implementation](#create-your-own-validator-implementation)
+- [Nonce generation](#nonce-generation)
+  - [Basic usage](#basic-usage-1)
+  - [Configuration](#configuration-1)
+  - [How it works](#how-it-works)
+
 # Introduction
 
 This library has everything that it takes to ensure that the authentication token sent by the Web-eID browser extension contains valid data. And that this data is consistent and was not modified in-between by the third party. It is easy to configure and to integrate into your authentication service.  
