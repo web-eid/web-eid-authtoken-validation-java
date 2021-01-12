@@ -135,8 +135,8 @@ final class AuthTokenParser {
             final String nonceField = getStringFieldOrThrow(body, "nonce", "body");
 
             // The "aud" field value is an array that contains the origin and may also contain site certificate fingerprint
-            final List audienceField = getListFieldOrThrow(body, "aud", "body");
-            final String origin = (String) audienceField.get(0);
+            final List<String> audienceField = getListFieldOrThrow(body, "aud", "body");
+            final String origin = audienceField.get(0);
             if (Strings.isNullOrEmpty(origin)) {
                 throw new TokenParseException("origin from aud field must not be empty");
             }
@@ -145,7 +145,7 @@ final class AuthTokenParser {
             data.setOrigin(origin);
 
             if (audienceField.size() > 1) {
-                final String siteCertificateFingerprintField = (String) audienceField.get(1);
+                final String siteCertificateFingerprintField = audienceField.get(1);
                 if (Strings.isNullOrEmpty(siteCertificateFingerprintField)
                     || !siteCertificateFingerprintField.startsWith("urn:cert:sha-256:")) {
                     throw new TokenParseException("site certificate fingerprint from aud field must start with urn:cert:sha-256:");
@@ -179,7 +179,7 @@ final class AuthTokenParser {
         return fieldValue;
     }
 
-    private List getListFieldOrThrow(Map<String, Object> fields, String fieldName, String sectionName) throws TokenParseException {
+    private List<String> getListFieldOrThrow(Map<String, Object> fields, String fieldName, String sectionName) throws TokenParseException {
         if (fields.get(fieldName) != null && !(fields.get(fieldName) instanceof List)) {
             throw new TokenParseException(fieldName + " field in authentication token "
                 + sectionName + " must be an array");
@@ -198,7 +198,9 @@ final class AuthTokenParser {
                 + sectionName + " must be an array of strings, but first element is not a string");
         }
 
-        return fieldValue;
+        @SuppressWarnings("unchecked")
+        final List<String> result = fieldValue;
+        return result;
     }
 
     private static X509Certificate parseCertificate(String certificateInBase64) throws CertificateException, IOException, TokenParseException {

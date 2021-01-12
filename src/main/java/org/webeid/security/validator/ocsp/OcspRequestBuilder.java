@@ -66,28 +66,28 @@ public final class OcspRequestBuilder {
 
     private static final SecureRandom GENERATOR = new SecureRandom();
 
-    private SecureRandom generator = GENERATOR;
-    private DigestCalculator calculator = Digester.sha1();
-    private X509Certificate certificate;
-    private X509Certificate issuer;
+    private SecureRandom randomGenerator = GENERATOR;
+    private DigestCalculator digestCalculator = Digester.sha1();
+    private X509Certificate subjectCertificate;
+    private X509Certificate issuerCertificate;
 
     public OcspRequestBuilder generator(SecureRandom generator) {
-        this.generator = generator;
+        this.randomGenerator = generator;
         return this;
     }
 
     public OcspRequestBuilder calculator(DigestCalculator calculator) {
-        this.calculator = calculator;
+        this.digestCalculator = calculator;
         return this;
     }
 
     public OcspRequestBuilder certificate(X509Certificate certificate) {
-        this.certificate = certificate;
+        this.subjectCertificate = certificate;
         return this;
     }
 
     public OcspRequestBuilder issuer(X509Certificate issuer) {
-        this.issuer = issuer;
+        this.issuerCertificate = issuer;
         return this;
     }
 
@@ -96,10 +96,10 @@ public final class OcspRequestBuilder {
      * and CA's will (should) reject subsequent requests that have the same nonce value.
      */
     public OCSPReq build() throws OCSPException, IOException, CertificateEncodingException {
-        final SecureRandom generator = Objects.requireNonNull(this.generator, "generator");
-        final DigestCalculator calculator = Objects.requireNonNull(this.calculator, "calculator");
-        final X509Certificate certificate = Objects.requireNonNull(this.certificate, "certificate");
-        final X509Certificate issuer = Objects.requireNonNull(this.issuer, "issuer");
+        final SecureRandom generator = Objects.requireNonNull(this.randomGenerator, "randomGenerator");
+        final DigestCalculator calculator = Objects.requireNonNull(this.digestCalculator, "digestCalculator");
+        final X509Certificate certificate = Objects.requireNonNull(this.subjectCertificate, "subjectCertificate");
+        final X509Certificate issuer = Objects.requireNonNull(this.issuerCertificate, "issuerCertificate");
 
         final BigInteger serial = certificate.getSerialNumber();
 

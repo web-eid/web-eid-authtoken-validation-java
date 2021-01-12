@@ -30,11 +30,12 @@ import org.webeid.security.testutil.AbstractTestWithCache;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class NonceGeneratorTest extends AbstractTestWithCache {
+
     private NonceGenerator nonceGenerator;
 
     @Override
     @BeforeEach
-    public void setup() {
+    protected void setup() {
         super.setup();
         nonceGenerator = new NonceGeneratorBuilder()
             .withNonceCache(cache)
@@ -42,12 +43,13 @@ class NonceGeneratorTest extends AbstractTestWithCache {
     }
 
     @Test
-    public void validateNonceGeneration() {
+    void validateNonceGeneration() {
         final String nonce1 = nonceGenerator.generateAndStoreNonce();
         final String nonce2 = nonceGenerator.generateAndStoreNonce();
 
-        assertThat(nonce1.length()).isEqualTo(44); // Base64-encoded 32 bytes
-        assertThat(nonce1).isNotEqualTo(nonce2);
+        assertThat(nonce1)
+            .hasSize(44) // Base64-encoded 32 bytes
+            .isNotEqualTo(nonce2);
         // It might be possible to add an entropy test by compressing the nonce bytes
         // and verifying that the result is longer than for non-random strings.
     }

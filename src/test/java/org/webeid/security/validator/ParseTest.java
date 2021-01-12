@@ -36,17 +36,21 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.webeid.security.testutil.Tokens.getUnsignedTokenString;
 import static org.webeid.security.util.TitleCase.toTitleCase;
 
-public class ParseTest extends AbstractTestWithMockedDateValidatorAndCorrectNonce {
+/**
+ * Some tests in this class (and possibly in others) will randomly fail due to
+ * https://github.com/jmockit/jmockit1/issues/689#issuecomment-702965484
+ */
+class ParseTest extends AbstractTestWithMockedDateValidatorAndCorrectNonce {
 
-    /*
-      Validates the happy path:
-      - valid user certificate with trusted issuer signature
-      - token signature is correct
-      - correct origin
-      - nonce exists in the cache and has not expired
+    /**
+     * Validates the happy path:
+     * - valid user certificate with trusted issuer signature
+     * - token signature is correct
+     * - correct origin
+     * - nonce exists in the cache and has not expired
      */
     @Test
-    public void parseSignedToken() throws Exception {
+    void parseSignedToken() throws Exception {
         final X509Certificate result = validator.validate(Tokens.SIGNED);
         assertThat(CertUtil.getSubjectCN(result))
             .isEqualTo("JÕEORG\\,JAAK-KRISTJAN\\,38001085718");
@@ -61,13 +65,13 @@ public class ParseTest extends AbstractTestWithMockedDateValidatorAndCorrectNonc
     }
 
     @Test
-    public void detectUnsignedToken() {
+    void detectUnsignedToken() {
         assertThatThrownBy(() -> validator.validate(getUnsignedTokenString()))
             .isInstanceOf(TokenSignatureValidationException.class);
     }
 
     @Test
-    public void detectCorruptedToken() {
+    void detectCorruptedToken() {
         assertThatThrownBy(() -> validator.validate(Tokens.CORRUPTED))
             .isInstanceOf(TokenParseException.class);
     }

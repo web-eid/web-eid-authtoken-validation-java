@@ -26,77 +26,74 @@ import org.junit.jupiter.api.Test;
 import org.webeid.security.exceptions.OriginMismatchException;
 import org.webeid.security.exceptions.TokenParseException;
 import org.webeid.security.testutil.AbstractTestWithMockedDateValidatorAndCorrectNonce;
-import org.webeid.security.testutil.Dates;
 import org.webeid.security.testutil.Tokens;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.webeid.security.testutil.AuthTokenValidators.getAuthTokenValidator;
 
-public class OriginTest extends AbstractTestWithMockedDateValidatorAndCorrectNonce {
+class OriginTest extends AbstractTestWithMockedDateValidatorAndCorrectNonce {
 
     @Test
-    public void validateOriginMismatchFailure() throws Exception {
+    void validateOriginMismatchFailure() throws Exception {
         validator = getAuthTokenValidator("https://mismatch.ee", cache);
         assertThatThrownBy(() -> validator.validate(Tokens.SIGNED))
             .isInstanceOf(OriginMismatchException.class);
     }
 
     @Test
-    public void testOriginMissing() {
+    void testOriginMissing() {
         assertThatThrownBy(() -> validator.validate(Tokens.ORIGIN_MISSING))
             .isInstanceOf(TokenParseException.class)
             .hasMessageStartingWith("aud field must be present in authentication token body and must be an array");
     }
 
     @Test
-    public void testOriginEmpty() {
+    void testOriginEmpty() {
         assertThatThrownBy(() -> validator.validate(Tokens.ORIGIN_EMPTY))
             .isInstanceOf(TokenParseException.class)
             .hasMessageStartingWith("origin from aud field must not be empty");
     }
 
     @Test
-    public void testOriginNotString() {
+    void testOriginNotString() {
         assertThatThrownBy(() -> validator.validate(Tokens.ORIGIN_NOT_STRING))
             .isInstanceOf(TokenParseException.class)
             .hasMessageStartingWith("aud field in authentication token body must be an array of strings");
     }
 
     @Test
-    public void testValidatorOriginNotUrl() {
+    void testValidatorOriginNotUrl() {
         assertThatThrownBy(() -> getAuthTokenValidator("not-url", cache))
             .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    public void testTokenOriginNotUrl() {
+    void testTokenOriginNotUrl() {
         assertThatThrownBy(() -> validator.validate(Tokens.ORIGIN_NOT_URL))
             .isInstanceOf(OriginMismatchException.class);
     }
 
     @Test
-    public void testValidatorOriginExcessiveElements() {
+    void testValidatorOriginExcessiveElements() {
         assertThatThrownBy(() -> getAuthTokenValidator("https://ria.ee/excessive-element", cache))
             .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    public void testTokenOriginExcessiveElements() throws Exception {
+    void testTokenOriginExcessiveElements() throws Exception {
         final AuthTokenValidator validator = getAuthTokenValidator("https://ria.ee", cache);
-        Dates.setMockedDate(Dates.create("2020-04-14T13:00:00Z"));
         assertThatThrownBy(() -> validator.validate(Tokens.ORIGIN_URL_WITH_EXCESSIVE_ELEMENTS))
             .isInstanceOf(OriginMismatchException.class);
     }
 
     @Test
-    public void testValidatorOriginNotHttps() {
+    void testValidatorOriginNotHttps() {
         assertThatThrownBy(() -> getAuthTokenValidator("http://ria.ee", cache))
             .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    public void testTokenOriginNotHttps() throws Exception {
-        Dates.setMockedDate(Dates.create("2020-04-14T13:00:00Z"));
+    void testTokenOriginNotHttps() throws Exception {
         final AuthTokenValidator validator = getAuthTokenValidator("https://ria.ee", cache);
         assertThatThrownBy(() -> validator.validate(Tokens.ORIGIN_VALID_URL_NOT_HTTPS))
             .isInstanceOf(OriginMismatchException.class);

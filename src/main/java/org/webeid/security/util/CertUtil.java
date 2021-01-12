@@ -65,4 +65,8 @@ public final class CertUtil {
             .collect(Collectors.joining(", "));
     }
 
+    private CertUtil() {
+        throw new IllegalStateException("Utility class");
+    }
+
 }

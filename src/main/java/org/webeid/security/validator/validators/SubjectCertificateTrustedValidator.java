@@ -52,17 +52,17 @@ public final class SubjectCertificateTrustedValidator {
 
         final X509Certificate certificate = actualTokenData.getSubjectCertificate();
 
-        for (final X509Certificate trustedCACertificate : trustedCACertificates) {
+        for (final X509Certificate caCertificate : trustedCACertificates) {
             try {
-                certificate.verify(trustedCACertificate.getPublicKey());
-                if (certificate.getNotAfter().after(trustedCACertificate.getNotAfter())) {
+                certificate.verify(caCertificate.getPublicKey());
+                if (certificate.getNotAfter().after(caCertificate.getNotAfter())) {
                     throw new UserCertificateNotTrustedException("Trusted CA certificate expires earlier than the user certificate");
                 }
-                this.trustedCACertificate = trustedCACertificate;
+                this.trustedCACertificate = caCertificate;
                 LOG.debug("User certificate is signed with a trusted CA certificate");
                 return;
             } catch (GeneralSecurityException e) {
-                LOG.trace("Error verifying signer's certificate {} against CA certificate {}", certificate.getSubjectDN(), trustedCACertificate.getSubjectDN());
+                LOG.trace("Error verifying signer's certificate {} against CA certificate {}", certificate.getSubjectDN(), caCertificate.getSubjectDN());
             }
         }
         throw new UserCertificateNotTrustedException();

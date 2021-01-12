@@ -46,7 +46,7 @@ public abstract class AbstractTestWithCache {
     protected Cache<String, LocalDateTime> cache;
 
     @BeforeEach
-    public void setup() {
+    protected void setup() {
         cache = cacheManager.createCache(CACHE_NAME, cacheConfig);
     }
 

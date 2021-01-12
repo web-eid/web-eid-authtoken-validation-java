@@ -28,7 +28,7 @@ public abstract class AbstractTestWithValidatorAndCorrectNonce extends AbstractT
 
     @Override
     @BeforeEach
-    public void setup() {
+    protected void setup() {
         super.setup();
         putCorrectNonceToCache();
     }

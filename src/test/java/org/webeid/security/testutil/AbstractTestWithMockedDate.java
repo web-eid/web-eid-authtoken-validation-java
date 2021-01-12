@@ -30,7 +30,7 @@ public abstract class AbstractTestWithMockedDate extends AbstractTestWithCache {
 
     @Override
     @BeforeEach
-    public void setup() {
+    protected void setup() {
         super.setup();
         try {
             // Authentication token is valid until 2020-04-14

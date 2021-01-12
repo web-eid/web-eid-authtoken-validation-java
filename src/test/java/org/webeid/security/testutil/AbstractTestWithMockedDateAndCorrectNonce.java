@@ -28,7 +28,7 @@ public abstract class AbstractTestWithMockedDateAndCorrectNonce extends Abstract
 
     @Override
     @BeforeEach
-    public void setup() {
+    protected void setup() {
         super.setup();
         putCorrectNonceToCache();
     }

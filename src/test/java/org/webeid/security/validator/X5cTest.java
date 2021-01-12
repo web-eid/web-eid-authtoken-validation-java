@@ -35,11 +35,11 @@ import java.text.ParseException;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-public class X5cTest extends AbstractTestWithValidatorAndCorrectNonce {
+class X5cTest extends AbstractTestWithValidatorAndCorrectNonce {
 
     @Override
     @BeforeEach
-    public void setup() {
+    protected void setup() {
         super.setup();
         try {
             // Ensure that certificate is valid
@@ -50,48 +50,48 @@ public class X5cTest extends AbstractTestWithValidatorAndCorrectNonce {
     }
 
     @Test
-    public void testX5cMissing() {
+    void testX5cMissing() {
         assertThatThrownBy(() -> validator.validate(Tokens.X5C_MISSING))
             .isInstanceOf(TokenParseException.class)
             .hasMessageStartingWith("x5c field must be present");
     }
 
     @Test
-    public void testX5cNotArray() {
+    void testX5cNotArray() {
         assertThatThrownBy(() -> validator.validate(Tokens.X5C_NOT_ARRAY))
             .isInstanceOf(TokenParseException.class)
             .hasMessageStartingWith("x5c field in authentication token header must be an array");
     }
 
     @Test
-    public void testX5cEmpty() {
+    void testX5cEmpty() {
         assertThatThrownBy(() -> validator.validate(Tokens.X5C_EMPTY))
             .isInstanceOf(TokenParseException.class)
             .hasMessageStartingWith("Certificate from x5c field must not be empty");
     }
 
     @Test
-    public void testX5cNotString() {
+    void testX5cNotString() {
         assertThatThrownBy(() -> validator.validate(Tokens.X5C_NOT_STRING))
             .isInstanceOf(TokenParseException.class)
             .hasMessageStartingWith("x5c field in authentication token header must be an array of strings");
     }
 
     @Test
-    public void testX5cInvalidCertificate() {
+    void testX5cInvalidCertificate() {
         assertThatThrownBy(() -> validator.validate(Tokens.X5C_INVALID_CERTIFICATE))
             .isInstanceOf(TokenParseException.class)
             .hasMessageStartingWith("x5c field must contain a valid certificate");
     }
 
     @Test
-    public void testX5cMissingPurposeCertificate() {
+    void testX5cMissingPurposeCertificate() {
         assertThatThrownBy(() -> validator.validate(Tokens.X5C_MISSING_PURPOSE_CERTIFICATE))
             .isInstanceOf(UserCertificateMissingPurposeException.class);
     }
 
     @Test
-    public void testX5cWrongPurposeCertificate() {
+    void testX5cWrongPurposeCertificate() {
         assertThatThrownBy(() -> validator.validate(Tokens.X5C_WRONG_PURPOSE_CERTIFICATE))
             .isInstanceOf(UserCertificateWrongPurposeException.class);
     }

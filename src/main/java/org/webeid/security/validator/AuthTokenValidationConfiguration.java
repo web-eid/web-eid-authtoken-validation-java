@@ -38,7 +38,7 @@ import static org.webeid.security.nonce.NonceGeneratorBuilder.requirePositiveDur
 /**
  * Stores configuration parameters for {@link AuthTokenValidatorImpl}.
  */
-final class AuthTokenValidationConfiguration implements Cloneable {
+final class AuthTokenValidationConfiguration {
 
     private URI siteOrigin;
     private Cache<String, LocalDateTime> nonceCache;
@@ -48,6 +48,20 @@ final class AuthTokenValidationConfiguration implements Cloneable {
     private Duration allowedClientClockSkew = Duration.ofMinutes(3);
     private boolean isSiteCertificateFingerprintValidationEnabled = false;
     private String siteCertificateSha256Fingerprint;
+
+    AuthTokenValidationConfiguration() {
+    }
+
+    private AuthTokenValidationConfiguration(AuthTokenValidationConfiguration other) {
+        this.siteOrigin = other.siteOrigin;
+        this.nonceCache = other.nonceCache;
+        this.trustedCACertificates = new ArrayList<>(other.trustedCACertificates);
+        this.isUserCertificateRevocationCheckWithOcspEnabled = other.isUserCertificateRevocationCheckWithOcspEnabled;
+        this.ocspRequestTimeout = other.ocspRequestTimeout;
+        this.allowedClientClockSkew = other.allowedClientClockSkew;
+        this.isSiteCertificateFingerprintValidationEnabled = other.isSiteCertificateFingerprintValidationEnabled;
+        this.siteCertificateSha256Fingerprint = other.siteCertificateSha256Fingerprint;
+    }
 
     void setSiteOrigin(URI siteOrigin) {
         this.siteOrigin = siteOrigin;
@@ -127,14 +141,7 @@ final class AuthTokenValidationConfiguration implements Cloneable {
         }
     }
 
-    @Override
-    protected AuthTokenValidationConfiguration clone() {
-        try {
-            final AuthTokenValidationConfiguration clone = (AuthTokenValidationConfiguration) super.clone();
-            clone.trustedCACertificates = new ArrayList<>(trustedCACertificates);
-            return clone;
-        } catch (CloneNotSupportedException e) {
-            throw new AssertionError(); // Can't happen
-        }
+    AuthTokenValidationConfiguration copy() {
+        return new AuthTokenValidationConfiguration(this);
     }
 }

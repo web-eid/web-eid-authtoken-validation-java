@@ -35,10 +35,10 @@ import java.util.Date;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-public class ValidateTest extends AbstractTestWithMockedDateValidatorAndCorrectNonce {
+class ValidateTest extends AbstractTestWithMockedDateValidatorAndCorrectNonce {
 
     @Test
-    public void certificateIsNotValidYet() throws Exception {
+    void certificateIsNotValidYet() throws Exception {
         final Date certValidFrom = Dates.create("2018-10-17");
         Dates.setMockedDate(certValidFrom);
 
@@ -47,7 +47,7 @@ public class ValidateTest extends AbstractTestWithMockedDateValidatorAndCorrectN
     }
 
     @Test
-    public void certificateIsNoLongerValid() throws Exception {
+    void certificateIsNoLongerValid() throws Exception {
         final Date certValidFrom = Dates.create("2023-10-19");
         Dates.setMockedDate(certValidFrom);
 
@@ -56,14 +56,14 @@ public class ValidateTest extends AbstractTestWithMockedDateValidatorAndCorrectN
     }
 
     @Test
-    public void testTokenTooShort() {
+    void testTokenTooShort() {
         assertThatThrownBy(() -> validator.validate(Tokens.TOKEN_TOO_SHORT))
             .isInstanceOf(TokenParseException.class)
             .hasMessageStartingWith("Auth token is null or too short");
     }
 
     @Test
-    public void testTokenTooLong() {
+    void testTokenTooLong() {
         assertThatThrownBy(() -> validator.validate(Tokens.TOKEN_TOO_LONG))
             .isInstanceOf(TokenParseException.class)
             .hasMessageStartingWith("Auth token is too long");

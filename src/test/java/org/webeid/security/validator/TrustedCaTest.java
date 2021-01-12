@@ -33,13 +33,13 @@ import java.security.cert.CertificateException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.webeid.security.testutil.AuthTokenValidators.getAuthTokenValidatorWithWrongTrustedCA;
 
-public class TrustedCaTest extends AbstractTestWithMockedDateAndCorrectNonce {
+class TrustedCaTest extends AbstractTestWithMockedDateAndCorrectNonce {
 
     private AuthTokenValidator validator;
 
     @Override
     @BeforeEach
-    public void setup() {
+    protected void setup() {
         super.setup();
         try {
             validator = getAuthTokenValidatorWithWrongTrustedCA(cache);
@@ -49,7 +49,7 @@ public class TrustedCaTest extends AbstractTestWithMockedDateAndCorrectNonce {
     }
 
     @Test
-    public void detectUntrustedUserCertificate() {
+    void detectUntrustedUserCertificate() {
         assertThatThrownBy(() -> validator.validate(Tokens.SIGNED))
             .isInstanceOf(UserCertificateNotTrustedException.class);
     }

@@ -34,13 +34,13 @@ import java.security.cert.CertificateException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.webeid.security.testutil.AuthTokenValidators.getAuthTokenValidatorWithOcspCheck;
 
-public class OcspTest extends AbstractTestWithMockedDateAndCorrectNonce {
+class OcspTest extends AbstractTestWithMockedDateAndCorrectNonce {
 
     private AuthTokenValidator validator;
 
     @Override
     @BeforeEach
-    public void setup() {
+    protected void setup() {
         super.setup();
         try {
             validator = getAuthTokenValidatorWithOcspCheck(cache);
@@ -50,7 +50,7 @@ public class OcspTest extends AbstractTestWithMockedDateAndCorrectNonce {
     }
 
     @Test
-    public void detectRevokedUserCertificate() {
+    void detectRevokedUserCertificate() {
         // This test used to have flaky results, due to occasionally failing
         // OCSP requests. Therefore, the failed revocation check is now handled
         // as passing.

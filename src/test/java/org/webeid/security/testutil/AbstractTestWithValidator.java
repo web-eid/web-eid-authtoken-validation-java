@@ -35,7 +35,7 @@ public class AbstractTestWithValidator extends AbstractTestWithCache {
 
     @Override
     @BeforeEach
-    public void setup() {
+    protected void setup() {
         super.setup();
         try {
             validator = getAuthTokenValidator(cache);

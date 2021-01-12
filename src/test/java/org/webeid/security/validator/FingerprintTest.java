@@ -31,10 +31,10 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.webeid.security.testutil.AuthTokenValidators.getAuthTokenValidator;
 
-public class FingerprintTest extends AbstractTestWithMockedDateAndCorrectNonce {
+class FingerprintTest extends AbstractTestWithMockedDateAndCorrectNonce {
 
     @Test
-    public void validateFingerprint() throws Exception {
+    void validateFingerprint() throws Exception {
         final AuthTokenValidator validator = getAuthTokenValidator(cache,
             "urn:cert:sha-256:6f0df244e4a856b94b3b3b47582a0a51a32d674dbc7107211ed23d4bec6d9c72");
         assertThatCode(() -> validator.validate(Tokens.SIGNED))
@@ -42,7 +42,7 @@ public class FingerprintTest extends AbstractTestWithMockedDateAndCorrectNonce {
     }
 
     @Test
-    public void validateInvalidFingerprint() throws Exception {
+    void validateInvalidFingerprint() throws Exception {
         final AuthTokenValidator validator = getAuthTokenValidator(cache,
             "abcde6f0df244e4a856b94b3b3b47582a0a51a32d674dbc7107211ed23d4bec6d9c72");
         assertThatThrownBy(() -> validator.validate(Tokens.SIGNED))
@@ -50,7 +50,7 @@ public class FingerprintTest extends AbstractTestWithMockedDateAndCorrectNonce {
     }
 
     @Test
-    public void testMismatchingSiteCertificateFingerprint() throws Exception {
+    void testMismatchingSiteCertificateFingerprint() throws Exception {
         final AuthTokenValidator validator = getAuthTokenValidator(cache,
             "urn:cert:sha-256:6f0df244e4a856b94b3b3b47582a0a51a32d674dbc7107211ed23d4bec6d9c72");
         assertThatThrownBy(() -> validator.validate(Tokens.MISMATCHING_SITE_CERTIFICATE_FINGERPRINT))

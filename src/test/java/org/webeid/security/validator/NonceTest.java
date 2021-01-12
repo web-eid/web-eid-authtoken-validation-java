@@ -32,24 +32,24 @@ import org.webeid.security.testutil.Tokens;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-public class NonceTest extends AbstractTestWithValidator {
+class NonceTest extends AbstractTestWithValidator {
 
     @Test
-    public void validateIncorrectNonce() {
+    void validateIncorrectNonce() {
         putIncorrectNonceToCache();
         assertThatThrownBy(() -> validator.validate(Tokens.SIGNED))
             .isInstanceOf(NonceNotFoundException.class);
     }
 
     @Test
-    public void validateExpiredNonce() {
+    void validateExpiredNonce() {
         putExpiredNonceToCache();
         assertThatThrownBy(() -> validator.validate(Tokens.SIGNED))
             .isInstanceOf(NonceExpiredException.class);
     }
 
     @Test
-    public void testNonceMissing() throws Exception {
+    void testNonceMissing() throws Exception {
         Dates.setMockedDate(Dates.create("2020-04-14T13:00:00Z"));
         assertThatThrownBy(() -> validator.validate(Tokens.NONCE_MISSING))
             .isInstanceOf(TokenParseException.class)
@@ -57,7 +57,7 @@ public class NonceTest extends AbstractTestWithValidator {
     }
 
     @Test
-    public void testNonceEmpty() throws Exception {
+    void testNonceEmpty() throws Exception {
         Dates.setMockedDate(Dates.create("2020-04-14T13:00:00Z"));
         assertThatThrownBy(() -> validator.validate(Tokens.NONCE_EMPTY))
             .isInstanceOf(TokenParseException.class)
@@ -65,14 +65,14 @@ public class NonceTest extends AbstractTestWithValidator {
     }
 
     @Test
-    public void testTokenNonceNotString() throws Exception {
+    void testTokenNonceNotString() throws Exception {
         Dates.setMockedDate(Dates.create("2020-04-14T13:00:00Z"));
         assertThatThrownBy(() -> validator.validate(Tokens.NONCE_NOT_STRING))
             .isInstanceOf(TokenParseException.class);
     }
 
     @Test
-    public void testNonceTooShort() throws Exception {
+    void testNonceTooShort() throws Exception {
         Dates.setMockedDate(Dates.create("2020-04-14T13:00:00Z"));
         putTooShortNonceToCache();
         assertThatThrownBy(() -> validator.validate(Tokens.NONCE_TOO_SHORT))

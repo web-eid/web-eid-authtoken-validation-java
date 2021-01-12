@@ -41,4 +41,8 @@ public final class TitleCase {
         return titleCase.toString();
     }
 
+    private TitleCase() {
+        throw new IllegalStateException("Utility class");
+    }
+
 }

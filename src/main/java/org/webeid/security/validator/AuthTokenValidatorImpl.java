@@ -22,7 +22,6 @@
 
 package org.webeid.security.validator;
 
-import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
@@ -32,6 +31,7 @@ import org.webeid.security.exceptions.TokenValidationException;
 import org.webeid.security.validator.validators.*;
 
 import java.security.cert.X509Certificate;
+import java.util.function.Supplier;
 
 /**
  * Provides default implementation of {@link AuthTokenValidator}.
@@ -56,8 +56,8 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
      * @param configuration configuration parameters for the token validator
      */
     AuthTokenValidatorImpl(AuthTokenValidationConfiguration configuration) {
-        // Clone the configuration object to make AuthTokenValidatorImpl immutable and thread-safe.
-        this.configuration = configuration.clone();
+        // Copy the configuration object to make AuthTokenValidatorImpl immutable and thread-safe.
+        this.configuration = configuration.copy();
         /*
          * Lazy initialization, avoid constructing the OkHttpClient object when certificate revocation check is not enabled.
          * Returns a supplier which caches the instance retrieved during the first call to get() and returns
@@ -80,6 +80,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         ).addOptional(configuration.isSiteCertificateFingerprintValidationEnabled(),
             new SiteCertificateFingerprintValidator(configuration.getSiteCertificateSha256Fingerprint())::validateSiteCertificateFingerprint
         );
+
     }
 
     @Override
@@ -99,14 +100,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
 
             simpleSubjectCertificateValidators.executeFor(actualTokenData);
 
-            final SubjectCertificateTrustedValidator certTrustedValidator =
-                new SubjectCertificateTrustedValidator(configuration.getTrustedCACertificates());
-            final ValidatorBatch certTrustValidators = ValidatorBatch.createFrom(
-                certTrustedValidator::validateCertificateTrusted
-            ).addOptional(configuration.isUserCertificateRevocationCheckWithOcspEnabled(),
-                new SubjectCertificateNotRevokedValidator(certTrustedValidator, httpClientSupplier.get())::validateCertificateNotRevoked
-            );
-            certTrustValidators.executeFor(actualTokenData);
+            getCertTrustValidators().executeFor(actualTokenData);
 
             authTokenParser.validateTokenSignatureAndParseClaims();
             authTokenParser.populateDataFromClaims(actualTokenData);
@@ -117,9 +111,27 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
             return actualTokenData.getSubjectCertificate();
 
         } catch (Exception e) {
+            // Generally "log and rethrow" is an anti-pattern, but it fits with the surrounding logging style.
             LOG.warn("Token parsing and validation was interrupted:", e);
             throw e;
         }
     }
 
+    /**
+     * Creates the certificate trust validator batch.
+     * As SubjectCertificateTrustedValidator has mutable state that SubjectCertificateNotRevokedValidator depends on,
+     * they cannot be reused/cached in an instance variable in a multi-threaded environment. Hence they are
+     * re-created for each validation run for thread safety.
+     *
+     * @return certificate trust validator batch
+     */
+    private ValidatorBatch getCertTrustValidators() {
+        final SubjectCertificateTrustedValidator certTrustedValidator =
+            new SubjectCertificateTrustedValidator(configuration.getTrustedCACertificates());
+        return ValidatorBatch.createFrom(
+            certTrustedValidator::validateCertificateTrusted
+        ).addOptional(configuration.isUserCertificateRevocationCheckWithOcspEnabled(),
+            new SubjectCertificateNotRevokedValidator(certTrustedValidator, httpClientSupplier.get())::validateCertificateNotRevoked
+        );
+    }
 }

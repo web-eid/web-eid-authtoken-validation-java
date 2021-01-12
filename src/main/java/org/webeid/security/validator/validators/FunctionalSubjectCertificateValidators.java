@@ -74,4 +74,8 @@ public final class FunctionalSubjectCertificateValidators {
             throw new UserCertificateParseException(e);
         }
     }
+
+    private FunctionalSubjectCertificateValidators() {
+        throw new IllegalStateException("Functional class");
+    }
 }

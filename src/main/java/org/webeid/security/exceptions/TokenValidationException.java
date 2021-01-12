@@ -26,11 +26,11 @@ package org.webeid.security.exceptions;
  * Base class for all authentication token validation exceptions.
  */
 public abstract class TokenValidationException extends Exception {
-    public TokenValidationException(String msg) {
+    protected TokenValidationException(String msg) {
         super(msg);
     }
 
-    public TokenValidationException(String msg, Throwable cause) {
+    protected TokenValidationException(String msg, Throwable cause) {
         super(msg, cause);
     }
 }
