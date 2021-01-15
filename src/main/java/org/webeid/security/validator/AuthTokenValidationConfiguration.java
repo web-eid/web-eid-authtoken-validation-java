@@ -22,6 +22,8 @@
 
 package org.webeid.security.validator;
 
+import com.google.common.collect.Sets;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.webeid.security.validator.validators.OriginValidator;
 
 import javax.cache.Cache;
@@ -29,11 +31,12 @@ import java.net.URI;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Objects;
 
 import static org.webeid.security.nonce.NonceGeneratorBuilder.requirePositiveDuration;
+import static org.webeid.security.util.SubjectCertificatePolicies.EST_MOBILE_ID_POLICY;
 
 /**
  * Stores configuration parameters for {@link AuthTokenValidatorImpl}.
@@ -42,12 +45,14 @@ final class AuthTokenValidationConfiguration {
 
     private URI siteOrigin;
     private Cache<String, LocalDateTime> nonceCache;
-    private Collection<X509Certificate> trustedCACertificates = new ArrayList<>();
+    private Collection<X509Certificate> trustedCACertificates = new HashSet<>();
     private boolean isUserCertificateRevocationCheckWithOcspEnabled = true;
     private Duration ocspRequestTimeout = Duration.ofSeconds(5);
     private Duration allowedClientClockSkew = Duration.ofMinutes(3);
     private boolean isSiteCertificateFingerprintValidationEnabled = false;
     private String siteCertificateSha256Fingerprint;
+    // Don't allow Estonian Mobile-ID policy by default.
+    private Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies = Sets.newHashSet(EST_MOBILE_ID_POLICY);
 
     AuthTokenValidationConfiguration() {
     }
@@ -55,12 +60,13 @@ final class AuthTokenValidationConfiguration {
     private AuthTokenValidationConfiguration(AuthTokenValidationConfiguration other) {
         this.siteOrigin = other.siteOrigin;
         this.nonceCache = other.nonceCache;
-        this.trustedCACertificates = new ArrayList<>(other.trustedCACertificates);
+        this.trustedCACertificates = new HashSet<>(other.trustedCACertificates);
         this.isUserCertificateRevocationCheckWithOcspEnabled = other.isUserCertificateRevocationCheckWithOcspEnabled;
         this.ocspRequestTimeout = other.ocspRequestTimeout;
         this.allowedClientClockSkew = other.allowedClientClockSkew;
         this.isSiteCertificateFingerprintValidationEnabled = other.isSiteCertificateFingerprintValidationEnabled;
         this.siteCertificateSha256Fingerprint = other.siteCertificateSha256Fingerprint;
+        this.disallowedSubjectCertificatePolicies = new HashSet<>(other.disallowedSubjectCertificatePolicies);
     }
 
     void setSiteOrigin(URI siteOrigin) {
@@ -144,4 +150,9 @@ final class AuthTokenValidationConfiguration {
     AuthTokenValidationConfiguration copy() {
         return new AuthTokenValidationConfiguration(this);
     }
+
+    public Collection<ASN1ObjectIdentifier> getDisallowedSubjectCertificatePolicies() {
+        return disallowedSubjectCertificatePolicies;
+    }
+
 }
