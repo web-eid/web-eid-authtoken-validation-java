@@ -22,6 +22,7 @@
 
 package org.webeid.security.validator;
 
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,7 +31,7 @@ import java.net.URI;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.Arrays;
+import java.util.Collections;
 
 /**
  * Builder for constructing {@link AuthTokenValidator} instances.
@@ -81,8 +82,22 @@ public class AuthTokenValidatorBuilder {
      * @return the builder instance for method chaining
      */
     public AuthTokenValidatorBuilder withTrustedCertificateAuthorities(X509Certificate... certificates) {
-        configuration.getTrustedCACertificates().addAll(Arrays.asList(certificates));
+        Collections.addAll(configuration.getTrustedCACertificates(), certificates);
         LOG.debug("Trusted certificate authorities set to {}", configuration.getTrustedCACertificates());
+        return this;
+    }
+
+    /**
+     * Sets the list of disallowed user certificate policies.
+     * In order for the user certificate to be considered valid, it must not contain any policies
+     * present in this list.
+     *
+     * @param policies disallowed user certificate policies
+     * @return the builder instance for method chaining
+     */
+    public AuthTokenValidatorBuilder withDisallowedCertificatePolicies(ASN1ObjectIdentifier... policies) {
+        Collections.addAll(configuration.getDisallowedSubjectCertificatePolicies(), policies);
+        LOG.debug("Disallowed subject certificate policies set to {}", configuration.getDisallowedSubjectCertificatePolicies());
         return this;
     }
 

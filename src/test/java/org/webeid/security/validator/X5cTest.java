@@ -24,9 +24,7 @@ package org.webeid.security.validator;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.webeid.security.exceptions.TokenParseException;
-import org.webeid.security.exceptions.UserCertificateMissingPurposeException;
-import org.webeid.security.exceptions.UserCertificateWrongPurposeException;
+import org.webeid.security.exceptions.*;
 import org.webeid.security.testutil.AbstractTestWithValidatorAndCorrectNonce;
 import org.webeid.security.testutil.Dates;
 import org.webeid.security.testutil.Tokens;
@@ -96,4 +94,15 @@ class X5cTest extends AbstractTestWithValidatorAndCorrectNonce {
             .isInstanceOf(UserCertificateWrongPurposeException.class);
     }
 
+    @Test
+    void testX5cWrongPolicyCertificate() {
+        assertThatThrownBy(() -> validator.validate(Tokens.X5C_WRONG_POLICY_CERTIFICATE))
+            .isInstanceOf(UserCertificateDisallowedPolicyException.class);
+    }
+
+    @Test
+    void testMobileIDCertificate() {
+        assertThatThrownBy(() -> validator.validate(Tokens.X5C_MOBILE_ID_CERTIFICATE))
+            .isInstanceOf(UserCertificateMissingPurposeException.class);
+    }
 }

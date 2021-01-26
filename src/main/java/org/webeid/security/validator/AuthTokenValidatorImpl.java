@@ -72,7 +72,8 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
 
         simpleSubjectCertificateValidators = ValidatorBatch.createFrom(
             FunctionalSubjectCertificateValidators::validateCertificateExpiry,
-            FunctionalSubjectCertificateValidators::validateCertificatePurpose
+            FunctionalSubjectCertificateValidators::validateCertificatePurpose,
+            new SubjectCertificatePolicyValidator(configuration.getDisallowedSubjectCertificatePolicies())::validateCertificatePolicies
         );
         tokenBodyValidators = ValidatorBatch.createFrom(
             new NonceValidator(configuration.getNonceCache())::validateNonce,
