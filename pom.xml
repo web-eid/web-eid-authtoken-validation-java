@@ -5,22 +5,20 @@
     <modelVersion>4.0.0</modelVersion>
     <artifactId>authtoken-validation</artifactId>
     <groupId>org.webeid.security</groupId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <packaging>jar</packaging>
     <name>authtoken-validation</name>
     <description>Web eID authentication token validation library for Java</description>
 
     <properties>
-        <!-- Build properties -->
         <maven.version>3.3.9</maven.version>
-        <maven-surefire-plugin.version>2.22.1</maven-surefire-plugin.version>
+        <maven-surefire-plugin.version>2.22.2</maven-surefire-plugin.version>
         <java.version>1.8</java.version>
         <jjwt.version>0.11.2</jjwt.version>
         <slf4j.version>1.7.30</slf4j.version>
         <caffeine.version>2.8.5</caffeine.version>
         <junit-jupiter.version>5.6.2</junit-jupiter.version>
         <assertj.version>3.17.2</assertj.version>
-        <jmockit.version>1.44</jmockit.version>
         <jacoco.version>0.8.5</jacoco.version>
         <sonar.coverage.jacoco.xmlReportPaths>
             ${project.basedir}/../jacoco-coverage-report/target/site/jacoco-aggregate/jacoco.xml
@@ -93,12 +91,6 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.jmockit</groupId>
-            <artifactId>jmockit</artifactId>
-            <version>${jmockit.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
             <version>${slf4j.version}</version>
@@ -121,13 +113,10 @@
     <build>
         <plugins>
             <plugin>
+                <!-- Surefire plugin 2.22+ is needed for JUnit 5 -->
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven-surefire-plugin.version}</version>
-                <configuration>
-                    <argLine>
-                        @{argLine} -javaagent:${settings.localRepository}/org/jmockit/jmockit/${jmockit.version}/jmockit-${jmockit.version}.jar
-                    </argLine>
-                </configuration>
             </plugin>
             <plugin>
                 <!-- Generate a coverage XML file for Sonar -->
@@ -152,21 +141,15 @@
         </plugins>
     </build>
 
-    <!-- For publishing the library in GitLab Maven repository, remove later -->
-    <repositories>
-        <repository>
-            <id>gitlab-maven</id>
-            <url>https://gitlab.com/api/v4/projects/${env.CI_PROJECT_ID}/packages/maven</url>
-        </repository>
-    </repositories>
+    <!-- For publishing the library to GitHub Packages -->
     <distributionManagement>
         <repository>
-            <id>gitlab-maven</id>
-            <url>https://gitlab.com/api/v4/projects/${env.CI_PROJECT_ID}/packages/maven</url>
+            <id>github</id>
+            <url>https://maven.pkg.github.com/web-eid/web-eid-authtoken-validation-java</url>
         </repository>
         <snapshotRepository>
-            <id>gitlab-maven</id>
-            <url>https://gitlab.com/api/v4/projects/${env.CI_PROJECT_ID}/packages/maven</url>
+            <id>github</id>
+            <url>https://maven.pkg.github.com/web-eid/web-eid-authtoken-validation-java</url>
         </snapshotRepository>
     </distributionManagement>
 
