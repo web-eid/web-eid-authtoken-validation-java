@@ -24,7 +24,10 @@ package org.webeid.security.validator;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.webeid.security.exceptions.*;
+import org.webeid.security.exceptions.TokenParseException;
+import org.webeid.security.exceptions.UserCertificateDisallowedPolicyException;
+import org.webeid.security.exceptions.UserCertificateMissingPurposeException;
+import org.webeid.security.exceptions.UserCertificateWrongPurposeException;
 import org.webeid.security.testutil.AbstractTestWithValidatorAndCorrectNonce;
 import org.webeid.security.testutil.Dates;
 import org.webeid.security.testutil.Tokens;
@@ -32,6 +35,7 @@ import org.webeid.security.testutil.Tokens;
 import java.text.ParseException;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.webeid.security.testutil.Dates.setMockedDefaultJwtParserDate;
 
 class X5cTest extends AbstractTestWithValidatorAndCorrectNonce {
 
@@ -41,8 +45,8 @@ class X5cTest extends AbstractTestWithValidatorAndCorrectNonce {
         super.setup();
         try {
             // Ensure that certificate is valid
-            Dates.setMockedDate(Dates.create("2020-09-25"));
-        } catch (ParseException e) {
+            setMockedDefaultJwtParserDate(Dates.create("2020-09-25"));
+        } catch (ParseException | NoSuchFieldException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
     }

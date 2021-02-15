@@ -30,13 +30,14 @@ import org.webeid.security.testutil.Tokens;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.webeid.security.testutil.Dates.setMockedDefaultJwtParserDate;
 
 class ClockSkewTest extends AbstractTestWithValidatorAndCorrectNonce {
 
     @Test
     void blockLargeClockSkew4min() throws Exception {
         // Authentication token expires at 2020-04-14 13:32:49
-        Dates.setMockedDate(Dates.create("2020-04-14T13:36:49Z"));
+        setMockedDefaultJwtParserDate(Dates.create("2020-04-14T13:36:49Z"));
         assertThatThrownBy(() -> validator.validate(Tokens.SIGNED))
             .isInstanceOf(TokenExpiredException.class);
     }
@@ -44,7 +45,7 @@ class ClockSkewTest extends AbstractTestWithValidatorAndCorrectNonce {
     @Test
     void allowSmallClockSkew2min() throws Exception {
         // Authentication token expires at 2020-04-14 13:32:49
-        Dates.setMockedDate(Dates.create("2020-04-14T13:30:49Z"));
+        setMockedDefaultJwtParserDate(Dates.create("2020-04-14T13:30:49Z"));
         assertThatCode(() -> validator.validate(Tokens.SIGNED))
             .doesNotThrowAnyException();
     }

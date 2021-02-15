@@ -31,6 +31,7 @@ import org.webeid.security.testutil.Dates;
 import org.webeid.security.testutil.Tokens;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.webeid.security.testutil.Dates.setMockedDefaultJwtParserDate;
 
 class NonceTest extends AbstractTestWithValidator {
 
@@ -50,7 +51,7 @@ class NonceTest extends AbstractTestWithValidator {
 
     @Test
     void testNonceMissing() throws Exception {
-        Dates.setMockedDate(Dates.create("2020-04-14T13:00:00Z"));
+        setMockedDefaultJwtParserDate(Dates.create("2020-04-14T13:00:00Z"));
         assertThatThrownBy(() -> validator.validate(Tokens.NONCE_MISSING))
             .isInstanceOf(TokenParseException.class)
             .hasMessageStartingWith("nonce field must be present and not empty in authentication token body");
@@ -58,7 +59,7 @@ class NonceTest extends AbstractTestWithValidator {
 
     @Test
     void testNonceEmpty() throws Exception {
-        Dates.setMockedDate(Dates.create("2020-04-14T13:00:00Z"));
+        setMockedDefaultJwtParserDate(Dates.create("2020-04-14T13:00:00Z"));
         assertThatThrownBy(() -> validator.validate(Tokens.NONCE_EMPTY))
             .isInstanceOf(TokenParseException.class)
             .hasMessageStartingWith("nonce field must be present and not empty in authentication token body");
@@ -66,14 +67,14 @@ class NonceTest extends AbstractTestWithValidator {
 
     @Test
     void testTokenNonceNotString() throws Exception {
-        Dates.setMockedDate(Dates.create("2020-04-14T13:00:00Z"));
+        setMockedDefaultJwtParserDate(Dates.create("2020-04-14T13:00:00Z"));
         assertThatThrownBy(() -> validator.validate(Tokens.NONCE_NOT_STRING))
             .isInstanceOf(TokenParseException.class);
     }
 
     @Test
     void testNonceTooShort() throws Exception {
-        Dates.setMockedDate(Dates.create("2020-04-14T13:00:00Z"));
+        setMockedDefaultJwtParserDate(Dates.create("2020-04-14T13:00:00Z"));
         putTooShortNonceToCache();
         assertThatThrownBy(() -> validator.validate(Tokens.NONCE_TOO_SHORT))
             .isInstanceOf(TokenParseException.class);

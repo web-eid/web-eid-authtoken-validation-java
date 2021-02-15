@@ -22,7 +22,7 @@
 
 package org.webeid.security.validator;
 
-
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.webeid.security.exceptions.TokenParseException;
 import org.webeid.security.exceptions.UserCertificateExpiredException;
@@ -34,13 +34,26 @@ import org.webeid.security.testutil.Tokens;
 import java.util.Date;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.webeid.security.testutil.Dates.resetMockedFunctionalSubjectCertificateValidatorsDate;
+import static org.webeid.security.testutil.Dates.setMockedFunctionalSubjectCertificateValidatorsDate;
 
 class ValidateTest extends AbstractTestWithMockedDateValidatorAndCorrectNonce {
+
+    @Override
+    @AfterEach
+    public void tearDown() {
+        super.tearDown();
+        try {
+            resetMockedFunctionalSubjectCertificateValidatorsDate();
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     @Test
     void certificateIsNotValidYet() throws Exception {
         final Date certValidFrom = Dates.create("2018-10-17");
-        Dates.setMockedDate(certValidFrom);
+        setMockedFunctionalSubjectCertificateValidatorsDate(certValidFrom);
 
         assertThatThrownBy(() -> validator.validate(Tokens.SIGNED))
             .isInstanceOf(UserCertificateNotYetValidException.class);
@@ -49,7 +62,7 @@ class ValidateTest extends AbstractTestWithMockedDateValidatorAndCorrectNonce {
     @Test
     void certificateIsNoLongerValid() throws Exception {
         final Date certValidFrom = Dates.create("2023-10-19");
-        Dates.setMockedDate(certValidFrom);
+        setMockedFunctionalSubjectCertificateValidatorsDate(certValidFrom);
 
         assertThatThrownBy(() -> validator.validate(Tokens.SIGNED))
             .isInstanceOf(UserCertificateExpiredException.class);
