@@ -22,6 +22,7 @@
 
 package org.webeid.security.validator.validators;
 
+import io.jsonwebtoken.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.webeid.security.exceptions.*;
@@ -30,6 +31,7 @@ import org.webeid.security.validator.AuthTokenValidatorData;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.CertificateParsingException;
+import java.util.Date;
 import java.util.List;
 
 public final class FunctionalSubjectCertificateValidators {
@@ -45,7 +47,8 @@ public final class FunctionalSubjectCertificateValidators {
      */
     public static void validateCertificateExpiry(AuthTokenValidatorData actualTokenData) throws TokenValidationException {
         try {
-            actualTokenData.getSubjectCertificate().checkValidity();
+            // Use JJWT Clock interface so that the date can be mocked in tests.
+            actualTokenData.getSubjectCertificate().checkValidity(DefaultClock.INSTANCE.now());
             LOG.debug("User certificate is valid.");
         } catch (CertificateNotYetValidException e) {
             throw new UserCertificateNotYetValidException(e);
@@ -77,5 +80,15 @@ public final class FunctionalSubjectCertificateValidators {
 
     private FunctionalSubjectCertificateValidators() {
         throw new IllegalStateException("Functional class");
+    }
+
+    public static class DefaultClock implements Clock {
+
+        public static final Clock INSTANCE = new DefaultClock();
+
+        public Date now() {
+            return new Date();
+        }
+
     }
 }

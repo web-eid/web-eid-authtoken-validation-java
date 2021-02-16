@@ -26,6 +26,8 @@ import org.junit.jupiter.api.BeforeEach;
 
 import java.text.ParseException;
 
+import static org.webeid.security.testutil.Dates.setMockedDefaultJwtParserDate;
+
 public abstract class AbstractTestWithMockedDate extends AbstractTestWithCache {
 
     @Override
@@ -34,8 +36,8 @@ public abstract class AbstractTestWithMockedDate extends AbstractTestWithCache {
         super.setup();
         try {
             // Authentication token is valid until 2020-04-14
-            Dates.setMockedDate(Dates.create("2020-04-11"));
-        } catch (ParseException e) {
+            setMockedDefaultJwtParserDate(Dates.create("2020-04-11"));
+        } catch (ParseException | NoSuchFieldException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
     }

@@ -23,9 +23,12 @@
 package org.webeid.security.testutil;
 
 import com.fasterxml.jackson.databind.util.StdDateFormat;
-import mockit.Mock;
-import mockit.MockUp;
+import io.jsonwebtoken.Clock;
+import io.jsonwebtoken.impl.DefaultClock;
+import org.webeid.security.validator.validators.FunctionalSubjectCertificateValidators;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.text.ParseException;
 import java.util.Date;
 
@@ -36,13 +39,31 @@ public final class Dates {
         return STD_DATE_FORMAT.parse(iso8601Date);
     }
 
-    public static void setMockedDate(Date mockedDate) {
-        new MockUp<System>() {
-            @Mock
-            public long currentTimeMillis() {
-                return mockedDate.getTime();
-            }
-        };
+    public static void setMockedDefaultJwtParserDate(Date mockedDate) throws NoSuchFieldException, IllegalAccessException {
+        setClockField(DefaultClock.class, mockedDate);
+    }
+
+    public static void setMockedFunctionalSubjectCertificateValidatorsDate(Date mockedDate) throws NoSuchFieldException, IllegalAccessException {
+        setClockField(FunctionalSubjectCertificateValidators.DefaultClock.class, mockedDate);
+    }
+
+    public static void resetMockedFunctionalSubjectCertificateValidatorsDate() throws NoSuchFieldException, IllegalAccessException {
+        setClockField(FunctionalSubjectCertificateValidators.DefaultClock.class, new Date());
+    }
+
+    private static void setClockField(Class<? extends Clock> cls, Date date) throws NoSuchFieldException, IllegalAccessException {
+        final Field clockField = cls.getDeclaredField("INSTANCE");
+        setFinalStaticField(clockField, (Clock) () -> date);
+    }
+
+    private static void setFinalStaticField(Field field, Object newValue) throws NoSuchFieldException, IllegalAccessException {
+        field.setAccessible(true);
+
+        final Field modifiersField = Field.class.getDeclaredField("modifiers");
+        modifiersField.setAccessible(true);
+        modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
+
+        field.set(null, newValue);
     }
 
 }

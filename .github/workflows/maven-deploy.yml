@@ -1,6 +1,8 @@
-name: Maven build
+name: Deploy to Github Packages
 
-on: [ push, pull_request ]
+on:
+  release:
+    types: [ created ]
 
 jobs:
   build:
@@ -20,8 +22,7 @@ jobs:
           key: ${{ runner.os }}-m2-v8-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2-v8
 
-      - name: Build
-        run: mvn --batch-mode compile
-
-      - name: Test
-        run: mvn --batch-mode verify
+      - name: Deploy to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mvn --batch-mode deploy
