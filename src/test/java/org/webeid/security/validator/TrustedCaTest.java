@@ -51,7 +51,8 @@ class TrustedCaTest extends AbstractTestWithMockedDateAndCorrectNonce {
     @Test
     void detectUntrustedUserCertificate() {
         assertThatThrownBy(() -> validator.validate(Tokens.SIGNED))
-            .isInstanceOf(UserCertificateNotTrustedException.class);
+            .isInstanceOf(UserCertificateNotTrustedException.class)
+            .hasMessageStartingWith("User certificate is not trusted: User certificate CA is not in the trusted CA list");
     }
 
 }

@@ -27,19 +27,24 @@ import org.slf4j.LoggerFactory;
 import org.webeid.security.exceptions.UserCertificateNotTrustedException;
 import org.webeid.security.validator.AuthTokenValidatorData;
 
+import javax.security.auth.x500.X500Principal;
 import java.security.GeneralSecurityException;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public final class SubjectCertificateTrustedValidator {
 
     private static final Logger LOG = LoggerFactory.getLogger(SubjectCertificateTrustedValidator.class);
 
-    private final Collection<X509Certificate> trustedCACertificates;
+    private final Map<X500Principal, X509Certificate> trustedCACertificates;
     private X509Certificate trustedCACertificate;
 
     public SubjectCertificateTrustedValidator(Collection<X509Certificate> trustedCACertificates) {
-        this.trustedCACertificates = trustedCACertificates;
+        this.trustedCACertificates = trustedCACertificates.stream()
+            .collect(Collectors.toMap(X509Certificate::getSubjectX500Principal, Function.identity()));
     }
 
     /**
@@ -50,22 +55,24 @@ public final class SubjectCertificateTrustedValidator {
      */
     public void validateCertificateTrusted(AuthTokenValidatorData actualTokenData) throws UserCertificateNotTrustedException {
 
-        final X509Certificate certificate = actualTokenData.getSubjectCertificate();
+        final X509Certificate userCertificate = actualTokenData.getSubjectCertificate();
+        final X509Certificate caCertificate = trustedCACertificates.get(userCertificate.getIssuerX500Principal());
 
-        for (final X509Certificate caCertificate : trustedCACertificates) {
-            try {
-                certificate.verify(caCertificate.getPublicKey());
-                if (certificate.getNotAfter().after(caCertificate.getNotAfter())) {
-                    throw new UserCertificateNotTrustedException("Trusted CA certificate expires earlier than the user certificate");
-                }
-                this.trustedCACertificate = caCertificate;
-                LOG.debug("User certificate is signed with a trusted CA certificate");
-                return;
-            } catch (GeneralSecurityException e) {
-                LOG.trace("Error verifying signer's certificate {} against CA certificate {}", certificate.getSubjectDN(), caCertificate.getSubjectDN());
-            }
+        if (caCertificate == null) {
+            throw new UserCertificateNotTrustedException("User certificate CA is not in the trusted CA list");
         }
-        throw new UserCertificateNotTrustedException();
+
+        try {
+            userCertificate.verify(caCertificate.getPublicKey());
+            if (userCertificate.getNotAfter().after(caCertificate.getNotAfter())) {
+                throw new UserCertificateNotTrustedException("Trusted CA certificate expires earlier than the user certificate");
+            }
+            this.trustedCACertificate = caCertificate;
+            LOG.debug("User certificate is signed with a trusted CA certificate");
+        } catch (GeneralSecurityException e) {
+            LOG.trace("Error verifying signer's certificate {} against CA certificate {}", userCertificate.getSubjectDN(), caCertificate.getSubjectDN());
+            throw new UserCertificateNotTrustedException();
+        }
     }
 
     public X509Certificate getSubjectCertificateIssuerCertificate() {
