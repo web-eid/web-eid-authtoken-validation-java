@@ -23,5 +23,5 @@ jobs:
       - name: Build
         run: mvn --batch-mode compile
 
-      - name: Test
-        run: mvn --batch-mode verify
+      - name: Test and package
+        run: mvn --batch-mode package

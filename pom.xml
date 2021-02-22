@@ -65,7 +65,7 @@
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>29.0-jre</version>
+            <version>30.1-jre</version>
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
@@ -141,8 +141,10 @@
         </plugins>
     </build>
 
-    <!-- For publishing the library to GitHub Packages -->
+    <!-- For publishing the library to GitHub Packages/GitLab Package Repository -->
     <distributionManagement>
+        <!-- Github Packages does not currently support public access, so disabled until it does.
+             See https://github.community/t/download-from-github-package-registry-without-authentication/14407
         <repository>
             <id>github</id>
             <url>https://maven.pkg.github.com/web-eid/web-eid-authtoken-validation-java</url>
@@ -150,6 +152,15 @@
         <snapshotRepository>
             <id>github</id>
             <url>https://maven.pkg.github.com/web-eid/web-eid-authtoken-validation-java</url>
+        </snapshotRepository>
+        -->
+        <repository>
+            <id>gitlab</id>
+            <url>https://gitlab.com/api/v4/projects/19948337/packages/maven</url>
+        </repository>
+        <snapshotRepository>
+            <id>gitlab</id>
+            <url>https://gitlab.com/api/v4/projects/19948337/packages/maven</url>
         </snapshotRepository>
     </distributionManagement>
 
