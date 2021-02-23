@@ -38,6 +38,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
+import java.util.Collection;
 import java.util.Objects;
 
 public final class SubjectCertificateNotRevokedValidator {
@@ -46,10 +47,12 @@ public final class SubjectCertificateNotRevokedValidator {
 
     private final SubjectCertificateTrustedValidator trustValidator;
     private final OkHttpClient httpClient;
+    private final Collection<URI> nonceDisabledOcspUrls;
 
-    public SubjectCertificateNotRevokedValidator(SubjectCertificateTrustedValidator trustValidator, OkHttpClient httpClient) {
+    public SubjectCertificateNotRevokedValidator(SubjectCertificateTrustedValidator trustValidator, OkHttpClient httpClient, Collection<URI> nonceDisabledOcspUrls) {
         this.trustValidator = trustValidator;
         this.httpClient = httpClient;
+        this.nonceDisabledOcspUrls = nonceDisabledOcspUrls;
     }
 
     /**
@@ -66,9 +69,14 @@ public final class SubjectCertificateNotRevokedValidator {
             if (uri == null) {
                 throw new UserCertificateRevocationCheckFailedException("The CA/certificate doesn't have an OCSP responder");
             }
+            final boolean ocspNonceDisabled = nonceDisabledOcspUrls.contains(uri);
+            if (ocspNonceDisabled) {
+                LOG.debug("Disabling OCSP nonce extension");
+            }
 
             final OCSPReq request = new OcspRequestBuilder()
                 .certificate(certificate)
+                .enableOcspNonce(!ocspNonceDisabled)
                 .issuer(Objects.requireNonNull(trustValidator.getSubjectCertificateIssuerCertificate()))
                 .build();
 

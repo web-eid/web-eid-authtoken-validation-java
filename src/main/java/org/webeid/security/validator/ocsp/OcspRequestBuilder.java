@@ -70,6 +70,7 @@ public final class OcspRequestBuilder {
     private DigestCalculator digestCalculator = Digester.sha1();
     private X509Certificate subjectCertificate;
     private X509Certificate issuerCertificate;
+    private boolean ocspNonceEnabled = true;
 
     public OcspRequestBuilder generator(SecureRandom generator) {
         this.randomGenerator = generator;
@@ -91,12 +92,16 @@ public final class OcspRequestBuilder {
         return this;
     }
 
+    public OcspRequestBuilder enableOcspNonce(boolean ocspNonceEnabled) {
+        this.ocspNonceEnabled = ocspNonceEnabled;
+        return this;
+    }
+
     /**
      * ATTENTION: The returned {@link OCSPReq} is not re-usable/cacheable! It contains a one-time nonce
      * and CA's will (should) reject subsequent requests that have the same nonce value.
      */
     public OCSPReq build() throws OCSPException, IOException, CertificateEncodingException {
-        final SecureRandom generator = Objects.requireNonNull(this.randomGenerator, "randomGenerator");
         final DigestCalculator calculator = Objects.requireNonNull(this.digestCalculator, "digestCalculator");
         final X509Certificate certificate = Objects.requireNonNull(this.subjectCertificate, "subjectCertificate");
         final X509Certificate issuer = Objects.requireNonNull(this.issuerCertificate, "issuerCertificate");
@@ -109,6 +114,16 @@ public final class OcspRequestBuilder {
         final OCSPReqBuilder builder = new OCSPReqBuilder();
         builder.addRequest(certId);
 
+        if (ocspNonceEnabled) {
+            addNonce(builder);
+        }
+
+        return builder.build();
+    }
+
+    private void addNonce(OCSPReqBuilder builder) {
+        final SecureRandom generator = Objects.requireNonNull(this.randomGenerator, "randomGenerator");
+
         final byte[] nonce = new byte[8];
         generator.nextBytes(nonce);
 
@@ -118,7 +133,6 @@ public final class OcspRequestBuilder {
         };
 
         builder.setRequestExtensions(new Extensions(extensions));
-
-        return builder.build();
     }
+
 }
