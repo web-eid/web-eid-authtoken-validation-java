@@ -242,7 +242,7 @@ The token validation process consists of three stages:
   
 ## Basic usage
 
-The builder class need a *javax.cache.Cache* instance (use *Hazelcast* or *Infinispan* if you do use a cluster, or *Caffeine* if you don't):  
+The builder class needs a *javax.cache.Cache* instance (use *Hazelcast* or *Infinispan* if you use a cluster, or *Caffeine* or *Ehcache* if you don't):
 ```java  
 Cache<String, Nonce> cache = // TODO: create new cache instance here  
 ```  

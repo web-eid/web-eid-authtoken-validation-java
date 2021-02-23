@@ -36,6 +36,7 @@ import java.util.HashSet;
 import java.util.Objects;
 
 import static org.webeid.security.nonce.NonceGeneratorBuilder.requirePositiveDuration;
+import static org.webeid.security.util.OcspUrls.ESTEID_2015;
 import static org.webeid.security.util.SubjectCertificatePolicies.EST_MOBILE_ID_POLICY;
 
 /**
@@ -53,6 +54,8 @@ final class AuthTokenValidationConfiguration {
     private String siteCertificateSha256Fingerprint;
     // Don't allow Estonian Mobile-ID policy by default.
     private Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies = Sets.newHashSet(EST_MOBILE_ID_POLICY);
+    // Disable OCSP nonce extension for EstEID 2015 cards by default.
+    private Collection<URI> nonceDisabledOcspUrls = Sets.newHashSet(ESTEID_2015);
 
     AuthTokenValidationConfiguration() {
     }
@@ -67,6 +70,7 @@ final class AuthTokenValidationConfiguration {
         this.isSiteCertificateFingerprintValidationEnabled = other.isSiteCertificateFingerprintValidationEnabled;
         this.siteCertificateSha256Fingerprint = other.siteCertificateSha256Fingerprint;
         this.disallowedSubjectCertificatePolicies = new HashSet<>(other.disallowedSubjectCertificatePolicies);
+        this.nonceDisabledOcspUrls = new HashSet<>(other.nonceDisabledOcspUrls);
     }
 
     void setSiteOrigin(URI siteOrigin) {
@@ -126,6 +130,14 @@ final class AuthTokenValidationConfiguration {
         return siteCertificateSha256Fingerprint;
     }
 
+    public Collection<ASN1ObjectIdentifier> getDisallowedSubjectCertificatePolicies() {
+        return disallowedSubjectCertificatePolicies;
+    }
+
+    public Collection<URI> getNonceDisabledOcspUrls() {
+        return nonceDisabledOcspUrls;
+    }
+
     /**
      * Checks that the configuration parameters are valid.
      *
@@ -149,10 +161,6 @@ final class AuthTokenValidationConfiguration {
 
     AuthTokenValidationConfiguration copy() {
         return new AuthTokenValidationConfiguration(this);
-    }
-
-    public Collection<ASN1ObjectIdentifier> getDisallowedSubjectCertificatePolicies() {
-        return disallowedSubjectCertificatePolicies;
     }
 
 }

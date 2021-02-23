@@ -132,7 +132,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         return ValidatorBatch.createFrom(
             certTrustedValidator::validateCertificateTrusted
         ).addOptional(configuration.isUserCertificateRevocationCheckWithOcspEnabled(),
-            new SubjectCertificateNotRevokedValidator(certTrustedValidator, httpClientSupplier.get())::validateCertificateNotRevoked
+            new SubjectCertificateNotRevokedValidator(certTrustedValidator, httpClientSupplier.get(), configuration.getNonceDisabledOcspUrls())::validateCertificateNotRevoked
         );
     }
 }
