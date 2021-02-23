@@ -1,4 +1,4 @@
-name: Deploy to Github Packages
+name: Deploy to GitLab Package Repository # Github Packages
 
 on:
   release:
@@ -22,7 +22,7 @@ jobs:
           key: ${{ runner.os }}-m2-v8-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2-v8
 
-      - name: Deploy to GitHub Packages
+      - name: Deploy to GitLab Package Repository # GitHub Packages
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: mvn --batch-mode deploy
+          GITLAB_DEPLOY_TOKEN: ${{ secrets.GITLAB_DEPLOY_TOKEN }} # GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mvn --batch-mode -s .github/gitlab-mvn-settings.xml deploy
