@@ -2,6 +2,7 @@ package org.webeid.security.validator;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.webeid.security.exceptions.JceException;
 import org.webeid.security.exceptions.UserCertificateDisallowedPolicyException;
 import org.webeid.security.testutil.AbstractTestWithMockedDateAndCorrectNonce;
 import org.webeid.security.testutil.Tokens;
@@ -20,7 +21,7 @@ class SubjectCertificatePolicyValidatorTest extends AbstractTestWithMockedDateAn
     void setUp() {
         try {
             validator = getAuthTokenValidatorWithDisallowedESTEIDPolicy(cache);
-        } catch (CertificateException e) {
+        } catch (CertificateException | JceException e) {
             throw new RuntimeException(e);
         }
     }

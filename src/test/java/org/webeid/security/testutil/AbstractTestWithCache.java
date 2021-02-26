@@ -40,14 +40,18 @@ public abstract class AbstractTestWithCache {
     private static final String INCORRECT_TEST_NONCE_KEY = CORRECT_TEST_NONCE_KEY + "incorrect";
     private static final String TOO_SHORT_TEST_NONCE_KEY = "1234567812345678123456781234567";
 
-    private final CacheManager cacheManager = Caching.getCachingProvider(CaffeineCachingProvider.class.getName()).getCacheManager();
-    private final CompleteConfiguration<String, LocalDateTime> cacheConfig = new MutableConfiguration<String, LocalDateTime>().setTypes(String.class, LocalDateTime.class);
+    private static final CacheManager cacheManager = Caching.getCachingProvider(CaffeineCachingProvider.class.getName()).getCacheManager();
+    private static final CompleteConfiguration<String, LocalDateTime> cacheConfig = new MutableConfiguration<String, LocalDateTime>().setTypes(String.class, LocalDateTime.class);
 
     protected Cache<String, LocalDateTime> cache;
 
+    public static Cache<String, LocalDateTime> createCache(String cacheName) {
+        return cacheManager.createCache(cacheName, cacheConfig);
+    }
+
     @BeforeEach
     protected void setup() {
-        cache = cacheManager.createCache(CACHE_NAME, cacheConfig);
+        cache = createCache(CACHE_NAME);
     }
 
     public void putCorrectNonceToCache() {

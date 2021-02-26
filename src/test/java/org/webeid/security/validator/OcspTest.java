@@ -24,6 +24,7 @@ package org.webeid.security.validator;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.webeid.security.exceptions.JceException;
 import org.webeid.security.exceptions.TokenValidationException;
 import org.webeid.security.exceptions.UserCertificateRevocationCheckFailedException;
 import org.webeid.security.exceptions.UserCertificateRevokedException;
@@ -46,7 +47,7 @@ class OcspTest extends AbstractTestWithMockedDateAndCorrectNonce {
         super.setup();
         try {
             validator = getAuthTokenValidatorWithOcspCheck(cache);
-        } catch (CertificateException e) {
+        } catch (CertificateException | JceException e) {
             throw new RuntimeException(e);
         }
     }

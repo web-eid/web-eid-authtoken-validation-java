@@ -24,27 +24,32 @@ package org.webeid.security.validator.validators;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.webeid.security.exceptions.JceException;
 import org.webeid.security.exceptions.UserCertificateNotTrustedException;
 import org.webeid.security.validator.AuthTokenValidatorData;
 
-import javax.security.auth.x500.X500Principal;
-import java.security.GeneralSecurityException;
-import java.security.cert.X509Certificate;
-import java.util.Collection;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.*;
+import java.util.Set;
 
+/**
+ * Validator that validates that the user certificate from the authentication token is signed by a trusted certificate authority.
+ * <p>
+ * We use the default JCE provider as there is no reason to use Bouncy Castle, moreover BC requires the validated certificate
+ * to be in the certificate store which breaks the clean immutable usage of {@code trustedRootCACertificateCertStore}.
+ */
 public final class SubjectCertificateTrustedValidator {
 
     private static final Logger LOG = LoggerFactory.getLogger(SubjectCertificateTrustedValidator.class);
 
-    private final Map<X500Principal, X509Certificate> trustedCACertificates;
-    private X509Certificate trustedCACertificate;
+    private final Set<TrustAnchor> trustedRootCACertificateAnchors;
+    private final CertStore trustedRootCACertificateCertStore;
+    private X509Certificate subjectCertificateIssuerRootCertificate;
 
-    public SubjectCertificateTrustedValidator(Collection<X509Certificate> trustedCACertificates) {
-        this.trustedCACertificates = trustedCACertificates.stream()
-            .collect(Collectors.toMap(X509Certificate::getSubjectX500Principal, Function.identity()));
+    public SubjectCertificateTrustedValidator(Set<TrustAnchor> trustedRootCACertificateAnchors, CertStore trustedRootCACertificateCertStore) {
+        this.trustedRootCACertificateAnchors = trustedRootCACertificateAnchors;
+        this.trustedRootCACertificateCertStore = trustedRootCACertificateCertStore;
     }
 
     /**
@@ -53,29 +58,33 @@ public final class SubjectCertificateTrustedValidator {
      * @param actualTokenData authentication token data that contains the user certificate.
      * @throws UserCertificateNotTrustedException when user certificate is not signed by a trusted CA or is valid after CA certificate.
      */
-    public void validateCertificateTrusted(AuthTokenValidatorData actualTokenData) throws UserCertificateNotTrustedException {
+    public void validateCertificateTrusted(AuthTokenValidatorData actualTokenData) throws UserCertificateNotTrustedException, JceException {
 
-        final X509Certificate userCertificate = actualTokenData.getSubjectCertificate();
-        final X509Certificate caCertificate = trustedCACertificates.get(userCertificate.getIssuerX500Principal());
+        final X509Certificate certificate = actualTokenData.getSubjectCertificate();
 
-        if (caCertificate == null) {
-            throw new UserCertificateNotTrustedException("User certificate CA is not in the trusted CA list");
-        }
+        final X509CertSelector selector = new X509CertSelector();
+        selector.setCertificate(certificate);
 
         try {
-            userCertificate.verify(caCertificate.getPublicKey());
-            if (userCertificate.getNotAfter().after(caCertificate.getNotAfter())) {
-                throw new UserCertificateNotTrustedException("Trusted CA certificate expires earlier than the user certificate");
-            }
-            this.trustedCACertificate = caCertificate;
-            LOG.debug("User certificate is signed with a trusted CA certificate");
-        } catch (GeneralSecurityException e) {
-            LOG.trace("Error verifying signer's certificate {} against CA certificate {}", userCertificate.getSubjectDN(), caCertificate.getSubjectDN());
+            final PKIXBuilderParameters pkixBuilderParameters = new PKIXBuilderParameters(trustedRootCACertificateAnchors, selector);
+            pkixBuilderParameters.setRevocationEnabled(false);
+            pkixBuilderParameters.addCertStore(trustedRootCACertificateCertStore);
+
+            // See the comment in AuthTokenValidatorImpl constructor why we use the default JCE provider.
+            final CertPathBuilder certPathBuilder = CertPathBuilder.getInstance(CertPathBuilder.getDefaultType());
+            final PKIXCertPathBuilderResult result = (PKIXCertPathBuilderResult) certPathBuilder.build(pkixBuilderParameters);
+
+            subjectCertificateIssuerRootCertificate = result.getTrustAnchor().getTrustedCert();
+
+        } catch (InvalidAlgorithmParameterException | NoSuchAlgorithmException e) {
+            throw new JceException(e);
+        } catch (CertPathBuilderException e) {
+            LOG.trace("Error verifying signer's certificate {}: {}", certificate.getSubjectDN(), e);
             throw new UserCertificateNotTrustedException();
         }
     }
 
-    public X509Certificate getSubjectCertificateIssuerCertificate() {
-        return trustedCACertificate;
+    public X509Certificate getSubjectCertificateIssuerRootCertificate() {
+        return subjectCertificateIssuerRootCertificate;
     }
 }

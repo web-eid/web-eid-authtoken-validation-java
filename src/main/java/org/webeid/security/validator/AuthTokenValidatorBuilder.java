@@ -25,6 +25,7 @@ package org.webeid.security.validator;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.webeid.security.exceptions.JceException;
 
 import javax.cache.Cache;
 import java.net.URI;
@@ -72,18 +73,18 @@ public class AuthTokenValidatorBuilder {
     }
 
     /**
-     * Sets the list of trusted user certificate Certificate Authorities.
-     * In order for the user certificate to be considered valid, the issuer of the user certificate
-     * must be present in this list.
+     * Sets the list of trusted user certificate root Certificate Authorities.
+     * In order for the user certificate to be considered valid, the root certificate of the issuer
+     * of the user certificate must be present in this list.
      * <p>
-     * At least one trusted Certificate Authority must be provided as mandatory configuration parameter.
+     * At least one trusted root Certificate Authority must be provided as mandatory configuration parameter.
      *
-     * @param certificates trusted Certificate Authority certificates
+     * @param certificates trusted root Certificate Authority certificates
      * @return the builder instance for method chaining
      */
-    public AuthTokenValidatorBuilder withTrustedCertificateAuthorities(X509Certificate... certificates) {
-        Collections.addAll(configuration.getTrustedCACertificates(), certificates);
-        LOG.debug("Trusted certificate authorities set to {}", configuration.getTrustedCACertificates());
+    public AuthTokenValidatorBuilder withTrustedRootCertificateAuthorities(X509Certificate... certificates) {
+        Collections.addAll(configuration.getTrustedRootCACertificates(), certificates);
+        LOG.debug("Trusted root certificate authorities set to {}", configuration.getTrustedRootCACertificates());
         return this;
     }
 
@@ -129,6 +130,19 @@ public class AuthTokenValidatorBuilder {
     }
 
     /**
+     * Sets the list of OCSP URLs for which the nonce protocol extension will be disabled.
+     * The OCSP URL is extracted from the user certificate and some OCSP services don't support the nonce extension.
+     *
+     * @param urls OCSP URLs for which the nonce protocol extension will be disabled
+     * @return the builder instance for method chaining
+     */
+    public AuthTokenValidatorBuilder withNonceDisabledOcspUrls(URI... urls) {
+        Collections.addAll(configuration.getNonceDisabledOcspUrls(), urls);
+        LOG.debug("OCSP URLs for which the nonce protocol extension is disabled set to {}", configuration.getNonceDisabledOcspUrls());
+        return this;
+    }
+
+    /**
      * Sets the tolerated clock skew of the client computer when verifying the token expiration field {@code exp}.
      * <p>
      * This is an optional configuration parameter, the default is 3 minutes.
@@ -162,8 +176,9 @@ public class AuthTokenValidatorBuilder {
      * @return the configured authentication token validator object
      * @throws NullPointerException     when required parameters are null
      * @throws IllegalArgumentException when any parameter is invalid
+     * @throws RuntimeException         when JCE configuration is invalid
      */
-    public AuthTokenValidator build() throws NullPointerException, IllegalArgumentException {
+    public AuthTokenValidator build() throws NullPointerException, IllegalArgumentException, JceException {
         configuration.validate();
         return new AuthTokenValidatorImpl(configuration);
     }
