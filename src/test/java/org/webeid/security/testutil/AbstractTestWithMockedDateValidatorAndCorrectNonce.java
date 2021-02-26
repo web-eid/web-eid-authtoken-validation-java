@@ -23,6 +23,7 @@
 package org.webeid.security.testutil;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.webeid.security.exceptions.JceException;
 import org.webeid.security.validator.AuthTokenValidator;
 
 import java.security.cert.CertificateException;
@@ -39,7 +40,7 @@ public abstract class AbstractTestWithMockedDateValidatorAndCorrectNonce extends
         super.setup();
         try {
             validator = getAuthTokenValidator(cache);
-        } catch (CertificateException e) {
+        } catch (CertificateException | JceException e) {
             throw new RuntimeException(e);
         }
     }

@@ -46,7 +46,7 @@ final class AuthTokenValidationConfiguration {
 
     private URI siteOrigin;
     private Cache<String, LocalDateTime> nonceCache;
-    private Collection<X509Certificate> trustedCACertificates = new HashSet<>();
+    private Collection<X509Certificate> trustedRootCACertificates = new HashSet<>();
     private boolean isUserCertificateRevocationCheckWithOcspEnabled = true;
     private Duration ocspRequestTimeout = Duration.ofSeconds(5);
     private Duration allowedClientClockSkew = Duration.ofMinutes(3);
@@ -63,7 +63,7 @@ final class AuthTokenValidationConfiguration {
     private AuthTokenValidationConfiguration(AuthTokenValidationConfiguration other) {
         this.siteOrigin = other.siteOrigin;
         this.nonceCache = other.nonceCache;
-        this.trustedCACertificates = new HashSet<>(other.trustedCACertificates);
+        this.trustedRootCACertificates = new HashSet<>(other.trustedRootCACertificates);
         this.isUserCertificateRevocationCheckWithOcspEnabled = other.isUserCertificateRevocationCheckWithOcspEnabled;
         this.ocspRequestTimeout = other.ocspRequestTimeout;
         this.allowedClientClockSkew = other.allowedClientClockSkew;
@@ -89,8 +89,8 @@ final class AuthTokenValidationConfiguration {
         return nonceCache;
     }
 
-    Collection<X509Certificate> getTrustedCACertificates() {
-        return trustedCACertificates;
+    Collection<X509Certificate> getTrustedRootCACertificates() {
+        return trustedRootCACertificates;
     }
 
     boolean isUserCertificateRevocationCheckWithOcspEnabled() {
@@ -148,8 +148,8 @@ final class AuthTokenValidationConfiguration {
         Objects.requireNonNull(siteOrigin, "Origin URI must not be null");
         OriginValidator.validateIsOriginURL(siteOrigin);
         Objects.requireNonNull(nonceCache, "Nonce cache must not be null");
-        if (trustedCACertificates.isEmpty()) {
-            throw new IllegalArgumentException("At least one trusted certificate authority must be provided");
+        if (trustedRootCACertificates.isEmpty()) {
+            throw new IllegalArgumentException("At least one trusted root certificate authority must be provided");
         }
         requirePositiveDuration(ocspRequestTimeout, "OCSP request timeout");
         requirePositiveDuration(allowedClientClockSkew, "Allowed client clock skew");

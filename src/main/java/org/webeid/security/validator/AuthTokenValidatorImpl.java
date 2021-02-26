@@ -23,18 +23,26 @@
 package org.webeid.security.validator;
 
 import com.google.common.base.Suppliers;
+import kotlin.Lazy;
 import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.webeid.security.exceptions.JceException;
 import org.webeid.security.exceptions.TokenParseException;
 import org.webeid.security.exceptions.TokenValidationException;
 import org.webeid.security.validator.validators.*;
 
+import java.security.GeneralSecurityException;
+import java.security.cert.CertStore;
+import java.security.cert.CollectionCertStoreParameters;
+import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
+import java.util.Set;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
- * Provides default implementation of {@link AuthTokenValidator}.
+ * Provides the default implementation of {@link AuthTokenValidator}.
  */
 final class AuthTokenValidatorImpl implements AuthTokenValidator {
 
@@ -51,19 +59,19 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
     private final Supplier<OkHttpClient> httpClientSupplier;
     private final ValidatorBatch simpleSubjectCertificateValidators;
     private final ValidatorBatch tokenBodyValidators;
+    private final Set<TrustAnchor> trustedRootCACertificateAnchors;
+    private final CertStore trustedRootCACertificateCertStore;
 
     /**
      * @param configuration configuration parameters for the token validator
      */
-    AuthTokenValidatorImpl(AuthTokenValidationConfiguration configuration) {
+    AuthTokenValidatorImpl(AuthTokenValidationConfiguration configuration) throws JceException {
         // Copy the configuration object to make AuthTokenValidatorImpl immutable and thread-safe.
         this.configuration = configuration.copy();
-        /*
-         * Lazy initialization, avoid constructing the OkHttpClient object when certificate revocation check is not enabled.
-         * Returns a supplier which caches the instance retrieved during the first call to get() and returns
-         * that value on subsequent calls to get(). The returned supplier is thread-safe.
-         * The OkHttpClient build() method will be invoked at most once.
-         */
+        // Lazy initialization, avoid constructing the OkHttpClient object when certificate revocation check is not enabled.
+        // Returns a supplier which caches the instance retrieved during the first call to get() and returns
+        // that value on subsequent calls to get(). The returned supplier is thread-safe.
+        // The OkHttpClient build() method will be invoked at most once.
         this.httpClientSupplier = Suppliers.memoize(() -> new OkHttpClient.Builder()
             .connectTimeout(configuration.getOcspRequestTimeout())
             .callTimeout(configuration.getOcspRequestTimeout())
@@ -82,6 +90,20 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
             new SiteCertificateFingerprintValidator(configuration.getSiteCertificateSha256Fingerprint())::validateSiteCertificateFingerprint
         );
 
+        // Create and cache trusted root CA certificate JCA objects for SubjectCertificateTrustedValidator.
+        trustedRootCACertificateAnchors = configuration.getTrustedRootCACertificates()
+            .stream()
+            .map(cert -> new TrustAnchor(cert, null))
+            .collect(Collectors.toSet());
+        try {
+            // We use the default JCE provider as there is no reason to use Bouncy Castle, moreover BC requires
+            // the validated certificate to be in the certificate store which breaks the clean immutable usage of
+            // trustedRootCACertificateCertStore in SubjectCertificateTrustedValidator.
+            trustedRootCACertificateCertStore = CertStore.getInstance("Collection",
+                new CollectionCertStoreParameters(configuration.getTrustedRootCACertificates()));
+        } catch (GeneralSecurityException e) {
+            throw new JceException(e);
+        }
     }
 
     @Override
@@ -128,7 +150,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
      */
     private ValidatorBatch getCertTrustValidators() {
         final SubjectCertificateTrustedValidator certTrustedValidator =
-            new SubjectCertificateTrustedValidator(configuration.getTrustedCACertificates());
+            new SubjectCertificateTrustedValidator(trustedRootCACertificateAnchors, trustedRootCACertificateCertStore);
         return ValidatorBatch.createFrom(
             certTrustedValidator::validateCertificateTrusted
         ).addOptional(configuration.isUserCertificateRevocationCheckWithOcspEnabled(),

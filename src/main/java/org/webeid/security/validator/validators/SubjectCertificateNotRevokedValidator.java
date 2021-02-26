@@ -77,7 +77,7 @@ public final class SubjectCertificateNotRevokedValidator {
             final OCSPReq request = new OcspRequestBuilder()
                 .certificate(certificate)
                 .enableOcspNonce(!ocspNonceDisabled)
-                .issuer(Objects.requireNonNull(trustValidator.getSubjectCertificateIssuerCertificate()))
+                .issuer(Objects.requireNonNull(trustValidator.getSubjectCertificateIssuerRootCertificate()))
                 .build();
 
             LOG.debug("Sending OCSP request");
