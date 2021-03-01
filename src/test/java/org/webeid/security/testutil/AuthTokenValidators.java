@@ -83,7 +83,7 @@ public final class AuthTokenValidators {
         return new AuthTokenValidatorBuilder()
             .withSiteOrigin(URI.create(uri))
             .withNonceCache(cache)
-            .withTrustedRootCertificateAuthorities(certificates);
+            .withTrustedCertificateAuthorities(certificates);
     }
 
     private static X509Certificate[] getCACertificates() throws CertificateException {

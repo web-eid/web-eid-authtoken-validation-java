@@ -33,23 +33,17 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.*;
 import java.util.Set;
 
-/**
- * Validator that validates that the user certificate from the authentication token is signed by a trusted certificate authority.
- * <p>
- * We use the default JCE provider as there is no reason to use Bouncy Castle, moreover BC requires the validated certificate
- * to be in the certificate store which breaks the clean immutable usage of {@code trustedRootCACertificateCertStore}.
- */
 public final class SubjectCertificateTrustedValidator {
 
     private static final Logger LOG = LoggerFactory.getLogger(SubjectCertificateTrustedValidator.class);
 
-    private final Set<TrustAnchor> trustedRootCACertificateAnchors;
-    private final CertStore trustedRootCACertificateCertStore;
-    private X509Certificate subjectCertificateIssuerRootCertificate;
+    private final Set<TrustAnchor> trustedCACertificateAnchors;
+    private final CertStore trustedCACertificateCertStore;
+    private X509Certificate subjectCertificateIssuerCertificate;
 
-    public SubjectCertificateTrustedValidator(Set<TrustAnchor> trustedRootCACertificateAnchors, CertStore trustedRootCACertificateCertStore) {
-        this.trustedRootCACertificateAnchors = trustedRootCACertificateAnchors;
-        this.trustedRootCACertificateCertStore = trustedRootCACertificateCertStore;
+    public SubjectCertificateTrustedValidator(Set<TrustAnchor> trustedCACertificateAnchors, CertStore trustedCACertificateCertStore) {
+        this.trustedCACertificateAnchors = trustedCACertificateAnchors;
+        this.trustedCACertificateCertStore = trustedCACertificateCertStore;
     }
 
     /**
@@ -66,15 +60,15 @@ public final class SubjectCertificateTrustedValidator {
         selector.setCertificate(certificate);
 
         try {
-            final PKIXBuilderParameters pkixBuilderParameters = new PKIXBuilderParameters(trustedRootCACertificateAnchors, selector);
+            final PKIXBuilderParameters pkixBuilderParameters = new PKIXBuilderParameters(trustedCACertificateAnchors, selector);
             pkixBuilderParameters.setRevocationEnabled(false);
-            pkixBuilderParameters.addCertStore(trustedRootCACertificateCertStore);
+            pkixBuilderParameters.addCertStore(trustedCACertificateCertStore);
 
             // See the comment in AuthTokenValidatorImpl constructor why we use the default JCE provider.
             final CertPathBuilder certPathBuilder = CertPathBuilder.getInstance(CertPathBuilder.getDefaultType());
             final PKIXCertPathBuilderResult result = (PKIXCertPathBuilderResult) certPathBuilder.build(pkixBuilderParameters);
 
-            subjectCertificateIssuerRootCertificate = result.getTrustAnchor().getTrustedCert();
+            subjectCertificateIssuerCertificate = result.getTrustAnchor().getTrustedCert();
 
         } catch (InvalidAlgorithmParameterException | NoSuchAlgorithmException e) {
             throw new JceException(e);
@@ -84,7 +78,7 @@ public final class SubjectCertificateTrustedValidator {
         }
     }
 
-    public X509Certificate getSubjectCertificateIssuerRootCertificate() {
-        return subjectCertificateIssuerRootCertificate;
+    public X509Certificate getSubjectCertificateIssuerCertificate() {
+        return subjectCertificateIssuerCertificate;
     }
 }

@@ -73,23 +73,23 @@ public class AuthTokenValidatorBuilder {
     }
 
     /**
-     * Sets the list of trusted user certificate root Certificate Authorities.
-     * In order for the user certificate to be considered valid, the root certificate of the issuer
-     * of the user certificate must be present in this list.
+     * Adds the given certificates to the list of trusted subject certificate intermediate Certificate Authorities.
+     * In order for the user certificate to be considered valid, the certificate of the issuer of the user certificate
+     * must be present in this list.
      * <p>
-     * At least one trusted root Certificate Authority must be provided as mandatory configuration parameter.
+     * At least one trusted intermediate Certificate Authority must be provided as a mandatory configuration parameter.
      *
-     * @param certificates trusted root Certificate Authority certificates
+     * @param certificates trusted intermediate Certificate Authority certificates
      * @return the builder instance for method chaining
      */
-    public AuthTokenValidatorBuilder withTrustedRootCertificateAuthorities(X509Certificate... certificates) {
-        Collections.addAll(configuration.getTrustedRootCACertificates(), certificates);
-        LOG.debug("Trusted root certificate authorities set to {}", configuration.getTrustedRootCACertificates());
+    public AuthTokenValidatorBuilder withTrustedCertificateAuthorities(X509Certificate... certificates) {
+        Collections.addAll(configuration.getTrustedCACertificates(), certificates);
+        LOG.debug("Trusted intermediate certificate authorities set to {}", configuration.getTrustedCACertificates());
         return this;
     }
 
     /**
-     * Sets the list of disallowed user certificate policies.
+     * Adds the given policies to the list of disallowed user certificate policies.
      * In order for the user certificate to be considered valid, it must not contain any policies
      * present in this list.
      *
@@ -130,7 +130,7 @@ public class AuthTokenValidatorBuilder {
     }
 
     /**
-     * Sets the list of OCSP URLs for which the nonce protocol extension will be disabled.
+     * Adds the given URLs to the list of OCSP URLs for which the nonce protocol extension will be disabled.
      * The OCSP URL is extracted from the user certificate and some OCSP services don't support the nonce extension.
      *
      * @param urls OCSP URLs for which the nonce protocol extension will be disabled
