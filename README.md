@@ -1,18 +1,14 @@
-<!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->  
-  
 # web-eid-authtoken-validation-java
 
 ![European Regional Development Fund](https://github.com/e-gov/RIHA-Frontend/raw/master/logo/EU/EU.png)
 
-The Web eID authentication token validation library for Java allows issuing challenge nonces and validating
-Web eID JWT authentication tokens during authentication in web applications.
+*web-eid-authtoken-validation-java* is a Java library for issuing challenge nonces and validating Web eID JWT authentication tokens during secure authentication with electronic ID (eID) smart cards in web applications.
 
 # Quickstart
 
-Complete the steps below to add strong authentication support to your web application back end. Instructions for the font end are available [here](https://github.com/web-eid/web-eid.js).
+Complete the steps below to add support for secure authentication with eID cards to your Java web application back end. Instructions for the font end are available [here](https://github.com/web-eid/web-eid.js).
 
-A Java web application that uses Maven or Gradle to manage packages is needed for running this quickstart.
-Examples are for Maven, but they are straightforward to translate to Gradle.
+A Java web application that uses Maven or Gradle to manage packages is needed for running this quickstart. Examples are for Maven, but they are straightforward to translate to Gradle.
 
 See full example [here](https://github.com/web-eid/web-eid-spring-boot-example).
 
@@ -21,66 +17,97 @@ See full example [here](https://github.com/web-eid/web-eid-spring-boot-example).
 Add the following lines to Maven `pom.xml` to include the Web eID authentication token validation library in your project:
 
 ```xml
+<dependencies>
     <dependency>
         <groupId>org.webeid.security</groupId>
         <artifactId>authtoken-validation</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <version>1.0.1</version>
     </dependency>
+</dependencies>
 
-    <repositories>
-        <repository>
-            <id>gitlab-maven</id>
-            <url>https://gitlab.com/api/v4/projects/19948337/packages/maven</url>
-        </repository>
-    </repositories>
+<repositories>
+    <repository>
+        <id>gitlab</id>
+        <url>https://gitlab.com/api/v4/projects/19948337/packages/maven</url>
+    </repository>
+</repositories>
 ```
 
 ## 2. Add cache support
 
-The validation library needs a cache for storing issued authentication tokens. Any *javax.cache.Cache* JSR107 API compatible implementation is suitable, we use Hazelcast here.
+The validation library needs a cache for storing issued challenge nonces. Any JSR107 *javax.cache.Cache* API compatible implementation is suitable, we use [Caffeine](https://github.com/ben-manes/caffeine) here.
 
 Add the following lines to Maven `pom.xml`:
 
 ```xml
-    <dependency>
+<properties>
+    <caffeine.version>2.8.5</caffeine.version>
+    <javaxcache.version>1.1.1</javaxcache.version>
+</properties>
+
+<dependencies>
+	<dependency>
         <groupId>javax.cache</groupId>
         <artifactId>cache-api</artifactId>
-        <version>1.1.1</version>
+        <version>${javaxcache.version}</version>
     </dependency>
     <dependency>
-        <groupId>com.hazelcast</groupId>
-        <artifactId>hazelcast</artifactId>
+        <groupId>com.github.ben-manes.caffeine</groupId>
+        <artifactId>caffeine</artifactId>
+        <version>${caffeine.version}</version>
     </dependency>
+    <dependency>
+        <groupId>com.github.ben-manes.caffeine</groupId>
+        <artifactId>jcache</artifactId>
+        <version>${caffeine.version}</version>
+    </dependency>
+</dependencies>
 ```
 
 Configure the cache as follows:
 
 ```java
+import com.github.benmanes.caffeine.jcache.spi.CaffeineCachingProvider;
+
 import javax.cache.Cache;
 import javax.cache.CacheManager;
 import javax.cache.Caching;
 import javax.cache.configuration.CompleteConfiguration;
 import javax.cache.configuration.MutableConfiguration;
+import javax.cache.expiry.CreatedExpiryPolicy;
+import javax.cache.expiry.Duration;
+import java.util.concurrent.TimeUnit;
+
+import static javax.cache.configuration.FactoryBuilder.factoryOf;
 
 ...
+    private static final long NONCE_TTL_MINUTES = 5;
+    private static final String CACHE_NAME = "nonceCache";
+
     private Cache<String, LocalDateTime> nonceCache() {
-        CacheManager cacheManager = Caching.getCachingProvider().getCacheManager();
-        Cache<String, LocalDateTime> cache = cacheManager.getCache("nonceCache");
+        CacheManager cacheManager = Caching.getCachingProvider(CaffeineCachingProvider.class.getName())
+            .getCacheManager();
+        Cache<String, LocalDateTime> cache = cacheManager.getCache(CACHE_NAME);
 
         if (cache == null) {
-            CompleteConfiguration<String, LocalDateTime> cacheConfig =
-                    new MutableConfiguration<String, LocalDateTime>().setTypes(String.class, LocalDateTime.class);
-            cache = cacheManager.createCache(CACHE_NAME, cacheConfig);
+            cache = createNonceCache(cacheManager);
         }
         return cache;
+    }
+
+    private Cache<String, LocalDateTime> createNonceCache(CacheManager cacheManager) {
+        CompleteConfiguration<String, LocalDateTime> cacheConfig = new MutableConfiguration<String, LocalDateTime>()
+                .setTypes(String.class, LocalDateTime.class)
+                .setExpiryPolicyFactory(factoryOf(new CreatedExpiryPolicy(
+                        new Duration(TimeUnit.MINUTES, NONCE_TTL_MINUTES + 1))));
+        return cacheManager.createCache(CACHE_NAME, cacheConfig);
     }
 ...
 ```
 
 ## 3. Configure the nonce generator
 
-The validation library needs to generate authentication challenge nonces and store them in the cache when issuing tokens.
-The nonce generator will be used in the REST endpoint that issues challenges; it is thread-safe and should be scoped as a singleton.
+The validation library needs to generate authentication challenge nonces and store them in the cache for later validation. Overview of nonce usage is provided in the [Web eID system architecture document](https://github.com/web-eid/web-eid-system-architecture-doc#authentication-1). The nonce generator will be used in the REST endpoint that issues challenges; it is thread-safe and should be scoped as a singleton.
 
 Configure the nonce generator as follows:
 
@@ -99,9 +126,7 @@ import org.webeid.security.nonce.NonceGeneratorBuilder;
 
 ## 4. Add trusted certificate authority certificates
 
-You must explicitly specify which certificate authorities (CAs) are trusted to issue the eID certificates for authentication.
-CA certificates can be loaded from either the truststore file or any stream source.
-We use the [`CertificateLoader`](https://github.com/web-eid/web-eid-authtoken-validation-java/blob/main/src/test/java/org/webeid/security/testutil/CertificateLoader.java) helper class from [`testutil`](https://github.com/web-eid/web-eid-authtoken-validation-java/tree/main/src/test/java/org/webeid/security/testutil) to load CA certificates from resouces here, but consider using [the truststore file](https://github.com/web-eid/web-eid-spring-boot-example/blob/main/src/main/java/org/webeid/example/config/ValidationConfiguration.java#L104-L122) instead.
+You must explicitly specify which **intermediate** certificate authorities (CAs) are trusted to issue the eID authentication certificates. CA certificates can be loaded from either the truststore file, resources or any stream source. We use the [`CertificateLoader`](https://github.com/web-eid/web-eid-authtoken-validation-java/blob/main/src/test/java/org/webeid/security/testutil/CertificateLoader.java) helper class from [`testutil`](https://github.com/web-eid/web-eid-authtoken-validation-java/tree/main/src/test/java/org/webeid/security/testutil) to load CA certificates from resources here, but consider using [the truststore file](https://github.com/web-eid/web-eid-spring-boot-example/blob/main/src/main/java/org/webeid/example/config/ValidationConfiguration.java#L104-L122) instead.
 
 First, copy the trusted certificates, for example `ESTEID-SK_2015.cer` and `ESTEID2018.cer`, to `resources/cacerts/`, then load the certificates as follows:
 
@@ -109,9 +134,9 @@ First, copy the trusted certificates, for example `ESTEID-SK_2015.cer` and `ESTE
 import java.security.cert.X509Certificate;
 
 ...
-    private X509Certificate[] trustedCertificateAuthorities() {
-         return CertificateLoader.loadCertificatesFromResources("cacerts/ESTEID-SK_2015.cer",
-                                                                "cacerts/ESTEID2018.cer");
+    private X509Certificate[] trustedIntermediateCACertificates() {
+         return CertificateLoader.loadCertificatesFromResources(
+             "cacerts/ESTEID-SK_2015.cer", "cacerts/ESTEID2018.cer");
     }
 ...
 ```
@@ -119,16 +144,15 @@ import java.security.cert.X509Certificate;
 ## 5. Configure the authentication token validator
 
 Once the prerequisites have been met, the authentication token validator itself can be configured.
-The minimum parameters are the website origin (the URL where the application is served from), nonce cache and trusted certificate authorities.
-The authentication token validator will be used in the login processing component of your web application authentication framework;
-it is thread-safe and should be scoped as a singleton.
+The mandatory parameters are the website origin (the URL serving the web application), nonce cache and trusted certificate authorities.
+The authentication token validator will be used in the login processing component of your web application authentication framework; it is thread-safe and should be scoped as a singleton.
 
 ```java
 import org.webeid.security.validator.AuthTokenValidator;
 import org.webeid.security.validator.AuthTokenValidatorBuilder;
 
 ...
-    public AuthTokenValidator validator() {
+    public AuthTokenValidator tokenValidator() throws JceException {
         return new AuthTokenValidatorBuilder()
                 .withSiteOrigin("https://example.org")
                 .withNonceCache(nonceCache())
@@ -154,12 +178,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("auth")
 public class ChallengeController {
 
-    @Autowired // for brevity
+    @Autowired // for brevity, prefer constructor dependency injection
     private NonceGenerator nonceGenerator;
 
     @GetMapping("challenge")
     public ChallengeDTO challenge() {
-        final ChallengeDTO challenge = new ChallengeDTO(); // a simple DTO with a single 'challenge' field
+        // a simple DTO with a single 'challenge' field
+        final ChallengeDTO challenge = new ChallengeDTO();
         challenge.setNonce(nonceGenerator.generateAndStoreNonce());
         return challenge;
     }
@@ -183,7 +208,8 @@ The gist of the validation is [in the `authenticate()` method](https://github.co
 ```java
 try {
     X509Certificate userCertificate = tokenValidator.validate(token);
-    return new PreAuthenticatedAuthenticationToken(getPrincipalFromCertificate(userCertificate), null, authorities);
+    return new PreAuthenticatedAuthenticationToken(
+        getPrincipalFromCertificate(userCertificate), null, authorities);
 } catch (...) {
     ...
 ```
@@ -199,244 +225,130 @@ try {
   - [6. Add a REST endpoint for issuing challenge nonces](#6-add-a-rest-endpoint-for-issuing-challenge-nonces)
   - [7. Implement authentication](#7-implement-authentication)
 - [Introduction](#introduction)
-- [Token validation](#token-validation)
+- [Authentication token validation](#authentication-token-validation)
   - [Basic usage](#basic-usage)
-  - [Configuration](#configuration)
-    - [Certificate fingerprint](#certificate-fingerprint)
-  - [What gets validated](#what-gets-validated)
+  - [Extended configuration](#extended-configuration)
+    - [Certificates' *Authority Information Access* (AIA) extension](#certificates-authority-information-access-aia-extension)
   - [Possible validation errors](#possible-validation-errors)
-      - [NonceNotFoundException](#noncenotfoundexception)
-      - [NonceExpiredException](#nonceexpiredexception)
-      - [OriginMismatchException](#originmismatchexception)
-      - [ServiceCertificateFingerprintValidationException](#servicecertificatefingerprintvalidationexception)
-      - [TokenExpiredException](#tokenexpiredexception)
-      - [TokenParseException](#tokenparseexception)
-      - [TokenSignatureValidationException](#tokensignaturevalidationexception)
-      - [UserCertificateExpiredException](#usercertificateexpiredexception)
-      - [UserCertificateMissingPurposeException](#usercertificatemissingpurposeexception)
-      - [UserCertificateNotTrustedException](#usercertificatenottrustedexception)
-      - [UserCertificateNotYetValidException](#usercertificatenotyetvalidexception)
-      - [UserCertificateParseException](#usercertificateparseexception)
-      - [UserCertificateRevocationCheckFailException](#usercertificaterevocationcheckfailexception)
-      - [UserCertificateRevokedException](#usercertificaterevokedexception)
-      - [UserCertificateWrongPurposeException](#usercertificatewrongpurposeexception)
-  - [Create your own validator implementation](#create-your-own-validator-implementation)
 - [Nonce generation](#nonce-generation)
   - [Basic usage](#basic-usage-1)
-  - [Configuration](#configuration-1)
-  - [How it works](#how-it-works)
+  - [Extended configuration](#extended-configuration-1)
 
 # Introduction
 
-This library has everything that it takes to ensure that the authentication token sent by the Web-eID browser extension contains valid data. And that this data is consistent and was not modified in-between by the third party. It is easy to configure and to integrate into your authentication service.  
-  
-The library is designed to take advantage of the so-called "builder" pattern to separate the configuration and execution parts from each other.  
-  
-# Token validation
+The Web eID authentication token validation library for Java has everything it takes to ensure that the authentication token sent by the Web eID browser extension contains valid, consistent data that has not been modified by a third party. It also implements secure challenge nonce generation as required by the Web eID authentication protocol. It is easy to configure and integrate into your authentication service.
 
-The token validation process consists of three stages:  
-  
-- Firstly, the **token header** gets parsed and the user certificate is extracted from the *x5c* field. Then the certificate is checked for validity, expiration and purpose. Also, an optional OCSP check is executed.  
-- Secondly, if the user certificate is valid and has a suitable purpose, the **token signature** is checked for validity.  
-- Lastly, the **token body** gets parsed. *Nonce* and *Origin* fields get validated. Also, an optional service certificate fingerprint check is executed.   
+The authentication protocol, validation requirements and nonce usage is described in more detail in the [Web eID system architecture document](https://github.com/web-eid/web-eid-system-architecture-doc#authentication-1).
+
+# Authentication token validation
+
+The authentication token validation process consists of three stages:
+
+- First, the validator parses the **token header** and extracts the user certificate from the *x5c* field. Then it checks the certificate expiration, purpose and policies. Next it checks that the certificate is signed by a trusted CA and checks the certificate status with OCSP.
+- Second, the validator validates the **token signature** and parses the **token body**. The signature validator validates that the signature was created using the user certificate that was provided in the header.
+- Last, the validator checks the **claims from the token body**. It checks that the token hasn't expired, that the *nonce* field contains a valid challenge nonce that exists in the cache and hasn't expired, and that the *aud* field contains the site origin URL. Optionally, if configured, it also verifies the site TLS certificate fingerprint included in the *aud* field (see *[Extended configuration](#extended-configuration)* below).
   
 ## Basic usage
 
-The builder class needs a *javax.cache.Cache* instance (use *Hazelcast* or *Infinispan* if you use a cluster, or *Caffeine* or *Ehcache* if you don't):
-```java  
-Cache<String, Nonce> cache = // TODO: create new cache instance here  
-```  
-You will also need to provide issuer certificates:  
-```java  
-X509Certificate[] trustedCertificateAuthorities = // TODO: load trusted issuer certs  
-```  
-The **cache** instance is used to look up the nonce object using its unique value as a search key. The values in the cache are populated by the nonce generator (which is described in detail in the *Nonce generation* chapter), while the **trustedCertificateAuthorities** certificates are used to validate the user certificate's trust chain.
-  
-The simplest way to create a validator instance is to use the builder class with a minimal set of mandatory parameters:  
-```java  
-AuthTokenValidator validator = new AuthTokenValidatorBuilder("https://my.origin.address")      
-        .withNonceCache(cache)    
-        .withTrustedCertificateAuthorities(trustedCertificateAuthorities)   
-        .build();  
-  X509Certificate userCertificate = tokenValidator.validate(myTokenString);  
-```  
-  
-## Configuration  
-Additional configuration is possible for the builder class:  
-  
-- `withCertificateFingerprint(String)` - certificate fingerprint validation is disabled by default, but can be enabled.  
-- `withoutCertificateRevocationValidation()` - disables certificate OCSP validation, which is enabled by default.  
-- `withAllowedClockSkew(Long)` - allows clock skew in seconds during token parsing process. Default value is **180L**, which corresponds to 3 minutes.  
-  
-Example:  
-```java  
-AuthTokenValidator validator = new AuthTokenValidatorBuilder("https://my.origin.address")     
-        .withNonceCache(cache)    
-        .withTrustedCertificateAuthorities(trustedCertificateAuthorities)   
-        .withCertificateFingerprint("urn:cert:sha-256:fingerprint-hash-goes-here")   
-        .withoutCertificateRevocationValidation()  
-        .withAllowedClockSkew(3600L)
-        .build();
+As described in section *[5. Configure the authentication token validator](#5-configure-the-authentication-token-validator)*, the mandatory configuration parameters are the website origin, nonce cache and trusted certificate authorities.
 
-X509Certificate userCertificate = tokenValidator.validate(myTokenString);  
-```  
-  
-### Certificate fingerprint  
-Due to the technical limitation of Web Browsers, certificate fingerprint validation currently works only when Firefox browser is used.  
-  
-## What gets validated  
-The token validation process covers different aspects. It ensures, that:  
-  
-- **token header** is valid, contains a valid and trusted certificate, which has not expired and has a proper purpose.  
-- **token signature** is not empty, is valid and was created using the certificate, that was specified in the header.  
-- **token body** is not empty and has meaningful data.  
-- **token** has not expired.  
-- **nonce value**, received from the client-side, has the corresponding nonce object in the cache, which has not expired.  
-- **Origin URL** is valid and matches the *expected Origin URL* set in builder class. 
+**Origin** should be the URL serving the web application. Origin URL must be in the form of `"https://" <hostname> [ ":" <port> ]`  as defined in [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Location/origin) and not contain path or query components.
 
-**NB!** `Nonce object` is a `Nonce value` plus `metadata` . To know more about it please refer to the *Nonce generation* chapter.
-  
+The **nonce cache** instance is used to look up nonce expiry time using its unique value as key. The values in the cache are populated by the nonce generator as described in section *[Nonce generation](#nonce-generation)* below. Consider using [Caffeine](https://github.com/ben-manes/caffeine) or [Ehcache](https://www.ehcache.org/) as the caching provider if your application does not run in a cluster, or [Hazelcast](https://hazelcast.com/), [Infinispan](https://infinispan.org/) or non-Java distributed cahces like [Memcached](https://memcached.org/) or [Redis](https://redis.io/) if it does. Cache configuration is described in more detail in section *[2. Add cache support](#2-add-cache-support)*.
+
+The **trusted certificate authority certificates** are used to validate that the user certificate from the authentication token is signed by a trusted certificate authority. Intermediate CA certificates must be used instead of the root CA certificates so that revoked CA certificates can be detected. Trusted certificate authority certificates configuration is described in more detail in section *[4. Add trusted certificate authority certificates](#4-add-trusted-certificate-authority-certificates)*.
+
+The authentication token validator configuration and construction is described in more detail in section *[5. Configure the authentication token validator](#5-configure-the-authentication-token-validator)*. Once the validator object has been constructed, it can be used for validating authentication tokens as follows:
+
+```java  
+X509Certificate userCertificate = tokenValidator.validate(tokenString);  
+```
+
+The `validate()` method returns the validated user certificate object if validation is successful or throws an exception as described in section *[Possible validation errors](#possible-validation-errors)* below if validation fails. The `CertUtil` and `TitleCase` classes can be used for extracting user information from the user certificate object:
+
+```java  
+import static org.webeid.security.util.TitleCase.toTitleCase;
+
+...
+    
+CertUtil.getSubjectCN(userCertificate); // "JÕEORG\\,JAAK-KRISTJAN\\,38001085718"
+CertUtil.getSubjectIdCode(userCertificate); // "PNOEE-38001085718"
+CertUtil.getSubjectCountryCode(userCertificate); // "EE"
+
+toTitleCase(CertUtil.getSubjectGivenName(userCertificate)); // "Jaak-Kristjan"
+toTitleCase(CertUtil.getSubjectSurname(userCertificate)); // "Jõeorg"
+```
+
+## Extended configuration  
+
+The following additional configuration options are available in `AuthTokenValidatorBuilder`:  
+
+- `withSiteCertificateSha256Fingerprint(String siteCertificateFingerprint)` – turns on origin website certificate fingerprint validation. The validator checks that the site certificate fingerprint from the authentication token matches with the provided site certificate SHA-256 fingerprint. This disables powerful man-in-the-middle attacks where attackers are able to issue falsified certificates for the origin, but also disables TLS proxy usage. Due to the technical limitations of web browsers, certificate fingerprint validation currently works only with Firefox. The provided certificate SHA-256 fingerprint should have the prefix `urn:cert:sha-256:` followed by the hexadecimal encoding of the hash value octets as specified in [URN Namespace for Certificates](https://tools.ietf.org/id/draft-seantek-certspec-01.html). Certificate fingerprint validation is disabled by default.
+- `withoutUserCertificateRevocationCheckWithOcsp()` – turns off user certificate revocation check with OCSP. The OCSP URL is extracted from the user certificate AIA extension. OCSP check is enabled by default.
+- `withOcspRequestTimeout(Duration ocspRequestTimeout)` – sets both the connection and response timeout of user certificate revocation check OCSP requests. Default is 5 seconds.
+- `withAllowedClientClockSkew(Duration allowedClockSkew)` – sets the tolerated clock skew of the client computer when verifying the token expiration. Default value is 3 minutes.
+- `withDisallowedCertificatePolicies(ASN1ObjectIdentifier... policies)` – adds the given policies to the list of disallowed user certificate policies. In order for the user certificate to be considered valid, it must not contain any policies present in this list. Contains the Estonian Mobile-ID policy by default as it must not be possible to authenticate with a Mobile-ID certificate when an eID smart card is expected.
+- `withNonceDisabledOcspUrls(URI... urls)` – adds the given URLs to the list of OCSP URLs for which the nonce protocol extension will be disabled. Some OCSP services don't support the nonce extension. Contains the ESTEID-2015 OCSP URL by default.
+
+Extended configuration example:  
+
+```java  
+AuthTokenValidator validator = new AuthTokenValidatorBuilder()
+    .withSiteOrigin("https://example.org")
+    .withNonceCache(nonceCache())
+    .withTrustedCertificateAuthorities(trustedCertificateAuthorities())
+    .withSiteCertificateSha256Fingerprint("urn:cert:sha-256:cert-hash-hex")
+    .withoutUserCertificateRevocationCheckWithOcsp()
+    .withAllowedClientClockSkew(Duration.ofMinutes(3))
+    .withDisallowedCertificatePolicies(new ASN1ObjectIdentifier("1.2.3"))
+    .withNonceDisabledOcspUrls(URI.create("http://aia.example.org/cert"))
+    .build();
+```
+
+### Certificates' *Authority Information Access* (AIA) extension
+
+It is assumed that the AIA extension that contains the certificates’ OCSP service location, is part of both the user and CA certificates. The AIA OCSP URL will be used to check the certificate revocation status with OCSP.
+
+**Note that there may be legal limitations to using AIA URLs during signing** as there URLs provide different security and SLA guarantees than dedicated OCSP cervices. For digital signing, OCSP responder certificate validation is additionally needed. Using AIA URLs during authentication is sufficient, however.
+
 ## Possible validation errors  
-There is a set of possible errors that can occur during the validation process:  
-  
-#### NonceNotFoundException  
-Is thrown if the nonce object is not found from the nonce cache using provided nonce value.  
-#### NonceExpiredException  
-Is thrown if the nonce object is found but has expired.  
-#### OriginMismatchException  
-Is thrown if origin URL does not match the *expected origin URL* which was set in builder class.  
-#### ServiceCertificateFingerprintValidationException  
-Is thrown if the service certificate fingerprint validation is enabled, however, the actual fingerprint does not match the *expected certificate fingerprint* which was set in builder class.  
-#### TokenExpiredException  
-Is thrown if an expired token is detected and the `withAllowedClockSkew` configuration option does not cover the time difference.
-#### TokenParseException  
-Is thrown if the token has an invalid format and cannot be parsed.  
-#### TokenSignatureValidationException  
-Is thrown if the token signature is missing or has an invalid format.  
-#### UserCertificateExpiredException  
-Is thrown if the user certificate's validity period end date is in the past. 
-#### UserCertificateMissingPurposeException
-Is thrown if the purpose of the user certificate is not defined.
-#### UserCertificateNotTrustedException  
-Is thrown if the user certificate is not trusted.  
-#### UserCertificateNotYetValidException  
-Is thrown if the user certificate's validity period start date is in the future.  
-#### UserCertificateParseException  
-Is thrown if the user certificate cannot be parsed from the token's x5c field.  
-#### UserCertificateRevocationCheckFailException  
-Is thrown if the user certificate OCSP check has failed.  
-#### UserCertificateRevokedException  
-Is thrown if the user certificate OCSP check's result is not GOOD.  
-#### UserCertificateWrongPurposeException  
-Is thrown if according to the user certificate's purpose is not meant to be used for authentication.  
-  
-## Create your own validator implementation  
-It is possible to create a custom implementation of the token validator. To achieve this, you have to:
 
-- Create a new validator class, which extends the `AuthTokenValidator` interface.
-- Create a new builder class, which extends the `AuthTokenValidatorBuilder` class and overrides the `build()` method to create an instance of your new validator class.
-
-**MyCustomTokenValidator.java**
-```java
-class MyCustomTokenValidator implements AuthTokenValidator {
-    ...
-}
-```
-**MyCustomBuilder.java**
-```java
-class MyCustomBuilder extends AuthTokenValidatorBuilder {
-    @Override
-    public AuthTokenValidator build() {
-        ...
-        validateParameters();
-        return new MyCustomTokenValidator(...);
-    }
-    ...
-}
-```
-
-Additionally, you can override the `validateParameters()` method in case you need to add new fields and validate them:
-
-
-**MyCustomBuilder.java**
-```java
-class MyCustomBuilder extends AuthTokenValidatorBuilder {
-    
-    private String myNewField = "";
-    
-    private MyCustomBuilder withMyNewField(String myNewField) {
-        this.myNewField = myNewField;
-    }
-
-    @Override
-    public AuthTokenValidator build() {
-        validateParameters();
-        return new MyCustomTokenValidator(..., myNewField);
-    }
-    
-    @Override  
-    protected void validateParameters() {  
-        super.validateParameters();  
-        Objects.requireNonNull(myNewField, "My new field must not be null");
-    }
-    ...
-}
-```
-Then use it in your application:
-```java
-MyCustomTokenValidator validator = new MyCustomBuilder("https://my.origin.address")      
-        .withNonceCache(cache)    
-        .withTrustedCertificateAuthorities(trustedCertificateAuthorities) 
-        .withMyNewField("My new field value")
-        .build();  
-
-X509Certificate certificate = validator.validate(myTokenString);
-```
+The `validate()` method of `AuthTokenValidator` returns the validated user certificate object if validation is successful or throws an exception if validation fails. All exceptions that can occur during validation derive from `TokenValidationException`, the list of available exceptions is available [here](src/main/java/org/webeid/security/exceptions/). Each exception file contains a documentation comment under which conditions the exception is thrown.
 
 # Nonce generation
-Nonce value generation is implemented similarly to the token validation - it also uses the builder pattern and also requires the cache instance. 
+The authentication protocol requires support for generating challenge nonces,  large random numbers that can be used only once, and storing them for later use during token validation. The validation library uses the *java.security.SecureRandom* API as the secure random source and the JSR107 *javax.cache.Cache* API for storing issued challenge nonces. 
+
+The `-Djava.security.egd=file:/dev/./urandom` command line argument is added to `pom.xml` to avoid the risk of having the code blocked unexpectedly during random generation. Without this, the JVM uses `/dev/random`, which can block, to seed the `SecureRandom` class.
+
+The authentication protocol requires a REST endpoint that issues challenge nonces as described in section *[6. Add a REST endpoint for issuing challenge nonces](#6-add-a-rest-endpoint-for-issuing-challenge-nonces)*.
+
+Nonce usage is described in more detail in the [Web eID system architecture document](https://github.com/web-eid/web-eid-system-architecture-doc#authentication-1).
 
 ## Basic usage  
-  
-The builder class will need a *javax.cache.Cache* instance (use *Hazelcast* or *Infinispan* if you do use a cluster, or *Caffeine* if you don't):  
+
+As described in section *[3. Configure the nonce generator](#3-configure-the-nonce-generator)*, the only mandatory configuration parameter of the nonce generator is the nonce cache.
+
+The nonce cache instance is used to store the nonce expiry time using the nonce value as key. The values in the cache are used by the token validator as described in the section *[Authentication token validation > Basic usage](#basic-usage)* that also contains recommendations for cache usage and configuration.
+
+The nonce generator configuration and construction is described in more detail in section *[3. Configure the nonce generator](#3-configure-the-nonce-generator)*. Once the generator object has been constructed, it can be used for generating nonces as follows:
+
 ```java  
-Cache<String, Nonce> cache = // TODO: create new cache instance here  
-```  
-
-The **cache** is used store nonce objects. 
-  
-The simplest way to create a generator instance is to use the builder class with a minimal set of mandatory parameters:  
-
-```java
-NonceGenerator generator = new NonceGeneratorBuilder()  
-        .withNonceCache(cache)  
-        .build();
-
-byte[] nonceKey = nonceGenerator.generate();
+String nonce = nonceGenerator.generateAndStoreNonce();  
 ```
-The`generate()` method also puts the generated nonce object into the provided cache.
 
-## Configuration  
-Additional configuration is possible for the builder class:  
-  
-- `withNonceTtl(int)` - specifies the time-to-live in minutes. Default value is 5.
-- `withSecureRandom(SecureRandom)` - allows to specify a custom [SecureRandom](https://docs.oracle.com/javase/8/docs/api/java/security/SecureRandom.html) class instance.
-  
-Example:  
+The `generateAndStoreNonce()` method both generates the nonce and stores it in the cache.
+
+## Extended configuration  
+The following additional configuration options are available in `NonceGeneratorBuilder`:
+
+- `withNonceTtl(Duration duration)` – overrides the default nonce time-to-live duration. When the time-to-live passes, the nonce is considered to be expired. Default nonce time-to-live is 5 minutes.
+- `withSecureRandom(SecureRandom)` - allows to specify a custom `SecureRandom` instance.
+
+Extended configuration example:  
 ```java  
 NonceGenerator generator = new NonceGeneratorBuilder()  
         .withNonceCache(cache)
-        .withNonceTtl(10)
-        .withSecureRandom(myCustomSecureRandomInstance)  
+        .withNonceTtl(Duration.ofMinutes(5))
+        .withSecureRandom(customSecureRandom)  
         .build();
-
-byte[] nonceKey = nonceGenerator.generate();  
-```  
-## How it works
-Here are some useful facts:
-
-- Nonce objects are stored into the cache on the server-side and later are looked up from the same cache using the nonce values as keys.
-- Nonce values are sent to the client-side, nonce objects are not.
-- Every nonce value is meant to be unique and as less likely reproducible as possible.
-- Every nonce object is meant to be used only once.
-- Every nonce object is meant to be used before it expires.
+```

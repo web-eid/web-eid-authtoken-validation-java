@@ -25,7 +25,7 @@ class AuthTokenValidatorBuilderTest {
             .withNonceCache(AbstractTestWithCache.createCache("AuthTokenValidatorBuilderTest"));
         assertThatThrownBy(builderWithMissingRootCa::build)
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageStartingWith("At least one trusted root certificate authority must be provided");
+            .hasMessageStartingWith("At least one trusted certificate authority must be provided");
     }
 
 }

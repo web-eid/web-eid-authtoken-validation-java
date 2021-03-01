@@ -58,8 +58,8 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
     private final Supplier<OkHttpClient> httpClientSupplier;
     private final ValidatorBatch simpleSubjectCertificateValidators;
     private final ValidatorBatch tokenBodyValidators;
-    private final Set<TrustAnchor> trustedRootCACertificateAnchors;
-    private final CertStore trustedRootCACertificateCertStore;
+    private final Set<TrustAnchor> trustedCACertificateAnchors;
+    private final CertStore trustedCACertificateCertStore;
 
     /**
      * @param configuration configuration parameters for the token validator
@@ -89,17 +89,17 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
             new SiteCertificateFingerprintValidator(configuration.getSiteCertificateSha256Fingerprint())::validateSiteCertificateFingerprint
         );
 
-        // Create and cache trusted root CA certificate JCA objects for SubjectCertificateTrustedValidator.
-        trustedRootCACertificateAnchors = configuration.getTrustedRootCACertificates()
+        // Create and cache trusted CA certificate JCA objects for SubjectCertificateTrustedValidator.
+        trustedCACertificateAnchors = configuration.getTrustedCACertificates()
             .stream()
             .map(cert -> new TrustAnchor(cert, null))
             .collect(Collectors.toSet());
         try {
             // We use the default JCE provider as there is no reason to use Bouncy Castle, moreover BC requires
             // the validated certificate to be in the certificate store which breaks the clean immutable usage of
-            // trustedRootCACertificateCertStore in SubjectCertificateTrustedValidator.
-            trustedRootCACertificateCertStore = CertStore.getInstance("Collection",
-                new CollectionCertStoreParameters(configuration.getTrustedRootCACertificates()));
+            // trustedCACertificateCertStore in SubjectCertificateTrustedValidator.
+            trustedCACertificateCertStore = CertStore.getInstance("Collection",
+                new CollectionCertStoreParameters(configuration.getTrustedCACertificates()));
         } catch (GeneralSecurityException e) {
             throw new JceException(e);
         }
@@ -149,7 +149,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
      */
     private ValidatorBatch getCertTrustValidators() {
         final SubjectCertificateTrustedValidator certTrustedValidator =
-            new SubjectCertificateTrustedValidator(trustedRootCACertificateAnchors, trustedRootCACertificateCertStore);
+            new SubjectCertificateTrustedValidator(trustedCACertificateAnchors, trustedCACertificateCertStore);
         return ValidatorBatch.createFrom(
             certTrustedValidator::validateCertificateTrusted
         ).addOptional(configuration.isUserCertificateRevocationCheckWithOcspEnabled(),
