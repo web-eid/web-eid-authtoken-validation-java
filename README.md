@@ -247,7 +247,9 @@ The authentication token validation process consists of three stages:
 - First, the validator parses the **token header** and extracts the user certificate from the *x5c* field. Then it checks the certificate expiration, purpose and policies. Next it checks that the certificate is signed by a trusted CA and checks the certificate status with OCSP.
 - Second, the validator validates the **token signature** and parses the **token body**. The signature validator validates that the signature was created using the user certificate that was provided in the header.
 - Last, the validator checks the **claims from the token body**. It checks that the token hasn't expired, that the *nonce* field contains a valid challenge nonce that exists in the cache and hasn't expired, and that the *aud* field contains the site origin URL. Optionally, if configured, it also verifies the site TLS certificate fingerprint included in the *aud* field (see *[Extended configuration](#extended-configuration)* below).
-  
+
+The authentication token can be used only once as the corresponding nonce will be removed from the cache during nonce validation. The nonce will also be automatically evicted from the cache when its cache time-to-live expires.
+
 ## Basic usage
 
 As described in section *[5. Configure the authentication token validator](#5-configure-the-authentication-token-validator)*, the mandatory configuration parameters are the website origin, nonce cache and trusted certificate authorities.
