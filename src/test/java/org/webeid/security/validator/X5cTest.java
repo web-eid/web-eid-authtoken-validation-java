@@ -105,8 +105,15 @@ class X5cTest extends AbstractTestWithValidatorAndCorrectNonce {
     }
 
     @Test
-    void testMobileIDCertificate() {
-        assertThatThrownBy(() -> validator.validate(Tokens.X5C_MOBILE_ID_CERTIFICATE))
+    void testOldMobileIDCertificate() {
+        assertThatThrownBy(() -> validator.validate(Tokens.X5C_OLD_MOBILE_ID_CERTIFICATE))
+            .isInstanceOf(UserCertificateDisallowedPolicyException.class);
+    }
+
+    @Test
+    void testNewMobileIDCertificate() {
+        assertThatThrownBy(() -> validator.validate(Tokens.X5C_NEW_MOBILE_ID_CERTIFICATE))
             .isInstanceOf(UserCertificateMissingPurposeException.class);
     }
+
 }

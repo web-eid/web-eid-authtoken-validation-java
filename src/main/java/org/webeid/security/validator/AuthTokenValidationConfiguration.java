@@ -37,7 +37,7 @@ import java.util.Objects;
 
 import static org.webeid.security.nonce.NonceGeneratorBuilder.requirePositiveDuration;
 import static org.webeid.security.util.OcspUrls.ESTEID_2015;
-import static org.webeid.security.util.SubjectCertificatePolicies.EST_MOBILE_ID_POLICY;
+import static org.webeid.security.util.SubjectCertificatePolicies.*;
 
 /**
  * Stores configuration parameters for {@link AuthTokenValidatorImpl}.
@@ -53,7 +53,12 @@ final class AuthTokenValidationConfiguration {
     private boolean isSiteCertificateFingerprintValidationEnabled = false;
     private String siteCertificateSha256Fingerprint;
     // Don't allow Estonian Mobile-ID policy by default.
-    private Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies = Sets.newHashSet(EST_MOBILE_ID_POLICY);
+    private Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies = Sets.newHashSet(
+        ESTEID_SK_2015_MOBILE_ID_POLICY_V1,
+        ESTEID_SK_2015_MOBILE_ID_POLICY_V2,
+        ESTEID_SK_2015_MOBILE_ID_POLICY_V3,
+        ESTEID_SK_2015_MOBILE_ID_POLICY
+    );
     // Disable OCSP nonce extension for EstEID 2015 cards by default.
     private Collection<URI> nonceDisabledOcspUrls = Sets.newHashSet(ESTEID_2015);
 
