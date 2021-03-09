@@ -36,10 +36,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.webeid.security.testutil.Tokens.getUnsignedTokenString;
 import static org.webeid.security.util.TitleCase.toTitleCase;
 
-/**
- * Some tests in this class (and possibly in others) will randomly fail due to
- * https://github.com/jmockit/jmockit1/issues/689#issuecomment-702965484
- */
 class ParseTest extends AbstractTestWithMockedDateValidatorAndCorrectNonce {
 
     /**
