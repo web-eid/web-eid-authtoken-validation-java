@@ -99,4 +99,17 @@ class OriginTest extends AbstractTestWithMockedDateValidatorAndCorrectNonce {
             .isInstanceOf(OriginMismatchException.class);
     }
 
+    @Test
+    void testValidatorOriginNotValidUrl() {
+        assertThatThrownBy(() -> getAuthTokenValidator("ria://ria.ee", cache))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageStartingWith("Provided URI is not a valid URL");
+    }
+
+    @Test
+    void testValidatorOriginNotValidSyntax() {
+        assertThatThrownBy(() -> getAuthTokenValidator("https:///ria.ee", cache))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageStartingWith("An URI syntax exception occurred");
+    }
 }
