@@ -6,7 +6,7 @@
 
 # Quickstart
 
-Complete the steps below to add support for secure authentication with eID cards to your Java web application back end. Instructions for the font end are available [here](https://github.com/web-eid/web-eid.js).
+Complete the steps below to add support for secure authentication with eID cards to your Java web application back end. Instructions for the front end are available [here](https://github.com/web-eid/web-eid.js).
 
 A Java web application that uses Maven or Gradle to manage packages is needed for running this quickstart. Examples are for Maven, but they are straightforward to translate to Gradle.
 
