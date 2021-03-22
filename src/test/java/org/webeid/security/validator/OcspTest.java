@@ -24,10 +24,7 @@ package org.webeid.security.validator;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.webeid.security.exceptions.JceException;
-import org.webeid.security.exceptions.TokenValidationException;
-import org.webeid.security.exceptions.UserCertificateRevocationCheckFailedException;
-import org.webeid.security.exceptions.UserCertificateRevokedException;
+import org.webeid.security.exceptions.*;
 import org.webeid.security.testutil.AbstractTestWithMockedDateAndCorrectNonce;
 import org.webeid.security.testutil.Tokens;
 
@@ -66,4 +63,17 @@ class OcspTest extends AbstractTestWithMockedDateAndCorrectNonce {
         }
     }
 
+    @Test
+    void testTokenCertRsaExpired() {
+        assertThatThrownBy(() -> validator.validate(Tokens.TOKEN_CERT_RSA_EXIPRED))
+            .isInstanceOf(UserCertificateExpiredException.class)
+            .hasMessageStartingWith("User certificate has expired:");
+    }
+
+    @Test
+    void testTokenCertEcdsaExpired() {
+        assertThatThrownBy(() -> validator.validate(Tokens.TOKEN_CERT_ECDSA_EXIPRED))
+            .isInstanceOf(UserCertificateExpiredException.class)
+            .hasMessageStartingWith("User certificate has expired:");
+    }
 }
