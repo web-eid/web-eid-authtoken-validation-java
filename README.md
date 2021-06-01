@@ -4,6 +4,8 @@
 
 *web-eid-authtoken-validation-java* is a Java library for issuing challenge nonces and validating Web eID JWT authentication tokens during secure authentication with electronic ID (eID) smart cards in web applications.
 
+More information about the Web eID project is available on the project [website](https://web-eid.eu/).
+
 # Quickstart
 
 Complete the steps below to add support for secure authentication with eID cards to your Java web application back end. Instructions for the front end are available [here](https://github.com/web-eid/web-eid.js).
@@ -236,7 +238,7 @@ try {
 
 # Introduction
 
-The Web eID authentication token validation library for Java has everything it takes to ensure that the authentication token sent by the Web eID browser extension contains valid, consistent data that has not been modified by a third party. It also implements secure challenge nonce generation as required by the Web eID authentication protocol. It is easy to configure and integrate into your authentication service.
+The Web eID authentication token validation library for Java contains the  implementation of the Web eID authentication token validation process in its entirety to ensure that the authentication token sent by the Web eID browser extension contains valid, consistent data that has not been modified by a third party. It also implements secure challenge nonce generation as required by the Web eID authentication protocol. It is easy to configure and integrate into your authentication service.
 
 The authentication protocol, validation requirements and nonce usage is described in more detail in the [Web eID system architecture document](https://github.com/web-eid/web-eid-system-architecture-doc#authentication-1).
 
