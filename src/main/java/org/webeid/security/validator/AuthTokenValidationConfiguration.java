@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Web eID Project
+ * Copyright (c) 2020, 2021 The Web eID Project
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -30,7 +30,7 @@ import javax.cache.Cache;
 import java.net.URI;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Objects;
@@ -45,7 +45,7 @@ import static org.webeid.security.util.SubjectCertificatePolicies.*;
 final class AuthTokenValidationConfiguration {
 
     private URI siteOrigin;
-    private Cache<String, LocalDateTime> nonceCache;
+    private Cache<String, ZonedDateTime> nonceCache;
     private Collection<X509Certificate> trustedCACertificates = new HashSet<>();
     private boolean isUserCertificateRevocationCheckWithOcspEnabled = true;
     private Duration ocspRequestTimeout = Duration.ofSeconds(5);
@@ -86,11 +86,11 @@ final class AuthTokenValidationConfiguration {
         return siteOrigin;
     }
 
-    void setNonceCache(Cache<String, LocalDateTime> nonceCache) {
+    void setNonceCache(Cache<String, ZonedDateTime> nonceCache) {
         this.nonceCache = nonceCache;
     }
 
-    Cache<String, LocalDateTime> getNonceCache() {
+    Cache<String, ZonedDateTime> getNonceCache() {
         return nonceCache;
     }
 

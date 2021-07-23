@@ -6,7 +6,6 @@ import org.webeid.security.exceptions.JceException;
 import org.webeid.security.exceptions.UserCertificateDisallowedPolicyException;
 import org.webeid.security.testutil.AbstractTestWithMockedDateAndCorrectNonce;
 import org.webeid.security.testutil.Tokens;
-import org.webeid.security.validator.AuthTokenValidator;
 
 import java.security.cert.CertificateException;
 

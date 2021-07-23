@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Web eID Project
+ * Copyright (c) 2020, 2021 The Web eID Project
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,18 +29,19 @@ import org.webeid.security.exceptions.NonceNotFoundException;
 import org.webeid.security.exceptions.TokenParseException;
 import org.webeid.security.exceptions.TokenValidationException;
 import org.webeid.security.nonce.NonceGenerator;
+import org.webeid.security.util.UtcDateTime;
 import org.webeid.security.validator.AuthTokenValidatorData;
 
 import javax.cache.Cache;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 
 public final class NonceValidator {
 
     private static final Logger LOG = LoggerFactory.getLogger(NonceValidator.class);
 
-    private final Cache<String, LocalDateTime> cache;
+    private final Cache<String, ZonedDateTime> cache;
 
-    public NonceValidator(Cache<String, LocalDateTime> cache) {
+    public NonceValidator(Cache<String, ZonedDateTime> cache) {
         this.cache = cache;
     }
 
@@ -54,7 +55,7 @@ public final class NonceValidator {
      */
     public void validateNonce(AuthTokenValidatorData actualTokenData) throws TokenValidationException {
         final String nonce = actualTokenData.getNonce();
-        final LocalDateTime nonceExpirationTime = cache.getAndRemove(nonce);
+        final ZonedDateTime nonceExpirationTime = cache.getAndRemove(nonce);
         if (nonceExpirationTime == null) {
             throw new NonceNotFoundException();
         }
@@ -64,7 +65,7 @@ public final class NonceValidator {
                 NonceGenerator.NONCE_LENGTH
             ));
         }
-        if (nonceExpirationTime.isBefore(LocalDateTime.now())) {
+        if (nonceExpirationTime.isBefore(UtcDateTime.now())) {
             throw new NonceExpiredException();
         }
         LOG.debug("Nonce was found and has not expired.");

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Web eID Project
+ * Copyright (c) 2020, 2021 The Web eID Project
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,7 +25,7 @@ package org.webeid.security.nonce;
 import javax.cache.Cache;
 import java.security.SecureRandom;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.Objects;
 
 /**
@@ -35,7 +35,7 @@ public class NonceGeneratorBuilder {
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    private Cache<String, LocalDateTime> cache;
+    private Cache<String, ZonedDateTime> cache;
     private SecureRandom secureRandom = RANDOM;
     private Duration ttl = Duration.ofMinutes(5);
 
@@ -60,7 +60,7 @@ public class NonceGeneratorBuilder {
      * @param cache nonce cache
      * @return current builder instance
      */
-    public NonceGeneratorBuilder withNonceCache(Cache<String, LocalDateTime> cache) {
+    public NonceGeneratorBuilder withNonceCache(Cache<String, ZonedDateTime> cache) {
         this.cache = cache;
         return this;
     }

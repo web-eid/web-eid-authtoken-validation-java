@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Web eID Project
+ * Copyright (c) 2020, 2021 The Web eID Project
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,13 +25,14 @@ package org.webeid.security.testutil;
 import com.github.benmanes.caffeine.jcache.spi.CaffeineCachingProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.webeid.security.util.UtcDateTime;
 
 import javax.cache.Cache;
 import javax.cache.CacheManager;
 import javax.cache.Caching;
 import javax.cache.configuration.CompleteConfiguration;
 import javax.cache.configuration.MutableConfiguration;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 
 public abstract class AbstractTestWithCache {
 
@@ -41,11 +42,11 @@ public abstract class AbstractTestWithCache {
     private static final String TOO_SHORT_TEST_NONCE_KEY = "1234567812345678123456781234567";
 
     private static final CacheManager cacheManager = Caching.getCachingProvider(CaffeineCachingProvider.class.getName()).getCacheManager();
-    private static final CompleteConfiguration<String, LocalDateTime> cacheConfig = new MutableConfiguration<String, LocalDateTime>().setTypes(String.class, LocalDateTime.class);
+    private static final CompleteConfiguration<String, ZonedDateTime> cacheConfig = new MutableConfiguration<String, ZonedDateTime>().setTypes(String.class, ZonedDateTime.class);
 
-    protected Cache<String, LocalDateTime> cache;
+    protected Cache<String, ZonedDateTime> cache;
 
-    public static Cache<String, LocalDateTime> createCache(String cacheName) {
+    public static Cache<String, ZonedDateTime> createCache(String cacheName) {
         return cacheManager.createCache(cacheName, cacheConfig);
     }
 
@@ -54,12 +55,17 @@ public abstract class AbstractTestWithCache {
         cache = createCache(CACHE_NAME);
     }
 
+    @AfterEach
+    protected void tearDown() {
+        cacheManager.destroyCache(CACHE_NAME);
+    }
+
     public void putCorrectNonceToCache() {
         cache.putIfAbsent(CORRECT_TEST_NONCE_KEY, fiveMinutesFromNow());
     }
 
     public void putExpiredNonceToCache() {
-        cache.putIfAbsent(CORRECT_TEST_NONCE_KEY, LocalDateTime.now().minusMinutes(5));
+        cache.putIfAbsent(CORRECT_TEST_NONCE_KEY, ZonedDateTime.now().minusMinutes(5));
     }
 
     public void putIncorrectNonceToCache() {
@@ -70,13 +76,8 @@ public abstract class AbstractTestWithCache {
         cache.putIfAbsent(TOO_SHORT_TEST_NONCE_KEY, fiveMinutesFromNow());
     }
 
-    @AfterEach
-    public void tearDown() {
-        cacheManager.destroyCache(CACHE_NAME);
-    }
-
-    private LocalDateTime fiveMinutesFromNow() {
-        return LocalDateTime.now().plusMinutes(5);
+    private ZonedDateTime fiveMinutesFromNow() {
+        return UtcDateTime.now().plusMinutes(5);
     }
 
 }

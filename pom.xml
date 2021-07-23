@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <artifactId>authtoken-validation</artifactId>
     <groupId>org.webeid.security</groupId>
-    <version>1.0.2</version>
+    <version>1.1.0</version>
     <packaging>jar</packaging>
     <name>authtoken-validation</name>
     <description>Web eID authentication token validation library for Java</description>

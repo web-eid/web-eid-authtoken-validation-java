@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Web eID Project
+ * Copyright (c) 2020, 2021 The Web eID Project
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,7 +31,7 @@ import javax.cache.Cache;
 import java.net.URI;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.Collections;
 
 /**
@@ -67,7 +67,7 @@ public class AuthTokenValidatorBuilder {
      * @param cache nonce cache
      * @return the builder instance for method chaining
      */
-    public AuthTokenValidatorBuilder withNonceCache(Cache<String, LocalDateTime> cache) {
+    public AuthTokenValidatorBuilder withNonceCache(Cache<String, ZonedDateTime> cache) {
         configuration.setNonceCache(cache);
         return this;
     }
