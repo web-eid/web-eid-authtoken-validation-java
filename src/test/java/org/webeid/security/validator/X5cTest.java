@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Web eID Project
+ * Copyright (c) 2020, 2021 The Web eID Project
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,9 +22,14 @@
 
 package org.webeid.security.validator;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.webeid.security.exceptions.*;
+import org.webeid.security.exceptions.TokenParseException;
+import org.webeid.security.exceptions.TokenSignatureValidationException;
+import org.webeid.security.exceptions.UserCertificateDisallowedPolicyException;
+import org.webeid.security.exceptions.UserCertificateMissingPurposeException;
+import org.webeid.security.exceptions.UserCertificateWrongPurposeException;
 import org.webeid.security.testutil.AbstractTestWithValidatorAndCorrectNonce;
 import org.webeid.security.testutil.Dates;
 import org.webeid.security.testutil.Tokens;
@@ -32,7 +37,8 @@ import org.webeid.security.testutil.Tokens;
 import java.text.ParseException;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.webeid.security.testutil.Dates.setMockedDefaultJwtParserDate;
+import static org.webeid.security.testutil.Dates.resetMockedFunctionalSubjectCertificateValidatorsDate;
+import static org.webeid.security.testutil.Dates.setMockedFunctionalSubjectCertificateValidatorsDate;
 
 class X5cTest extends AbstractTestWithValidatorAndCorrectNonce {
 
@@ -41,9 +47,20 @@ class X5cTest extends AbstractTestWithValidatorAndCorrectNonce {
     protected void setup() {
         super.setup();
         try {
-            // Ensure that certificate is valid
-            setMockedDefaultJwtParserDate(Dates.create("2020-09-25"));
+            // Ensure that the certificates do not expire.
+            setMockedFunctionalSubjectCertificateValidatorsDate(Dates.create("2021-01-01"));
         } catch (ParseException | NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    @AfterEach
+    public void tearDown() {
+        super.tearDown();
+        try {
+            resetMockedFunctionalSubjectCertificateValidatorsDate();
+        } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
     }
