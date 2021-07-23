@@ -86,10 +86,10 @@ import static javax.cache.configuration.FactoryBuilder.factoryOf;
     private static final long NONCE_TTL_MINUTES = 5;
     private static final String CACHE_NAME = "nonceCache";
 
-    private Cache<String, LocalDateTime> nonceCache() {
+    private Cache<String, ZonedDateTime> nonceCache() {
         CacheManager cacheManager = Caching.getCachingProvider(CaffeineCachingProvider.class.getName())
             .getCacheManager();
-        Cache<String, LocalDateTime> cache = cacheManager.getCache(CACHE_NAME);
+        Cache<String, ZonedDateTime> cache = cacheManager.getCache(CACHE_NAME);
 
         if (cache == null) {
             cache = createNonceCache(cacheManager);
@@ -97,9 +97,9 @@ import static javax.cache.configuration.FactoryBuilder.factoryOf;
         return cache;
     }
 
-    private Cache<String, LocalDateTime> createNonceCache(CacheManager cacheManager) {
-        CompleteConfiguration<String, LocalDateTime> cacheConfig = new MutableConfiguration<String, LocalDateTime>()
-                .setTypes(String.class, LocalDateTime.class)
+    private Cache<String, ZonedDateTime> createNonceCache(CacheManager cacheManager) {
+        CompleteConfiguration<String, ZonedDateTime> cacheConfig = new MutableConfiguration<String, ZonedDateTime>()
+                .setTypes(String.class, ZonedDateTime.class)
                 .setExpiryPolicyFactory(factoryOf(new CreatedExpiryPolicy(
                         new Duration(TimeUnit.MINUTES, NONCE_TTL_MINUTES + 1))));
         return cacheManager.createCache(CACHE_NAME, cacheConfig);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021 The Web eID Project
+ * Copyright (c) 2021 The Web eID Project
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -20,35 +20,18 @@
  * SOFTWARE.
  */
 
-package org.webeid.security.nonce;
+package org.webeid.security.util;
 
-import org.webeid.security.util.UtcDateTime;
-
-import javax.cache.Cache;
-import java.security.SecureRandom;
-import java.time.Duration;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
-import java.util.Base64;
 
-final class NonceGeneratorImpl implements NonceGenerator {
+public final class UtcDateTime {
 
-    private final Cache<String, ZonedDateTime> cache;
-    private final SecureRandom secureRandom;
-    private final Duration ttl;
-
-    NonceGeneratorImpl(Cache<String, ZonedDateTime> cache, SecureRandom secureRandom, Duration ttl) {
-        this.cache = cache;
-        this.secureRandom = secureRandom;
-        this.ttl = ttl;
+    public static ZonedDateTime now() {
+        return ZonedDateTime.now(ZoneOffset.UTC);
     }
 
-    @Override
-    public String generateAndStoreNonce() {
-        final byte[] nonceBytes = new byte[NONCE_LENGTH];
-        secureRandom.nextBytes(nonceBytes);
-        final ZonedDateTime expirationTime = UtcDateTime.now().plus(ttl);
-        final String base64StringNonce = Base64.getEncoder().encodeToString(nonceBytes);
-        cache.put(base64StringNonce, expirationTime);
-        return base64StringNonce;
+    private UtcDateTime() {
+        throw new IllegalStateException("Utility class");
     }
 }
