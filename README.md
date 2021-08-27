@@ -313,7 +313,7 @@ AuthTokenValidator validator = new AuthTokenValidatorBuilder()
 
 It is assumed that the AIA extension that contains the certificates’ OCSP service location, is part of both the user and CA certificates. The AIA OCSP URL will be used to check the certificate revocation status with OCSP.
 
-**Note that there may be legal limitations to using AIA URLs during signing** as there URLs provide different security and SLA guarantees than dedicated OCSP services. For digital signing, OCSP responder certificate validation is additionally needed. Using AIA URLs during authentication is sufficient, however.
+**Note that there may be legal limitations to using AIA URLs during signing** as the services behind these URLs provide different security and SLA guarantees than dedicated OCSP services. For digital signing, OCSP responder certificate validation is additionally needed. Using AIA URLs during authentication is sufficient, however.
 
 ## Possible validation errors  
 
