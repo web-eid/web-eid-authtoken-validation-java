@@ -143,6 +143,11 @@ import java.security.cert.X509Certificate;
 ...
 ```
 
+## 5. Add trusted OCSP responder certificates
+
+- AIA
+- Designated
+
 ## 5. Configure the authentication token validator
 
 Once the prerequisites have been met, the authentication token validator itself can be configured.
@@ -235,6 +240,8 @@ try {
 - [Nonce generation](#nonce-generation)
   - [Basic usage](#basic-usage-1)
   - [Extended configuration](#extended-configuration-1)
+- [Frequently asked questions](#frequently-asked-questions)
+  - [How can I find the AIA OCSP service URLs?](#how-can-i-find-the-aia-ocsp-service-urls)
 
 # Introduction
 
@@ -356,3 +363,14 @@ NonceGenerator generator = new NonceGeneratorBuilder()
         .withSecureRandom(customSecureRandom)  
         .build();
 ```
+
+## Frequently asked questions
+
+### How can I find the AIA OCSP service URLs?
+
+You can find the AIA OCSP service URLs from the electronic ID certificate profile documents, in the section that describes certificate extensions.
+The AIA OCSP extension OID is 1.3.6.1.5.5.7.48.1.
+
+For example, the EstEID AIA URLs are specified in the documents
+[*Certificate, CRL and OCSP Profile for identification documents of the Republic of Estonia*](https://www.skidsolutions.eu/upload/files/SK-CPR-ESTEID-EN-v8_4-20200630.pdf) and
+[*Certificate, CRL and OCSP Profile for ID-1 Format Identity Documents Issued by the Republic of Estonia*](https://www.skidsolutions.eu/upload/files/SK-CPR-ESTEID2018-EN-v1_2_20200630.pdf).

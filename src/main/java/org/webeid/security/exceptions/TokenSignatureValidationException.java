@@ -27,6 +27,6 @@ package org.webeid.security.exceptions;
  */
 public class TokenSignatureValidationException extends TokenValidationException {
     public TokenSignatureValidationException(Throwable cause) {
-        super("Token signature validation has failed:", cause);
+        super("Token signature validation has failed", cause);
     }
 }

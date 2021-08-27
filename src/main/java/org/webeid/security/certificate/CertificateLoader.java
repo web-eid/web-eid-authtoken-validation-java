@@ -20,32 +20,43 @@
  * SOFTWARE.
  */
 
-package org.webeid.security.testutil;
+package org.webeid.security.certificate;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 
 public final class CertificateLoader {
 
-    public static X509Certificate[] loadCertificatesFromResources(String... resourceNames) throws CertificateException {
-        List<X509Certificate> caCertificates = new ArrayList<>();
-        CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
+    public static X509Certificate[] loadCertificatesFromResources(String... resourceNames) throws CertificateException, IOException {
+        final List<X509Certificate> caCertificates = new ArrayList<>();
+        final CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
 
         for (final String resourceName : resourceNames) {
             try (final InputStream resourceAsStream = ClassLoader.getSystemResourceAsStream(resourceName)) {
                 X509Certificate caCertificate = (X509Certificate) certFactory.generateCertificate(resourceAsStream);
                 caCertificates.add(caCertificate);
-            } catch (IOException e) {
-                throw new RuntimeException("Error loading certificate resource.", e);
             }
         }
 
         return caCertificates.toArray(new X509Certificate[0]);
     }
 
+    public static X509Certificate loadCertificateFromBase64String(String certificate) throws CertificateException, IOException {
+        try (final InputStream targetStream = new ByteArrayInputStream(Base64.getDecoder().decode(certificate))) {
+            return (X509Certificate) CertificateFactory
+                .getInstance("X509")
+                .generateCertificate(targetStream);
+        }
+    }
+
+    private CertificateLoader() {
+        throw new IllegalStateException("Utility class");
+    }
 }

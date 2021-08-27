@@ -26,6 +26,8 @@ import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.webeid.security.exceptions.JceException;
+import org.webeid.security.validator.ocsp.service.AiaOcspServiceConfiguration;
+import org.webeid.security.validator.ocsp.service.DesignatedOcspServiceConfiguration;
 
 import javax.cache.Cache;
 import java.net.URI;
@@ -84,7 +86,10 @@ public class AuthTokenValidatorBuilder {
      */
     public AuthTokenValidatorBuilder withTrustedCertificateAuthorities(X509Certificate... certificates) {
         Collections.addAll(configuration.getTrustedCACertificates(), certificates);
-        LOG.debug("Trusted intermediate certificate authorities set to {}", configuration.getTrustedCACertificates());
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Trusted intermediate certificate authorities set to {}",
+                configuration.getTrustedCACertificates().stream().map(X509Certificate::getSubjectDN));
+        }
         return this;
     }
 
@@ -125,20 +130,19 @@ public class AuthTokenValidatorBuilder {
      */
     public AuthTokenValidatorBuilder withOcspRequestTimeout(Duration ocspRequestTimeout) {
         configuration.setOcspRequestTimeout(ocspRequestTimeout);
-        LOG.debug("OCSP request timeout set to {}.", ocspRequestTimeout);
+        LOG.debug("OCSP request timeout set to {}", ocspRequestTimeout);
         return this;
     }
 
-    /**
-     * Adds the given URLs to the list of OCSP URLs for which the nonce protocol extension will be disabled.
-     * The OCSP URL is extracted from the user certificate and some OCSP services don't support the nonce extension.
-     *
-     * @param urls OCSP URLs for which the nonce protocol extension will be disabled
-     * @return the builder instance for method chaining
-     */
-    public AuthTokenValidatorBuilder withNonceDisabledOcspUrls(URI... urls) {
-        Collections.addAll(configuration.getNonceDisabledOcspUrls(), urls);
-        LOG.debug("OCSP URLs for which the nonce protocol extension is disabled set to {}", configuration.getNonceDisabledOcspUrls());
+    public AuthTokenValidatorBuilder withAiaOcspServiceConfiguration(AiaOcspServiceConfiguration serviceConfiguration) {
+        configuration.setAiaOcspServiceConfiguration(serviceConfiguration);
+        LOG.debug("Using AIA OCSP service configuration");
+        return this;
+    }
+
+    public AuthTokenValidatorBuilder withDesignatedOcspServiceConfiguration(DesignatedOcspServiceConfiguration serviceConfiguration) {
+        configuration.setDesignatedOcspServiceConfiguration(serviceConfiguration);
+        LOG.debug("Using designated OCSP service configuration");
         return this;
     }
 

@@ -22,20 +22,19 @@
 
 package org.webeid.security.validator.validators;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.webeid.security.exceptions.JceException;
-import org.webeid.security.exceptions.UserCertificateNotTrustedException;
+import org.webeid.security.exceptions.TokenValidationException;
+import org.webeid.security.exceptions.CertificateNotTrustedException;
 import org.webeid.security.validator.AuthTokenValidatorData;
 
-import java.security.InvalidAlgorithmParameterException;
-import java.security.NoSuchAlgorithmException;
-import java.security.cert.*;
+import java.security.cert.CertStore;
+import java.security.cert.TrustAnchor;
+import java.security.cert.X509Certificate;
 import java.util.Set;
+
+import static org.webeid.security.certificate.CertificateValidator.validateIsSignedByTrustedCA;
 
 public final class SubjectCertificateTrustedValidator {
 
-    private static final Logger LOG = LoggerFactory.getLogger(SubjectCertificateTrustedValidator.class);
 
     private final Set<TrustAnchor> trustedCACertificateAnchors;
     private final CertStore trustedCACertificateCertStore;
@@ -50,32 +49,11 @@ public final class SubjectCertificateTrustedValidator {
      * Validates that the user certificate from the authentication token is signed by a trusted certificate authority.
      *
      * @param actualTokenData authentication token data that contains the user certificate.
-     * @throws UserCertificateNotTrustedException when user certificate is not signed by a trusted CA or is valid after CA certificate.
+     * @throws CertificateNotTrustedException when user certificate is not signed by a trusted CA.
      */
-    public void validateCertificateTrusted(AuthTokenValidatorData actualTokenData) throws UserCertificateNotTrustedException, JceException {
-
+    public void validateCertificateTrusted(AuthTokenValidatorData actualTokenData) throws TokenValidationException {
         final X509Certificate certificate = actualTokenData.getSubjectCertificate();
-
-        final X509CertSelector selector = new X509CertSelector();
-        selector.setCertificate(certificate);
-
-        try {
-            final PKIXBuilderParameters pkixBuilderParameters = new PKIXBuilderParameters(trustedCACertificateAnchors, selector);
-            pkixBuilderParameters.setRevocationEnabled(false);
-            pkixBuilderParameters.addCertStore(trustedCACertificateCertStore);
-
-            // See the comment in AuthTokenValidatorImpl constructor why we use the default JCE provider.
-            final CertPathBuilder certPathBuilder = CertPathBuilder.getInstance(CertPathBuilder.getDefaultType());
-            final PKIXCertPathBuilderResult result = (PKIXCertPathBuilderResult) certPathBuilder.build(pkixBuilderParameters);
-
-            subjectCertificateIssuerCertificate = result.getTrustAnchor().getTrustedCert();
-
-        } catch (InvalidAlgorithmParameterException | NoSuchAlgorithmException e) {
-            throw new JceException(e);
-        } catch (CertPathBuilderException e) {
-            LOG.trace("Error verifying signer's certificate {}: {}", certificate.getSubjectDN(), e);
-            throw new UserCertificateNotTrustedException();
-        }
+        subjectCertificateIssuerCertificate = validateIsSignedByTrustedCA(certificate, trustedCACertificateAnchors, trustedCACertificateCertStore);
     }
 
     public X509Certificate getSubjectCertificateIssuerCertificate() {

@@ -27,6 +27,6 @@ package org.webeid.security.exceptions;
  */
 public class UserCertificateExpiredException extends TokenValidationException {
     public UserCertificateExpiredException(Throwable cause) {
-        super("User certificate has expired:", cause);
+        super("User certificate has expired", cause);
     }
 }

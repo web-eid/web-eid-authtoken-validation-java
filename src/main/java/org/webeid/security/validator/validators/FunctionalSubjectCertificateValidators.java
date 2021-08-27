@@ -25,14 +25,17 @@ package org.webeid.security.validator.validators;
 import io.jsonwebtoken.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.webeid.security.exceptions.*;
+import org.webeid.security.exceptions.TokenValidationException;
+import org.webeid.security.exceptions.UserCertificateMissingPurposeException;
+import org.webeid.security.exceptions.UserCertificateParseException;
+import org.webeid.security.exceptions.UserCertificateWrongPurposeException;
 import org.webeid.security.validator.AuthTokenValidatorData;
 
-import java.security.cert.CertificateExpiredException;
-import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.CertificateParsingException;
 import java.util.Date;
 import java.util.List;
+
+import static org.webeid.security.certificate.CertificateValidator.certificateIsValidOnDate;
 
 public final class FunctionalSubjectCertificateValidators {
 
@@ -46,15 +49,9 @@ public final class FunctionalSubjectCertificateValidators {
      * @throws TokenValidationException when the user certificate is expired or not yet valid
      */
     public static void validateCertificateExpiry(AuthTokenValidatorData actualTokenData) throws TokenValidationException {
-        try {
-            // Use JJWT Clock interface so that the date can be mocked in tests.
-            actualTokenData.getSubjectCertificate().checkValidity(DefaultClock.INSTANCE.now());
-            LOG.debug("User certificate is valid.");
-        } catch (CertificateNotYetValidException e) {
-            throw new UserCertificateNotYetValidException(e);
-        } catch (CertificateExpiredException e) {
-            throw new UserCertificateExpiredException(e);
-        }
+        // Use JJWT Clock interface so that the date can be mocked in tests.
+        certificateIsValidOnDate(actualTokenData.getSubjectCertificate(), DefaultClock.INSTANCE.now());
+        LOG.debug("User certificate is valid.");
     }
 
     /**

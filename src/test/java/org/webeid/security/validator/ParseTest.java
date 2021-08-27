@@ -27,7 +27,7 @@ import org.webeid.security.exceptions.TokenParseException;
 import org.webeid.security.exceptions.TokenSignatureValidationException;
 import org.webeid.security.testutil.AbstractTestWithMockedDateValidatorAndCorrectNonce;
 import org.webeid.security.testutil.Tokens;
-import org.webeid.security.util.CertUtil;
+import org.webeid.security.certificate.CertificateData;
 
 import java.security.cert.X509Certificate;
 
@@ -48,15 +48,15 @@ class ParseTest extends AbstractTestWithMockedDateValidatorAndCorrectNonce {
     @Test
     void parseSignedToken() throws Exception {
         final X509Certificate result = validator.validate(Tokens.SIGNED);
-        assertThat(CertUtil.getSubjectCN(result))
+        assertThat(CertificateData.getSubjectCN(result))
             .isEqualTo("JÕEORG\\,JAAK-KRISTJAN\\,38001085718");
-        assertThat(toTitleCase(CertUtil.getSubjectGivenName(result)))
+        assertThat(toTitleCase(CertificateData.getSubjectGivenName(result)))
             .isEqualTo("Jaak-Kristjan");
-        assertThat(toTitleCase(CertUtil.getSubjectSurname(result)))
+        assertThat(toTitleCase(CertificateData.getSubjectSurname(result)))
             .isEqualTo("Jõeorg");
-        assertThat(CertUtil.getSubjectIdCode(result))
+        assertThat(CertificateData.getSubjectIdCode(result))
             .isEqualTo("PNOEE-38001085718");
-        assertThat(CertUtil.getSubjectCountryCode(result))
+        assertThat(CertificateData.getSubjectCountryCode(result))
             .isEqualTo("EE");
     }
 

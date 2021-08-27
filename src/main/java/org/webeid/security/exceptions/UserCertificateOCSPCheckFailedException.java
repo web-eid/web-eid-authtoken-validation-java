@@ -25,12 +25,12 @@ package org.webeid.security.exceptions;
 /**
  * Thrown when user certificate revocation check with OCSP fails.
  */
-public class UserCertificateRevocationCheckFailedException extends TokenValidationException {
-    public UserCertificateRevocationCheckFailedException(Throwable cause) {
-        super("User certificate revocation check has failed:", cause);
+public class UserCertificateOCSPCheckFailedException extends TokenValidationException {
+    public UserCertificateOCSPCheckFailedException(Throwable cause) {
+        super("User certificate revocation check has failed", cause);
     }
 
-    public UserCertificateRevocationCheckFailedException(String message) {
+    public UserCertificateOCSPCheckFailedException(String message) {
         super("User certificate revocation check has failed: " + message);
     }
 }

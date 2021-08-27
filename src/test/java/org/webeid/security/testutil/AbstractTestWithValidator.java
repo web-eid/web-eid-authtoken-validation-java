@@ -26,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.webeid.security.exceptions.JceException;
 import org.webeid.security.validator.AuthTokenValidator;
 
+import java.io.IOException;
 import java.security.cert.CertificateException;
 
 import static org.webeid.security.testutil.AuthTokenValidators.getAuthTokenValidator;
@@ -40,7 +41,7 @@ public class AbstractTestWithValidator extends AbstractTestWithCache {
         super.setup();
         try {
             validator = getAuthTokenValidator(cache);
-        } catch (CertificateException | JceException e) {
+        } catch (CertificateException | JceException | IOException e) {
             throw new RuntimeException(e);
         }
     }

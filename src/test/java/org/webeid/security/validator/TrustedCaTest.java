@@ -25,10 +25,11 @@ package org.webeid.security.validator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.webeid.security.exceptions.JceException;
-import org.webeid.security.exceptions.UserCertificateNotTrustedException;
+import org.webeid.security.exceptions.CertificateNotTrustedException;
 import org.webeid.security.testutil.AbstractTestWithMockedDateAndCorrectNonce;
 import org.webeid.security.testutil.Tokens;
 
+import java.io.IOException;
 import java.security.cert.CertificateException;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -44,7 +45,7 @@ class TrustedCaTest extends AbstractTestWithMockedDateAndCorrectNonce {
         super.setup();
         try {
             validator = getAuthTokenValidatorWithWrongTrustedCA(cache);
-        } catch (CertificateException | JceException e) {
+        } catch (CertificateException | JceException | IOException e) {
             throw new RuntimeException(e);
         }
     }
@@ -52,7 +53,7 @@ class TrustedCaTest extends AbstractTestWithMockedDateAndCorrectNonce {
     @Test
     void detectUntrustedUserCertificate() {
         assertThatThrownBy(() -> validator.validate(Tokens.SIGNED))
-            .isInstanceOf(UserCertificateNotTrustedException.class);
+            .isInstanceOf(CertificateNotTrustedException.class);
     }
 
 }

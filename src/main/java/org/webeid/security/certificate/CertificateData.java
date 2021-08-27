@@ -20,7 +20,7 @@
  * SOFTWARE.
  */
 
-package org.webeid.security.util;
+package org.webeid.security.certificate;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x500.RDN;
@@ -34,7 +34,7 @@ import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-public final class CertUtil {
+public final class CertificateData {
 
     public static String getSubjectCN(X509Certificate certificate) throws CertificateEncodingException {
         return getField(certificate, BCStyle.CN);
@@ -65,7 +65,7 @@ public final class CertUtil {
             .collect(Collectors.joining(", "));
     }
 
-    private CertUtil() {
+    private CertificateData() {
         throw new IllegalStateException("Utility class");
     }
 

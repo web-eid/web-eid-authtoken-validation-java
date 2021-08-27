@@ -27,6 +27,6 @@ package org.webeid.security.exceptions;
  */
 public class UserCertificateNotYetValidException extends TokenValidationException {
     public UserCertificateNotYetValidException(Throwable cause) {
-        super("User certificate is not yet valid:", cause);
+        super("User certificate is not yet valid", cause);
     }
 }
