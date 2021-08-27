@@ -7,6 +7,7 @@ import org.webeid.security.exceptions.UserCertificateDisallowedPolicyException;
 import org.webeid.security.testutil.AbstractTestWithMockedDateAndCorrectNonce;
 import org.webeid.security.testutil.Tokens;
 
+import java.io.IOException;
 import java.security.cert.CertificateException;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -20,7 +21,7 @@ class SubjectCertificatePolicyValidatorTest extends AbstractTestWithMockedDateAn
     void setUp() {
         try {
             validator = getAuthTokenValidatorWithDisallowedESTEIDPolicy(cache);
-        } catch (CertificateException | JceException e) {
+        } catch (CertificateException | JceException | IOException e) {
             throw new RuntimeException(e);
         }
     }

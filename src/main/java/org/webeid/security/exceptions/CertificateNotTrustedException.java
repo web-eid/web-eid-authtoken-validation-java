@@ -22,15 +22,15 @@
 
 package org.webeid.security.exceptions;
 
+import java.security.cert.X509Certificate;
+
 /**
- * Thrown when the user certificate is not trusted.
+ * Thrown when the given certificate is not signed by a trusted CA.
  */
-public class UserCertificateNotTrustedException extends TokenValidationException {
-    public UserCertificateNotTrustedException() {
-        super("User certificate is not trusted");
+public class CertificateNotTrustedException extends TokenValidationException {
+
+    public CertificateNotTrustedException(X509Certificate certificate, Throwable e) {
+        super("Certificate " + certificate.getSubjectDN() + " is not trusted", e);
     }
 
-    public UserCertificateNotTrustedException(String msg) {
-        super("User certificate is not trusted: " + msg);
-    }
 }

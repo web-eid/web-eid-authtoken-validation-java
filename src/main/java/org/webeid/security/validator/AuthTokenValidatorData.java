@@ -36,7 +36,7 @@ public final class AuthTokenValidatorData {
     private String origin;
     private String siteCertificateFingerprint;
 
-    AuthTokenValidatorData(X509Certificate subjectCertificate) {
+    public AuthTokenValidatorData(X509Certificate subjectCertificate) {
         this.subjectCertificate = subjectCertificate;
     }
 

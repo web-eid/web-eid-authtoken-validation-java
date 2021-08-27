@@ -28,6 +28,6 @@ package org.webeid.security.exceptions;
 public class TokenExpiredException extends TokenValidationException {
 
     public TokenExpiredException(Throwable cause) {
-        super("Token has expired:", cause);
+        super("Token has expired", cause);
     }
 }

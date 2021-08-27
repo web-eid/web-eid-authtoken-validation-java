@@ -27,7 +27,7 @@ package org.webeid.security.exceptions;
  */
 public class TokenParseException extends TokenValidationException {
     public TokenParseException(Throwable cause) {
-        super("Error parsing token:", cause);
+        super("Error parsing token", cause);
     }
 
     public TokenParseException(String message) {

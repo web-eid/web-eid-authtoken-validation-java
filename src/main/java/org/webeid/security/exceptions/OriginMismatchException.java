@@ -35,6 +35,6 @@ public class OriginMismatchException extends TokenValidationException {
     }
 
     public OriginMismatchException(Throwable cause) {
-        super(MESSAGE + ":", cause);
+        super(MESSAGE, cause);
     }
 }

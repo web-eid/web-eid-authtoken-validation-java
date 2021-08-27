@@ -27,6 +27,6 @@ package org.webeid.security.exceptions;
  */
 public class UserCertificateParseException extends TokenValidationException {
     public UserCertificateParseException(Throwable cause) {
-        super("Error parsing certificate:", cause);
+        super("Error parsing certificate", cause);
     }
 }

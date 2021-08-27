@@ -39,49 +39,64 @@
 
 package org.webeid.security.validator.ocsp;
 
-import okhttp3.*;
-import org.bouncycastle.asn1.*;
+import org.bouncycastle.asn1.ASN1Encodable;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.ASN1Primitive;
+import org.bouncycastle.asn1.BERTags;
+import org.bouncycastle.asn1.DLSequence;
+import org.bouncycastle.asn1.DLTaggedObject;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
-import org.bouncycastle.cert.ocsp.OCSPReq;
-import org.bouncycastle.cert.ocsp.OCSPResp;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.webeid.security.exceptions.OCSPCertificateException;
 
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
-import java.util.Objects;
 
 public final class OcspUtils {
 
-    private static final Logger LOG = LoggerFactory.getLogger(OcspUtils.class);
-
+    /**
+     * Indicates that a X.509 Certificates corresponding private key may be used by an authority to sign OCSP responses.
+     * <p>
+     * https://oidref.com/1.3.6.1.5.5.7.3.9
+     */
+    private static final String OID_OCSP_SIGNING = "1.3.6.1.5.5.7.3.9";
     /**
      * The OID for OCSP responder URLs.
      * <p>
-     * http://www.alvestrand.no/objectid/1.3.6.1.5.5.7.48.1.html
+     * https://oidref.com/1.3.6.1.5.5.7.48.1
      */
     private static final ASN1ObjectIdentifier OCSP_RESPONDER_OID
         = new ASN1ObjectIdentifier("1.3.6.1.5.5.7.48.1").intern();
 
-    private static final MediaType OCSP_REQUEST_TYPE = MediaType.get("application/ocsp-request");
-    private static final MediaType OCSP_RESPONSE_TYPE = MediaType.get("application/ocsp-response");
-
-    private OcspUtils() {
+    public static void validateHasSigningExtension(X509Certificate cert) throws OCSPCertificateException {
+        try {
+            if (cert.getExtendedKeyUsage() == null || !cert.getExtendedKeyUsage().contains(OID_OCSP_SIGNING)) {
+                throw new OCSPCertificateException("Certificate " + cert.getSubjectDN() +
+                    " does not contain the key usage extension for OCSP response signing");
+            }
+        } catch (CertificateParsingException e) {
+            throw new OCSPCertificateException("Certificate parsing failed:", e);
+        }
     }
 
     /**
      * Returns the OCSP responder {@link URI} or {@code null} if it doesn't have one.
      */
-    public static URI ocspUri(X509Certificate certificate) throws IOException {
+    public static URI ocspUri(X509Certificate certificate)  {
         final byte[] value = certificate.getExtensionValue(Extension.authorityInfoAccess.getId());
         if (value == null) {
             return null;
         }
 
-        final ASN1Primitive authorityInfoAccess = JcaX509ExtensionUtils.parseExtensionValue(value);
+        final ASN1Primitive authorityInfoAccess;
+        try {
+            authorityInfoAccess = JcaX509ExtensionUtils.parseExtensionValue(value);
+        } catch (IOException e) {
+            return null;
+        }
         if (!(authorityInfoAccess instanceof DLSequence)) {
             return null;
         }
@@ -96,7 +111,12 @@ public final class OcspUtils {
             return null;
         }
 
-        final byte[] encoded = taggedObject.getEncoded();
+        final byte[] encoded;
+        try {
+            encoded = taggedObject.getEncoded();
+        } catch (IOException e) {
+            return null;
+        }
         int length = (int) encoded[1] & 0xFF;
         final String uri = new String(encoded, 2, length, StandardCharsets.UTF_8);
         return URI.create(uri);
@@ -124,36 +144,7 @@ public final class OcspUtils {
         return null;
     }
 
-    /**
-     * Use OkHttpClient to fetch the OCSP response from the CA's OCSP responder server.
-     *
-     * @param uri        OCSP server URL
-     * @param ocspReq    OCSP request
-     * @param httpClient OkHttpClient instance
-     * @return OCSP response from the server
-     * @throws IOException if the request could not be executed due to cancellation, a connectivity problem or timeout,
-     *                     or if the response status is not successful, or if response has wrong content type.
-     */
-    public static OCSPResp request(URI uri, OCSPReq ocspReq, OkHttpClient httpClient) throws IOException {
-        final RequestBody requestBody = RequestBody.create(ocspReq.getEncoded(), OCSP_REQUEST_TYPE);
-        final Request request = new Request.Builder()
-            .url(uri.toURL())
-            .post(requestBody)
-            .build();
-
-        try (final Response response = httpClient.newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("OCSP request was not successful, response: " + response);
-            } else {
-                LOG.debug("OCSP response: {}", response);
-            }
-            try (final ResponseBody responseBody = Objects.requireNonNull(response.body())) {
-                if (!OCSP_RESPONSE_TYPE.equals(responseBody.contentType())) {
-                    throw new IOException("OCSP response content type is not " + OCSP_RESPONSE_TYPE);
-                }
-                return new OCSPResp(responseBody.bytes());
-            }
-        }
+    private OcspUtils() {
+        throw new IllegalStateException("Utility class");
     }
-
 }

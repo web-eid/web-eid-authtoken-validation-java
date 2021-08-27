@@ -28,6 +28,8 @@ import org.webeid.security.exceptions.*;
 import org.webeid.security.testutil.AbstractTestWithMockedDateAndCorrectNonce;
 import org.webeid.security.testutil.Tokens;
 
+import java.io.IOException;
+import java.net.URISyntaxException;
 import java.security.cert.CertificateException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,7 +46,7 @@ class OcspTest extends AbstractTestWithMockedDateAndCorrectNonce {
         super.setup();
         try {
             validator = getAuthTokenValidatorWithOcspCheck(cache);
-        } catch (CertificateException | JceException e) {
+        } catch (CertificateException | JceException | URISyntaxException | IOException e) {
             throw new RuntimeException(e);
         }
     }
@@ -58,7 +60,7 @@ class OcspTest extends AbstractTestWithMockedDateAndCorrectNonce {
         } catch (TokenValidationException e) {
             assertThat(e).isInstanceOfAny(
                 UserCertificateRevokedException.class,
-                UserCertificateRevocationCheckFailedException.class
+                UserCertificateOCSPCheckFailedException.class
             );
         }
     }
@@ -67,13 +69,13 @@ class OcspTest extends AbstractTestWithMockedDateAndCorrectNonce {
     void testTokenCertRsaExpired() {
         assertThatThrownBy(() -> validator.validate(Tokens.TOKEN_CERT_RSA_EXIPRED))
             .isInstanceOf(UserCertificateExpiredException.class)
-            .hasMessageStartingWith("User certificate has expired:");
+            .hasMessageStartingWith("User certificate has expired");
     }
 
     @Test
     void testTokenCertEcdsaExpired() {
         assertThatThrownBy(() -> validator.validate(Tokens.TOKEN_CERT_ECDSA_EXIPRED))
             .isInstanceOf(UserCertificateExpiredException.class)
-            .hasMessageStartingWith("User certificate has expired:");
+            .hasMessageStartingWith("User certificate has expired");
     }
 }
