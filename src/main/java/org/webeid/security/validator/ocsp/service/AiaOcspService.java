@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2020-2021 Estonian Information System Authority
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 package org.webeid.security.validator.ocsp.service;
 
 import org.bouncycastle.cert.X509CertificateHolder;
@@ -5,17 +27,20 @@ import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.webeid.security.exceptions.OCSPCertificateException;
 import org.webeid.security.exceptions.TokenValidationException;
 import org.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
-import org.webeid.security.validator.ocsp.OcspUtils;
 
 import java.net.URI;
+import java.security.cert.CertStore;
 import java.security.cert.CertificateException;
+import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.Objects;
+import java.util.Set;
 
 import static org.webeid.security.certificate.CertificateValidator.certificateIsValidOnDate;
 import static org.webeid.security.certificate.CertificateValidator.validateIsSignedByTrustedCA;
-import static org.webeid.security.validator.ocsp.OcspUtils.validateHasSigningExtension;
+import static org.webeid.security.validator.ocsp.OcspResponseValidator.validateHasSigningExtension;
+import static org.webeid.security.validator.ocsp.OcspUrl.getOcspUri;
 
 /**
  * An OCSP service that uses the responders from the Certificates' Authority Information Access (AIA) extension.
@@ -23,23 +48,26 @@ import static org.webeid.security.validator.ocsp.OcspUtils.validateHasSigningExt
 public class AiaOcspService implements OcspService {
 
     private final JcaX509CertificateConverter certificateConverter = new JcaX509CertificateConverter();
-
+    private final Set<TrustAnchor> trustedCACertificateAnchors;
+    private final CertStore trustedCACertificateCertStore;
     private final URI url;
-    private final AiaOcspResponderConfiguration configuration;
+    private final boolean supportsNonce;
 
-    public AiaOcspService(AiaOcspServiceConfiguration aiaOcspServiceConfiguration, X509Certificate certificate) throws TokenValidationException {
-        this.url = getOcspAiaUrlFromCertificate(certificate);
-        Objects.requireNonNull(aiaOcspServiceConfiguration, "aiaOcspServiceConfiguration");
-        this.configuration = aiaOcspServiceConfiguration.getResponderConfigurationForUrl(this.url);
+    public AiaOcspService(AiaOcspServiceConfiguration configuration, X509Certificate certificate) throws TokenValidationException {
+        Objects.requireNonNull(configuration);
+        this.trustedCACertificateAnchors = configuration.getTrustedCACertificateAnchors();
+        this.trustedCACertificateCertStore = configuration.getTrustedCACertificateCertStore();
+        this.url = getOcspAiaUrlFromCertificate(Objects.requireNonNull(certificate));
+        this.supportsNonce = !configuration.getNonceDisabledOcspUrls().contains(this.url);
     }
 
     @Override
     public boolean doesSupportNonce() {
-        return configuration.doesSupportNonce();
+        return supportsNonce;
     }
 
     @Override
-    public URI getUrl() {
+    public URI getAccessLocation() {
         return url;
     }
 
@@ -47,20 +75,17 @@ public class AiaOcspService implements OcspService {
     public void validateResponderCertificate(X509CertificateHolder cert, Date producedAt) throws TokenValidationException {
         try {
             final X509Certificate certificate = certificateConverter.getCertificate(cert);
-            certificateIsValidOnDate(certificate, producedAt);
+            certificateIsValidOnDate(certificate, producedAt, "AIA OCSP responder");
+            // Trusted certificates' validity has been already verified in validateCertificateExpiry().
             validateHasSigningExtension(certificate);
-            validateIsSignedByTrustedCA(
-                certificate,
-                configuration.getTrustedCACertificateAnchors(),
-                configuration.getTrustedCACertificateCertStore()
-            );
+            validateIsSignedByTrustedCA(certificate, trustedCACertificateAnchors, trustedCACertificateCertStore);
         } catch (CertificateException e) {
-            throw new OCSPCertificateException("Invalid certificate", e);
+            throw new OCSPCertificateException("Invalid responder certificate", e);
         }
     }
 
     private static URI getOcspAiaUrlFromCertificate(X509Certificate certificate) throws TokenValidationException {
-        final URI uri = OcspUtils.ocspUri(Objects.requireNonNull(certificate, "certificate"));
+        final URI uri = getOcspUri(certificate);
         if (uri == null) {
             throw new UserCertificateOCSPCheckFailedException("Getting the AIA OCSP responder field from the certificate failed");
         }

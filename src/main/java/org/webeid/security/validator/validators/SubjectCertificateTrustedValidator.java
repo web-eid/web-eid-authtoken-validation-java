@@ -22,8 +22,10 @@
 
 package org.webeid.security.validator.validators;
 
-import org.webeid.security.exceptions.TokenValidationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.webeid.security.exceptions.CertificateNotTrustedException;
+import org.webeid.security.exceptions.TokenValidationException;
 import org.webeid.security.validator.AuthTokenValidatorData;
 
 import java.security.cert.CertStore;
@@ -35,6 +37,7 @@ import static org.webeid.security.certificate.CertificateValidator.validateIsSig
 
 public final class SubjectCertificateTrustedValidator {
 
+    private static final Logger LOG = LoggerFactory.getLogger(SubjectCertificateTrustedValidator.class);
 
     private final Set<TrustAnchor> trustedCACertificateAnchors;
     private final CertStore trustedCACertificateCertStore;
@@ -54,6 +57,7 @@ public final class SubjectCertificateTrustedValidator {
     public void validateCertificateTrusted(AuthTokenValidatorData actualTokenData) throws TokenValidationException {
         final X509Certificate certificate = actualTokenData.getSubjectCertificate();
         subjectCertificateIssuerCertificate = validateIsSignedByTrustedCA(certificate, trustedCACertificateAnchors, trustedCACertificateCertStore);
+        LOG.debug("Subject certificate is signed by a trusted CA");
     }
 
     public X509Certificate getSubjectCertificateIssuerCertificate() {

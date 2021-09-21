@@ -24,7 +24,10 @@ package org.webeid.security.validator;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.webeid.security.exceptions.*;
+import org.webeid.security.exceptions.JceException;
+import org.webeid.security.exceptions.TokenValidationException;
+import org.webeid.security.exceptions.CertificateExpiredException;
+import org.webeid.security.exceptions.UserCertificateRevokedException;
 import org.webeid.security.testutil.AbstractTestWithMockedDateAndCorrectNonce;
 import org.webeid.security.testutil.Tokens;
 
@@ -34,6 +37,7 @@ import java.security.cert.CertificateException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.webeid.security.testutil.AuthTokenValidators.getAuthTokenValidatorWithDesignatedOcspCheck;
 import static org.webeid.security.testutil.AuthTokenValidators.getAuthTokenValidatorWithOcspCheck;
 
 class OcspTest extends AbstractTestWithMockedDateAndCorrectNonce {
@@ -53,29 +57,35 @@ class OcspTest extends AbstractTestWithMockedDateAndCorrectNonce {
 
     @Test
     void detectRevokedUserCertificate() {
-        // This test had flaky results as OCSP requests sometimes failed, sometimes passed.
-        // Hence the catch which may or may not execute instead of assertThatThrownBy().
         try {
             validator.validate(Tokens.SIGNED);
         } catch (TokenValidationException e) {
-            assertThat(e).isInstanceOfAny(
-                UserCertificateRevokedException.class,
-                UserCertificateOCSPCheckFailedException.class
-            );
+            assertThat(e).isInstanceOf(UserCertificateRevokedException.class);
+        }
+    }
+
+    @Test
+    void detectRevokedUserCertificateWithDesignatedOcspService() throws Exception {
+        final AuthTokenValidator validatorWithDesignatedOcspCheck = getAuthTokenValidatorWithDesignatedOcspCheck(cache);
+        try {
+            validatorWithDesignatedOcspCheck.validate(Tokens.SIGNED);
+        } catch (TokenValidationException e) {
+            assertThat(e).isInstanceOf(UserCertificateRevokedException.class);
         }
     }
 
     @Test
     void testTokenCertRsaExpired() {
         assertThatThrownBy(() -> validator.validate(Tokens.TOKEN_CERT_RSA_EXIPRED))
-            .isInstanceOf(UserCertificateExpiredException.class)
+            .isInstanceOf(CertificateExpiredException.class)
             .hasMessageStartingWith("User certificate has expired");
     }
 
     @Test
     void testTokenCertEcdsaExpired() {
         assertThatThrownBy(() -> validator.validate(Tokens.TOKEN_CERT_ECDSA_EXIPRED))
-            .isInstanceOf(UserCertificateExpiredException.class)
+            .isInstanceOf(CertificateExpiredException.class)
             .hasMessageStartingWith("User certificate has expired");
     }
+
 }
