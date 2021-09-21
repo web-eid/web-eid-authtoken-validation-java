@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Web eID Project
+ * Copyright (c) 2020-2021 Estonian Information System Authority
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,10 +23,10 @@
 package org.webeid.security.exceptions;
 
 /**
- * Thrown when the user certificate valid from date is in the future.
+ * Thrown when the certificate's valid until date is in the past.
  */
-public class UserCertificateNotYetValidException extends TokenValidationException {
-    public UserCertificateNotYetValidException(Throwable cause) {
-        super("User certificate is not yet valid", cause);
+public class CertificateExpiredException extends TokenValidationException {
+    public CertificateExpiredException(String subject, Throwable cause) {
+        super(subject + " certificate has expired", cause);
     }
 }

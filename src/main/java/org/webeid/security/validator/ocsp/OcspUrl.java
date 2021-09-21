@@ -1,28 +1,6 @@
 /*
- * Copyright (c) 2020 The Web eID Project
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
-
-/*
- * Copyright 2017 The Netty Project
- * Copyright 2020 The Web eID project
+ * Copyright (c) 2017 The Netty Project
+ * Copyright (c) 2020-2021 Estonian Information System Authority
  *
  * The Netty Project and The Web eID Project license this file to you under the
  * Apache License, version 2.0 (the "License"); you may not use this file except
@@ -47,22 +25,17 @@ import org.bouncycastle.asn1.DLSequence;
 import org.bouncycastle.asn1.DLTaggedObject;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
-import org.webeid.security.exceptions.OCSPCertificateException;
 
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
+import java.util.Objects;
 
-public final class OcspUtils {
+public final class OcspUrl {
 
-    /**
-     * Indicates that a X.509 Certificates corresponding private key may be used by an authority to sign OCSP responses.
-     * <p>
-     * https://oidref.com/1.3.6.1.5.5.7.3.9
-     */
-    private static final String OID_OCSP_SIGNING = "1.3.6.1.5.5.7.3.9";
+    public static final URI AIA_ESTEID_2015 = URI.create("http://aia.sk.ee/esteid2015");
+
     /**
      * The OID for OCSP responder URLs.
      * <p>
@@ -71,21 +44,11 @@ public final class OcspUtils {
     private static final ASN1ObjectIdentifier OCSP_RESPONDER_OID
         = new ASN1ObjectIdentifier("1.3.6.1.5.5.7.48.1").intern();
 
-    public static void validateHasSigningExtension(X509Certificate cert) throws OCSPCertificateException {
-        try {
-            if (cert.getExtendedKeyUsage() == null || !cert.getExtendedKeyUsage().contains(OID_OCSP_SIGNING)) {
-                throw new OCSPCertificateException("Certificate " + cert.getSubjectDN() +
-                    " does not contain the key usage extension for OCSP response signing");
-            }
-        } catch (CertificateParsingException e) {
-            throw new OCSPCertificateException("Certificate parsing failed:", e);
-        }
-    }
-
     /**
      * Returns the OCSP responder {@link URI} or {@code null} if it doesn't have one.
      */
-    public static URI ocspUri(X509Certificate certificate)  {
+    public static URI getOcspUri(X509Certificate certificate) {
+        Objects.requireNonNull(certificate, "certificate");
         final byte[] value = certificate.getExtensionValue(Extension.authorityInfoAccess.getId());
         if (value == null) {
             return null;
@@ -94,7 +57,7 @@ public final class OcspUtils {
         final ASN1Primitive authorityInfoAccess;
         try {
             authorityInfoAccess = JcaX509ExtensionUtils.parseExtensionValue(value);
-        } catch (IOException e) {
+        } catch (IOException | IllegalArgumentException e) {
             return null;
         }
         if (!(authorityInfoAccess instanceof DLSequence)) {
@@ -117,7 +80,7 @@ public final class OcspUtils {
         } catch (IOException e) {
             return null;
         }
-        int length = (int) encoded[1] & 0xFF;
+        int length = encoded[1] & 0xFF;
         final String uri = new String(encoded, 2, length, StandardCharsets.UTF_8);
         return URI.create(uri);
     }
@@ -144,7 +107,7 @@ public final class OcspUtils {
         return null;
     }
 
-    private OcspUtils() {
+    private OcspUrl() {
         throw new IllegalStateException("Utility class");
     }
 }

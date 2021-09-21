@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021 The Web eID Project
+ * Copyright (c) 2020-2021 Estonian Information System Authority
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,7 +26,6 @@ import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.webeid.security.exceptions.JceException;
-import org.webeid.security.validator.ocsp.service.AiaOcspServiceConfiguration;
 import org.webeid.security.validator.ocsp.service.DesignatedOcspServiceConfiguration;
 
 import javax.cache.Cache;
@@ -35,6 +34,7 @@ import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.Collections;
+import java.util.stream.Collectors;
 
 /**
  * Builder for constructing {@link AuthTokenValidator} instances.
@@ -75,9 +75,10 @@ public class AuthTokenValidatorBuilder {
     }
 
     /**
-     * Adds the given certificates to the list of trusted subject certificate intermediate Certificate Authorities.
-     * In order for the user certificate to be considered valid, the certificate of the issuer of the user certificate
-     * must be present in this list.
+     * Adds the given certificates to the list of trusted intermediate Certificate Authorities
+     * used during validation of subject and OCSP responder certificates.
+     * In order for a user or OCSP responder certificate to be considered valid, the certificate
+     * of the issuer of the certificate must be present in this list.
      * <p>
      * At least one trusted intermediate Certificate Authority must be provided as a mandatory configuration parameter.
      *
@@ -88,7 +89,9 @@ public class AuthTokenValidatorBuilder {
         Collections.addAll(configuration.getTrustedCACertificates(), certificates);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Trusted intermediate certificate authorities set to {}",
-                configuration.getTrustedCACertificates().stream().map(X509Certificate::getSubjectDN));
+                configuration.getTrustedCACertificates().stream()
+                    .map(X509Certificate::getSubjectDN)
+                    .collect(Collectors.toList()));
         }
         return this;
     }
@@ -134,12 +137,28 @@ public class AuthTokenValidatorBuilder {
         return this;
     }
 
-    public AuthTokenValidatorBuilder withAiaOcspServiceConfiguration(AiaOcspServiceConfiguration serviceConfiguration) {
-        configuration.setAiaOcspServiceConfiguration(serviceConfiguration);
-        LOG.debug("Using AIA OCSP service configuration");
+    /**
+     * Adds the given URLs to the list of OCSP URLs for which the nonce protocol extension will be disabled.
+     * The OCSP URL is extracted from the user certificate and some OCSP services don't support the nonce extension.
+     *
+     * @param urls OCSP URLs for which the nonce protocol extension will be disabled
+     * @return the builder instance for method chaining
+     */
+    public AuthTokenValidatorBuilder withNonceDisabledOcspUrls(URI... urls) {
+        Collections.addAll(configuration.getNonceDisabledOcspUrls(), urls);
+        LOG.debug("OCSP URLs for which the nonce protocol extension is disabled set to {}", configuration.getNonceDisabledOcspUrls());
         return this;
     }
 
+    /**
+     * Activates the provided designated OCSP service for user certificate revocation check with OCSP.
+     * The designated service is only used for checking the status of the certificates whose issuers are
+     * supported by the service, falling back to the default OCSP service access location from
+     * the certificate's AIA extension if not.
+     *
+     * @param serviceConfiguration configuration of the designated OCSP service
+     * @return the builder instance for method chaining
+     */
     public AuthTokenValidatorBuilder withDesignatedOcspServiceConfiguration(DesignatedOcspServiceConfiguration serviceConfiguration) {
         configuration.setDesignatedOcspServiceConfiguration(serviceConfiguration);
         LOG.debug("Using designated OCSP service configuration");

@@ -35,24 +35,10 @@ import java.security.cert.CertificateParsingException;
 import java.util.Date;
 import java.util.List;
 
-import static org.webeid.security.certificate.CertificateValidator.certificateIsValidOnDate;
+public final class SubjectCertificatePurposeValidator {
 
-public final class FunctionalSubjectCertificateValidators {
-
-    private static final Logger LOG = LoggerFactory.getLogger(FunctionalSubjectCertificateValidators.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SubjectCertificatePurposeValidator.class);
     private static final String EXTENDED_KEY_USAGE_CLIENT_AUTHENTICATION = "1.3.6.1.5.5.7.3.2";
-
-    /**
-     * Checks the validity of the user certificate from the authentication token.
-     *
-     * @param actualTokenData authentication token data that contains the user certificate
-     * @throws TokenValidationException when the user certificate is expired or not yet valid
-     */
-    public static void validateCertificateExpiry(AuthTokenValidatorData actualTokenData) throws TokenValidationException {
-        // Use JJWT Clock interface so that the date can be mocked in tests.
-        certificateIsValidOnDate(actualTokenData.getSubjectCertificate(), DefaultClock.INSTANCE.now());
-        LOG.debug("User certificate is valid.");
-    }
 
     /**
      * Validates that the purpose of the user certificate from the authentication token contains client authentication.
@@ -75,7 +61,7 @@ public final class FunctionalSubjectCertificateValidators {
         }
     }
 
-    private FunctionalSubjectCertificateValidators() {
+    private SubjectCertificatePurposeValidator() {
         throw new IllegalStateException("Functional class");
     }
 

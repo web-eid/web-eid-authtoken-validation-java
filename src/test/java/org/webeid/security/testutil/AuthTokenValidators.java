@@ -25,9 +25,10 @@ package org.webeid.security.testutil;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.webeid.security.certificate.CertificateLoader;
 import org.webeid.security.exceptions.JceException;
+import org.webeid.security.exceptions.OCSPCertificateException;
+import org.webeid.security.validator.AuthTokenValidationConfiguration;
 import org.webeid.security.validator.AuthTokenValidator;
 import org.webeid.security.validator.AuthTokenValidatorBuilder;
-import org.webeid.security.validator.ocsp.service.AiaOcspResponderConfiguration;
 import org.webeid.security.validator.ocsp.service.AiaOcspServiceConfiguration;
 
 import javax.cache.Cache;
@@ -40,6 +41,7 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 
 import static org.webeid.security.testutil.Certificates.getTestEsteid2018CA;
+import static org.webeid.security.testutil.OcspServiceMaker.getDesignatedOcspServiceConfiguration;
 
 public final class AuthTokenValidators {
 
@@ -59,6 +61,7 @@ public final class AuthTokenValidators {
             // Assure that all builder methods are covered with tests.
             .withAllowedClientClockSkew(Duration.ofMinutes(2))
             .withOcspRequestTimeout(Duration.ofSeconds(1))
+            .withNonceDisabledOcspUrls(URI.create("http://example.org"))
             .withoutUserCertificateRevocationCheckWithOcsp()
             .build();
     }
@@ -72,8 +75,12 @@ public final class AuthTokenValidators {
 
     public static AuthTokenValidator getAuthTokenValidatorWithOcspCheck(Cache<String, ZonedDateTime> cache) throws CertificateException, JceException, URISyntaxException, IOException {
         return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, cache, getCACertificates())
-            .withAiaOcspServiceConfiguration(new AiaOcspServiceConfiguration(
-                new AiaOcspResponderConfiguration(new URI("http://aia.demo.sk.ee/esteid2018"), getTestEsteid2018CA())))
+            .build();
+    }
+
+    public static AuthTokenValidator getAuthTokenValidatorWithDesignatedOcspCheck(Cache<String, ZonedDateTime> cache) throws CertificateException, JceException, URISyntaxException, IOException, OCSPCertificateException {
+        return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, cache, getCACertificates())
+            .withDesignatedOcspServiceConfiguration(getDesignatedOcspServiceConfiguration())
             .build();
     }
 

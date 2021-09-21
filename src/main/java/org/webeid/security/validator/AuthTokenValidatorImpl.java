@@ -22,7 +22,6 @@
 
 package org.webeid.security.validator;
 
-import com.google.common.base.Suppliers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.webeid.security.exceptions.JceException;
@@ -31,13 +30,13 @@ import org.webeid.security.exceptions.TokenValidationException;
 import org.webeid.security.validator.ocsp.OcspClient;
 import org.webeid.security.validator.ocsp.OcspClientImpl;
 import org.webeid.security.validator.ocsp.OcspServiceProvider;
+import org.webeid.security.validator.ocsp.service.AiaOcspServiceConfiguration;
 import org.webeid.security.validator.validators.*;
 
 import java.security.cert.CertStore;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
 import java.util.Set;
-import java.util.function.Supplier;
 
 import static org.webeid.security.certificate.CertificateValidator.buildCertStoreFromCertificates;
 import static org.webeid.security.certificate.CertificateValidator.buildTrustAnchorsFromCertificates;
@@ -52,14 +51,15 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
     private static final Logger LOG = LoggerFactory.getLogger(AuthTokenValidatorImpl.class);
 
     private final AuthTokenValidationConfiguration configuration;
-    // OkHttp performs best when a single OkHttpClient instance is created and reused for all HTTP calls.
-    // This is because each client holds its own connection pool and thread pools.
-    // Reusing connections and threads reduces latency and saves memory.
-    private final Supplier<OcspClient> ocspClientSupplier;
     private final ValidatorBatch simpleSubjectCertificateValidators;
     private final ValidatorBatch tokenBodyValidators;
     private final Set<TrustAnchor> trustedCACertificateAnchors;
     private final CertStore trustedCACertificateCertStore;
+    // OcspClient uses OkHttp internally.
+    // OkHttp performs best when a single OkHttpClient instance is created and reused for all HTTP calls.
+    // This is because each client holds its own connection pool and thread pools.
+    // Reusing connections and threads reduces latency and saves memory.
+    private OcspClient ocspClient;
     private OcspServiceProvider ocspServiceProvider;
 
     /**
@@ -68,15 +68,14 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
     AuthTokenValidatorImpl(AuthTokenValidationConfiguration configuration) throws JceException {
         // Copy the configuration object to make AuthTokenValidatorImpl immutable and thread-safe.
         this.configuration = configuration.copy();
-        // Lazy initialization, avoid constructing the OkHttpClient object when certificate revocation check is not enabled.
-        // Returns a supplier which caches the instance retrieved during the first call to get() and returns
-        // that value on subsequent calls to get(). The returned supplier is thread-safe.
-        // The OkHttpClient build() method will be invoked at most once.
-        this.ocspClientSupplier = Suppliers.memoize(() -> OcspClientImpl.build(configuration.getOcspRequestTimeout()));
+
+        // Create and cache trusted CA certificate JCA objects for SubjectCertificateTrustedValidator and AiaOcspService.
+        trustedCACertificateAnchors = buildTrustAnchorsFromCertificates(configuration.getTrustedCACertificates());
+        trustedCACertificateCertStore = buildCertStoreFromCertificates(configuration.getTrustedCACertificates());
 
         simpleSubjectCertificateValidators = ValidatorBatch.createFrom(
-            FunctionalSubjectCertificateValidators::validateCertificateExpiry,
-            FunctionalSubjectCertificateValidators::validateCertificatePurpose,
+            new CertificateExpiryValidator(trustedCACertificateAnchors)::validateCertificateExpiry,
+            SubjectCertificatePurposeValidator::validateCertificatePurpose,
             new SubjectCertificatePolicyValidator(configuration.getDisallowedSubjectCertificatePolicies())::validateCertificatePolicies
         );
         tokenBodyValidators = ValidatorBatch.createFrom(
@@ -86,14 +85,13 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
             new SiteCertificateFingerprintValidator(configuration.getSiteCertificateSha256Fingerprint())::validateSiteCertificateFingerprint
         );
 
-        // Create and cache trusted CA certificate JCA objects for SubjectCertificateTrustedValidator.
-        trustedCACertificateAnchors = buildTrustAnchorsFromCertificates(configuration.getTrustedCACertificates());
-        trustedCACertificateCertStore = buildCertStoreFromCertificates(configuration.getTrustedCACertificates());
-
         if (configuration.isUserCertificateRevocationCheckWithOcspEnabled()) {
-            ocspServiceProvider = configuration.getAiaOcspServiceConfiguration() != null ?
-                new OcspServiceProvider(configuration.getAiaOcspServiceConfiguration()) :
-                new OcspServiceProvider(configuration.getDesignatedOcspServiceConfiguration());
+            ocspClient = OcspClientImpl.build(configuration.getOcspRequestTimeout());
+            ocspServiceProvider = new OcspServiceProvider(
+                configuration.getDesignatedOcspServiceConfiguration(),
+                new AiaOcspServiceConfiguration(configuration.getNonceDisabledOcspUrls(),
+                    trustedCACertificateAnchors,
+                    trustedCACertificateCertStore));
         }
     }
 
@@ -145,7 +143,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         return ValidatorBatch.createFrom(
             certTrustedValidator::validateCertificateTrusted
         ).addOptional(configuration.isUserCertificateRevocationCheckWithOcspEnabled(),
-            new SubjectCertificateNotRevokedValidator(certTrustedValidator, ocspClientSupplier.get(), ocspServiceProvider)::validateCertificateNotRevoked
+            new SubjectCertificateNotRevokedValidator(certTrustedValidator, ocspClient, ocspServiceProvider)::validateCertificateNotRevoked
         );
     }
 }

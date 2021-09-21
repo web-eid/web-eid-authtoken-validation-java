@@ -7,7 +7,7 @@ import org.bouncycastle.asn1.x509.PolicyInformation;
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
 import org.webeid.security.exceptions.TokenValidationException;
 import org.webeid.security.exceptions.UserCertificateDisallowedPolicyException;
-import org.webeid.security.exceptions.UserCertificateInvalidPolicyException;
+import org.webeid.security.exceptions.UserCertificateParseException;
 import org.webeid.security.validator.AuthTokenValidatorData;
 
 import java.io.IOException;
@@ -16,7 +16,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Optional;
 
-public class SubjectCertificatePolicyValidator {
+public final class SubjectCertificatePolicyValidator {
 
     private final Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies;
 
@@ -29,7 +29,7 @@ public class SubjectCertificatePolicyValidator {
      *
      * @param actualTokenData authentication token data that contains the user certificate.
      * @throws UserCertificateDisallowedPolicyException when user certificate policy does not match the configured policies.
-     * @throws UserCertificateInvalidPolicyException when user certificate policy is invalid.
+     * @throws UserCertificateParseException when user certificate policy is invalid.
      */
     public void validateCertificatePolicies(AuthTokenValidatorData actualTokenData) throws TokenValidationException {
         final X509Certificate certificate = actualTokenData.getSubjectCertificate();
@@ -46,7 +46,7 @@ public class SubjectCertificatePolicyValidator {
                 throw new UserCertificateDisallowedPolicyException();
             }
         } catch (IOException e) {
-            throw new UserCertificateInvalidPolicyException();
+            throw new UserCertificateParseException(e);
         }
     }
 }

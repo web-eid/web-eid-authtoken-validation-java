@@ -1,9 +1,31 @@
+/*
+ * Copyright (c) 2020-2021 Estonian Information System Authority
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 package org.webeid.security.certificate;
 
 import org.webeid.security.exceptions.CertificateNotTrustedException;
 import org.webeid.security.exceptions.JceException;
-import org.webeid.security.exceptions.UserCertificateExpiredException;
-import org.webeid.security.exceptions.UserCertificateNotYetValidException;
+import org.webeid.security.exceptions.CertificateExpiredException;
+import org.webeid.security.exceptions.CertificateNotYetValidException;
 
 import java.security.GeneralSecurityException;
 import java.security.InvalidAlgorithmParameterException;
@@ -11,8 +33,6 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertPathBuilder;
 import java.security.cert.CertPathBuilderException;
 import java.security.cert.CertStore;
-import java.security.cert.CertificateExpiredException;
-import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.CollectionCertStoreParameters;
 import java.security.cert.PKIXBuilderParameters;
 import java.security.cert.PKIXCertPathBuilderResult;
@@ -20,23 +40,25 @@ import java.security.cert.TrustAnchor;
 import java.security.cert.X509CertSelector;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Date;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 public final class CertificateValidator {
 
-    /**
-     * Checks whether the certificate was valid on the given date.
-     */
-    public static void certificateIsValidOnDate(X509Certificate cert, Date date) throws UserCertificateNotYetValidException, UserCertificateExpiredException {
+    public static void certificateIsValidOnDate(X509Certificate cert, Date date, String subject) throws CertificateNotYetValidException, CertificateExpiredException {
         try {
             cert.checkValidity(date);
-        } catch (CertificateNotYetValidException e) {
-            throw new UserCertificateNotYetValidException(e);
-        } catch (CertificateExpiredException e) {
-            throw new UserCertificateExpiredException(e);
+        } catch (java.security.cert.CertificateNotYetValidException e) {
+            throw new CertificateNotYetValidException(subject, e);
+        } catch (java.security.cert.CertificateExpiredException e) {
+            throw new CertificateExpiredException(subject, e);
+        }
+    }
+
+    public static void trustedCACertificatesAreValidOnDate(Set<TrustAnchor> trustedCACertificateAnchors, Date date) throws CertificateNotYetValidException, CertificateExpiredException {
+        for (TrustAnchor cert : trustedCACertificateAnchors) {
+            certificateIsValidOnDate(cert.getTrustedCert(), date, "Trusted CA");
         }
     }
 
@@ -70,10 +92,6 @@ public final class CertificateValidator {
             .collect(Collectors.toSet());
     }
 
-    public static Set<TrustAnchor> buildTrustAnchorsFromCertificate(X509Certificate certificate) {
-        return buildTrustAnchorsFromCertificates(Collections.singleton(certificate));
-    }
-
     public static CertStore buildCertStoreFromCertificates(Collection<X509Certificate> certificates) throws JceException {
         // We use the default JCE provider as there is no reason to use Bouncy Castle, moreover BC requires
         // the validated certificate to be in the certificate store which breaks the clean immutable usage of
@@ -83,10 +101,6 @@ public final class CertificateValidator {
         } catch (GeneralSecurityException e) {
             throw new JceException(e);
         }
-    }
-
-    public static CertStore buildCertStoreFromCertificate(X509Certificate certificate) throws JceException {
-        return buildCertStoreFromCertificates(Collections.singleton(certificate));
     }
 
     private CertificateValidator() {

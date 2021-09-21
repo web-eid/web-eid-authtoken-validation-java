@@ -143,11 +143,6 @@ import java.security.cert.X509Certificate;
 ...
 ```
 
-## 5. Add trusted OCSP responder certificates
-
-- AIA
-- Designated
-
 ## 5. Configure the authentication token validator
 
 Once the prerequisites have been met, the authentication token validator itself can be configured.
@@ -240,8 +235,6 @@ try {
 - [Nonce generation](#nonce-generation)
   - [Basic usage](#basic-usage-1)
   - [Extended configuration](#extended-configuration-1)
-- [Frequently asked questions](#frequently-asked-questions)
-  - [How can I find the AIA OCSP service URLs?](#how-can-i-find-the-aia-ocsp-service-urls)
 
 # Introduction
 
@@ -294,12 +287,13 @@ toTitleCase(CertUtil.getSubjectSurname(userCertificate)); // "Jõeorg"
 
 The following additional configuration options are available in `AuthTokenValidatorBuilder`:  
 
-- `withSiteCertificateSha256Fingerprint(String siteCertificateFingerprint)` – turns on origin website certificate fingerprint validation. The validator checks that the site certificate fingerprint from the authentication token matches with the provided site certificate SHA-256 fingerprint. This disables powerful man-in-the-middle attacks where attackers are able to issue falsified certificates for the origin, but also disables TLS proxy usage. Due to the technical limitations of web browsers, certificate fingerprint validation currently works only with Firefox. The provided certificate SHA-256 fingerprint should have the prefix `urn:cert:sha-256:` followed by the hexadecimal encoding of the hash value octets as specified in [URN Namespace for Certificates](https://tools.ietf.org/id/draft-seantek-certspec-01.html). Certificate fingerprint validation is disabled by default.
-- `withoutUserCertificateRevocationCheckWithOcsp()` – turns off user certificate revocation check with OCSP. The OCSP URL is extracted from the user certificate AIA extension. OCSP check is enabled by default.
+- `withSiteCertificateSha256Fingerprint(String siteCertificateFingerprint)` – turns on origin website certificate fingerprint validation. The validator checks that the site certificate fingerprint from the authentication token matches with the provided site certificate SHA-256 fingerprint. This disables powerful man-in-the-middle attacks where attackers are able to issue falsified certificates for the origin, but also disables TLS proxy usage. Due to the technical limitations of web browsers, certificate fingerprint validation is an experimental feature that currently works only with Firefox. The provided certificate SHA-256 fingerprint should have the prefix `urn:cert:sha-256:` followed by the hexadecimal encoding of the hash value octets as specified in [URN Namespace for Certificates](https://tools.ietf.org/id/draft-seantek-certspec-01.html). Certificate fingerprint validation is disabled by default.
+- `withoutUserCertificateRevocationCheckWithOcsp()` – turns off user certificate revocation check with OCSP. OCSP check is enabled by default and the OCSP responder access location URL is extracted from the user certificate AIA extension unless a designated OCSP service is activated.
+- `withDesignatedOcspServiceConfiguration(DesignatedOcspServiceConfiguration serviceConfiguration)` – activates the provided designated OCSP responder service configuration for user certificate revocation check with OCSP. The designated service is only used for checking the status of the certificates whose issuers are supported by the service, for other certificates the default AIA extension service access location will be used. See configuration examples in `testutil.OcspServiceMaker.getDesignatedOcspServiceConfiguration()`.
 - `withOcspRequestTimeout(Duration ocspRequestTimeout)` – sets both the connection and response timeout of user certificate revocation check OCSP requests. Default is 5 seconds.
 - `withAllowedClientClockSkew(Duration allowedClockSkew)` – sets the tolerated clock skew of the client computer when verifying the token expiration. Default value is 3 minutes.
 - `withDisallowedCertificatePolicies(ASN1ObjectIdentifier... policies)` – adds the given policies to the list of disallowed user certificate policies. In order for the user certificate to be considered valid, it must not contain any policies present in this list. Contains the Estonian Mobile-ID policies by default as it must not be possible to authenticate with a Mobile-ID certificate when an eID smart card is expected.
-- `withNonceDisabledOcspUrls(URI... urls)` – adds the given URLs to the list of OCSP URLs for which the nonce protocol extension will be disabled. Some OCSP services don't support the nonce extension. Contains the ESTEID-2015 OCSP URL by default.
+- `withNonceDisabledOcspUrls(URI... urls)` – adds the given URLs to the list of OCSP responder access location URLs for which the nonce protocol extension will be disabled. Some OCSP responders don't support the nonce extension. Contains the ESTEID-2015 OCSP responder URL by default.
 
 Extended configuration example:  
 
@@ -318,9 +312,9 @@ AuthTokenValidator validator = new AuthTokenValidatorBuilder()
 
 ### Certificates' *Authority Information Access* (AIA) extension
 
-It is assumed that the AIA extension that contains the certificates’ OCSP service location, is part of both the user and CA certificates. The AIA OCSP URL will be used to check the certificate revocation status with OCSP.
+Unless a designated OCSP responder service is in use, it is required that the AIA extension that contains the certificate’s OCSP responder access location is present in the user certificate. The AIA OCSP URL will be used to check the certificate revocation status with OCSP.
 
-**Note that there may be legal limitations to using AIA URLs during signing** as the services behind these URLs provide different security and SLA guarantees than dedicated OCSP services. For digital signing, OCSP responder certificate validation is additionally needed. Using AIA URLs during authentication is sufficient, however.
+**Note that there may be legal limitations to using AIA URLs during signing** as the services behind these URLs provide different security and SLA guarantees than dedicated OCSP responder services. Using AIA URLs during authentication is sufficient, however.
 
 ## Possible validation errors  
 
@@ -350,6 +344,7 @@ String nonce = nonceGenerator.generateAndStoreNonce();
 The `generateAndStoreNonce()` method both generates the nonce and stores it in the cache.
 
 ## Extended configuration  
+
 The following additional configuration options are available in `NonceGeneratorBuilder`:
 
 - `withNonceTtl(Duration duration)` – overrides the default nonce time-to-live duration. When the time-to-live passes, the nonce is considered to be expired. Default nonce time-to-live is 5 minutes.
@@ -363,14 +358,3 @@ NonceGenerator generator = new NonceGeneratorBuilder()
         .withSecureRandom(customSecureRandom)  
         .build();
 ```
-
-## Frequently asked questions
-
-### How can I find the AIA OCSP service URLs?
-
-You can find the AIA OCSP service URLs from the electronic ID certificate profile documents, in the section that describes certificate extensions.
-The AIA OCSP extension OID is 1.3.6.1.5.5.7.48.1.
-
-For example, the EstEID AIA URLs are specified in the documents
-[*Certificate, CRL and OCSP Profile for identification documents of the Republic of Estonia*](https://www.skidsolutions.eu/upload/files/SK-CPR-ESTEID-EN-v8_4-20200630.pdf) and
-[*Certificate, CRL and OCSP Profile for ID-1 Format Identity Documents Issued by the Republic of Estonia*](https://www.skidsolutions.eu/upload/files/SK-CPR-ESTEID2018-EN-v1_2_20200630.pdf).

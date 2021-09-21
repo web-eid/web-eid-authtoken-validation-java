@@ -25,7 +25,7 @@ package org.webeid.security.testutil;
 import com.fasterxml.jackson.databind.util.StdDateFormat;
 import io.jsonwebtoken.Clock;
 import io.jsonwebtoken.impl.DefaultClock;
-import org.webeid.security.validator.validators.FunctionalSubjectCertificateValidators;
+import org.webeid.security.validator.validators.SubjectCertificatePurposeValidator;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -44,11 +44,11 @@ public final class Dates {
     }
 
     public static void setMockedFunctionalSubjectCertificateValidatorsDate(Date mockedDate) throws NoSuchFieldException, IllegalAccessException {
-        setClockField(FunctionalSubjectCertificateValidators.DefaultClock.class, mockedDate);
+        setClockField(SubjectCertificatePurposeValidator.DefaultClock.class, mockedDate);
     }
 
     public static void resetMockedFunctionalSubjectCertificateValidatorsDate() throws NoSuchFieldException, IllegalAccessException {
-        setClockField(FunctionalSubjectCertificateValidators.DefaultClock.class, new Date());
+        setClockField(SubjectCertificatePurposeValidator.DefaultClock.class, new Date());
     }
 
     private static void setClockField(Class<? extends Clock> cls, Date date) throws NoSuchFieldException, IllegalAccessException {

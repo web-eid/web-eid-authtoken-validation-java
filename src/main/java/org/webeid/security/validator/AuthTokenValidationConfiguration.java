@@ -24,7 +24,6 @@ package org.webeid.security.validator;
 
 import com.google.common.collect.Sets;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
-import org.webeid.security.validator.ocsp.service.AiaOcspServiceConfiguration;
 import org.webeid.security.validator.ocsp.service.DesignatedOcspServiceConfiguration;
 import org.webeid.security.validator.validators.OriginValidator;
 
@@ -38,15 +37,13 @@ import java.util.HashSet;
 import java.util.Objects;
 
 import static org.webeid.security.nonce.NonceGeneratorBuilder.requirePositiveDuration;
-import static org.webeid.security.util.SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY;
-import static org.webeid.security.util.SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V1;
-import static org.webeid.security.util.SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V2;
-import static org.webeid.security.util.SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V3;
+import static org.webeid.security.validator.ocsp.OcspUrl.AIA_ESTEID_2015;
+import static org.webeid.security.util.SubjectCertificatePolicies.*;
 
 /**
  * Stores configuration parameters for {@link AuthTokenValidatorImpl}.
  */
-final class AuthTokenValidationConfiguration {
+public final class AuthTokenValidationConfiguration {
 
     private URI siteOrigin;
     private Cache<String, ZonedDateTime> nonceCache;
@@ -54,7 +51,6 @@ final class AuthTokenValidationConfiguration {
     private boolean isUserCertificateRevocationCheckWithOcspEnabled = true;
     private Duration ocspRequestTimeout = Duration.ofSeconds(5);
     private Duration allowedClientClockSkew = Duration.ofMinutes(3);
-    private AiaOcspServiceConfiguration aiaOcspServiceConfiguration;
     private DesignatedOcspServiceConfiguration designatedOcspServiceConfiguration;
     private boolean isSiteCertificateFingerprintValidationEnabled = false;
     private String siteCertificateSha256Fingerprint;
@@ -65,6 +61,8 @@ final class AuthTokenValidationConfiguration {
         ESTEID_SK_2015_MOBILE_ID_POLICY_V3,
         ESTEID_SK_2015_MOBILE_ID_POLICY
     );
+    // Disable OCSP nonce extension for EstEID 2015 cards by default.
+    private Collection<URI> nonceDisabledOcspUrls = Sets.newHashSet(AIA_ESTEID_2015);
 
     AuthTokenValidationConfiguration() {
     }
@@ -76,11 +74,11 @@ final class AuthTokenValidationConfiguration {
         this.isUserCertificateRevocationCheckWithOcspEnabled = other.isUserCertificateRevocationCheckWithOcspEnabled;
         this.ocspRequestTimeout = other.ocspRequestTimeout;
         this.allowedClientClockSkew = other.allowedClientClockSkew;
-        this.aiaOcspServiceConfiguration = other.aiaOcspServiceConfiguration;
         this.designatedOcspServiceConfiguration = other.designatedOcspServiceConfiguration;
         this.isSiteCertificateFingerprintValidationEnabled = other.isSiteCertificateFingerprintValidationEnabled;
         this.siteCertificateSha256Fingerprint = other.siteCertificateSha256Fingerprint;
         this.disallowedSubjectCertificatePolicies = new HashSet<>(other.disallowedSubjectCertificatePolicies);
+        this.nonceDisabledOcspUrls = new HashSet<>(other.nonceDisabledOcspUrls);
     }
 
     void setSiteOrigin(URI siteOrigin) {
@@ -127,14 +125,6 @@ final class AuthTokenValidationConfiguration {
         return allowedClientClockSkew;
     }
 
-    public AiaOcspServiceConfiguration getAiaOcspServiceConfiguration() {
-        return aiaOcspServiceConfiguration;
-    }
-
-    public void setAiaOcspServiceConfiguration(AiaOcspServiceConfiguration aiaOcspServiceConfiguration) {
-        this.aiaOcspServiceConfiguration = aiaOcspServiceConfiguration;
-    }
-
     public DesignatedOcspServiceConfiguration getDesignatedOcspServiceConfiguration() {
         return designatedOcspServiceConfiguration;
     }
@@ -160,6 +150,10 @@ final class AuthTokenValidationConfiguration {
         return disallowedSubjectCertificatePolicies;
     }
 
+    public Collection<URI> getNonceDisabledOcspUrls() {
+        return nonceDisabledOcspUrls;
+    }
+
     /**
      * Checks that the configuration parameters are valid.
      *
@@ -172,18 +166,6 @@ final class AuthTokenValidationConfiguration {
         Objects.requireNonNull(nonceCache, "Nonce cache must not be null");
         if (trustedCACertificates.isEmpty()) {
             throw new IllegalArgumentException("At least one trusted certificate authority must be provided");
-        }
-        if (isUserCertificateRevocationCheckWithOcspEnabled) {
-            if (aiaOcspServiceConfiguration == null && designatedOcspServiceConfiguration == null) {
-                throw new IllegalArgumentException("Either AIA or designated OCSP service configuration must be provided");
-            }
-            if (aiaOcspServiceConfiguration != null && designatedOcspServiceConfiguration != null) {
-                throw new IllegalArgumentException("AIA and designated OCSP service configuration cannot provided together, " +
-                    "please provide either one or the other");
-            }
-        } else if (aiaOcspServiceConfiguration != null || designatedOcspServiceConfiguration != null) {
-            throw new IllegalArgumentException("When user certificate OCSP check is disabled, " +
-                "AIA or designated OCSP service configuration should not be provided");
         }
         requirePositiveDuration(ocspRequestTimeout, "OCSP request timeout");
         requirePositiveDuration(allowedClientClockSkew, "Allowed client clock skew");
