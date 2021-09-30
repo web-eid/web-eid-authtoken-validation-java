@@ -40,6 +40,7 @@ import java.security.cert.TrustAnchor;
 import java.security.cert.X509CertSelector;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -87,9 +88,9 @@ public final class CertificateValidator {
     }
 
     public static Set<TrustAnchor> buildTrustAnchorsFromCertificates(Collection<X509Certificate> certificates) {
-        return certificates.stream()
+        return Collections.unmodifiableSet(certificates.stream()
             .map(cert -> new TrustAnchor(cert, null))
-            .collect(Collectors.toSet());
+            .collect(Collectors.toSet()));
     }
 
     public static CertStore buildCertStoreFromCertificates(Collection<X509Certificate> certificates) throws JceException {

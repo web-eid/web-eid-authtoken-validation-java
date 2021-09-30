@@ -33,6 +33,7 @@ import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Objects;
 
@@ -70,15 +71,15 @@ public final class AuthTokenValidationConfiguration {
     private AuthTokenValidationConfiguration(AuthTokenValidationConfiguration other) {
         this.siteOrigin = other.siteOrigin;
         this.nonceCache = other.nonceCache;
-        this.trustedCACertificates = new HashSet<>(other.trustedCACertificates);
+        this.trustedCACertificates = Collections.unmodifiableSet(new HashSet<>(other.trustedCACertificates));
         this.isUserCertificateRevocationCheckWithOcspEnabled = other.isUserCertificateRevocationCheckWithOcspEnabled;
         this.ocspRequestTimeout = other.ocspRequestTimeout;
         this.allowedClientClockSkew = other.allowedClientClockSkew;
         this.designatedOcspServiceConfiguration = other.designatedOcspServiceConfiguration;
         this.isSiteCertificateFingerprintValidationEnabled = other.isSiteCertificateFingerprintValidationEnabled;
         this.siteCertificateSha256Fingerprint = other.siteCertificateSha256Fingerprint;
-        this.disallowedSubjectCertificatePolicies = new HashSet<>(other.disallowedSubjectCertificatePolicies);
-        this.nonceDisabledOcspUrls = new HashSet<>(other.nonceDisabledOcspUrls);
+        this.disallowedSubjectCertificatePolicies = Collections.unmodifiableSet(new HashSet<>(other.disallowedSubjectCertificatePolicies));
+        this.nonceDisabledOcspUrls = Collections.unmodifiableSet(new HashSet<>(other.nonceDisabledOcspUrls));
     }
 
     void setSiteOrigin(URI siteOrigin) {
