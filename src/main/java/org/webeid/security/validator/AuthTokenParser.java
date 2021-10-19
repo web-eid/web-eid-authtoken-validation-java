@@ -23,11 +23,20 @@
 package org.webeid.security.validator;
 
 import com.google.common.base.Strings;
-import io.jsonwebtoken.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Header;
+import io.jsonwebtoken.Jws;
+import io.jsonwebtoken.JwsHeader;
+import io.jsonwebtoken.Jwt;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.JwtParser;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.SigningKeyResolver;
+import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.security.SecurityException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.webeid.security.exceptions.TokenExpiredException;
 import org.webeid.security.exceptions.TokenParseException;
 import org.webeid.security.exceptions.TokenSignatureValidationException;
 import org.webeid.security.exceptions.TokenValidationException;
@@ -39,7 +48,6 @@ import java.security.Key;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -57,14 +65,12 @@ final class AuthTokenParser {
     private Claims body;
 
     /**
-     * @param authToken        the Web eID authentication token with signature
-     * @param allowedClockSkew the tolerated client computer clock skew when verifying the token {@code exp} field
+     * @param authToken the Web eID authentication token with signature
      */
-    AuthTokenParser(String authToken, Duration allowedClockSkew) {
+    AuthTokenParser(String authToken) {
         this.authToken = authToken;
         this.parser = Jwts.parserBuilder()
             .setSigningKeyResolver(new X5cFieldPublicKeyResolver())
-            .setAllowedClockSkewSeconds(allowedClockSkew.getSeconds())
             .build();
     }
 
@@ -114,9 +120,6 @@ final class AuthTokenParser {
             final Jws<Claims> claimsJws = parser.parseClaimsJws(authToken);
             body = claimsJws.getBody();
             LOG.trace("JWT body: {}", body);
-
-        } catch (ExpiredJwtException e) {
-            throw new TokenExpiredException(e);
         } catch (SecurityException | UnsupportedJwtException e) {
             throw new TokenSignatureValidationException(e);
         } catch (JwtException e) {

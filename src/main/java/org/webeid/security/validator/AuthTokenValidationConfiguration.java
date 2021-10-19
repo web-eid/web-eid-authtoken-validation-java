@@ -51,7 +51,6 @@ public final class AuthTokenValidationConfiguration {
     private Collection<X509Certificate> trustedCACertificates = new HashSet<>();
     private boolean isUserCertificateRevocationCheckWithOcspEnabled = true;
     private Duration ocspRequestTimeout = Duration.ofSeconds(5);
-    private Duration allowedClientClockSkew = Duration.ofMinutes(3);
     private DesignatedOcspServiceConfiguration designatedOcspServiceConfiguration;
     private boolean isSiteCertificateFingerprintValidationEnabled = false;
     private String siteCertificateSha256Fingerprint;
@@ -74,7 +73,6 @@ public final class AuthTokenValidationConfiguration {
         this.trustedCACertificates = Collections.unmodifiableSet(new HashSet<>(other.trustedCACertificates));
         this.isUserCertificateRevocationCheckWithOcspEnabled = other.isUserCertificateRevocationCheckWithOcspEnabled;
         this.ocspRequestTimeout = other.ocspRequestTimeout;
-        this.allowedClientClockSkew = other.allowedClientClockSkew;
         this.designatedOcspServiceConfiguration = other.designatedOcspServiceConfiguration;
         this.isSiteCertificateFingerprintValidationEnabled = other.isSiteCertificateFingerprintValidationEnabled;
         this.siteCertificateSha256Fingerprint = other.siteCertificateSha256Fingerprint;
@@ -116,14 +114,6 @@ public final class AuthTokenValidationConfiguration {
 
     void setOcspRequestTimeout(Duration ocspRequestTimeout) {
         this.ocspRequestTimeout = ocspRequestTimeout;
-    }
-
-    void setAllowedClientClockSkew(Duration allowedClientClockSkew) {
-        this.allowedClientClockSkew = allowedClientClockSkew;
-    }
-
-    Duration getAllowedClientClockSkew() {
-        return allowedClientClockSkew;
     }
 
     public DesignatedOcspServiceConfiguration getDesignatedOcspServiceConfiguration() {
@@ -169,7 +159,6 @@ public final class AuthTokenValidationConfiguration {
             throw new IllegalArgumentException("At least one trusted certificate authority must be provided");
         }
         requirePositiveDuration(ocspRequestTimeout, "OCSP request timeout");
-        requirePositiveDuration(allowedClientClockSkew, "Allowed client clock skew");
         if (isSiteCertificateFingerprintValidationEnabled) {
             Objects.requireNonNull(siteCertificateSha256Fingerprint, "Certificate fingerprint must not be null "
                 + "when site certificate fingerprint validation is enabled");

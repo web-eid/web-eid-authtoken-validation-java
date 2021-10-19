@@ -22,6 +22,7 @@
 
 package org.webeid.security.validator.validators;
 
+import io.jsonwebtoken.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.webeid.security.exceptions.TokenValidationException;
@@ -53,11 +54,20 @@ public final class CertificateExpiryValidator {
      */
     public void validateCertificateExpiry(AuthTokenValidatorData actualTokenData) throws TokenValidationException {
         // Use JJWT Clock interface so that the date can be mocked in tests.
-        final Date now = SubjectCertificatePurposeValidator.DefaultClock.INSTANCE.now();
+        final Date now = DefaultClock.INSTANCE.now();
         trustedCACertificatesAreValidOnDate(trustedCACertificateAnchors, now);
         LOG.debug("CA certificates are valid.");
         certificateIsValidOnDate(actualTokenData.getSubjectCertificate(), now, "User");
         LOG.debug("User certificate is valid.");
     }
 
+    public static class DefaultClock implements Clock {
+
+        public static final Clock INSTANCE = new DefaultClock();
+
+        public Date now() {
+            return new Date();
+        }
+
+    }
 }

@@ -59,7 +59,6 @@ public final class AuthTokenValidators {
     public static AuthTokenValidator getAuthTokenValidator(String url, Cache<String, ZonedDateTime> cache, X509Certificate... certificates) throws JceException {
         return getAuthTokenValidatorBuilder(url, cache, certificates)
             // Assure that all builder methods are covered with tests.
-            .withAllowedClientClockSkew(Duration.ofMinutes(2))
             .withOcspRequestTimeout(Duration.ofSeconds(1))
             .withNonceDisabledOcspUrls(URI.create("http://example.org"))
             .withoutUserCertificateRevocationCheckWithOcsp()

@@ -107,7 +107,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
 
         try {
             LOG.info("Starting token parsing and validation");
-            final AuthTokenParser authTokenParser = new AuthTokenParser(authToken, configuration.getAllowedClientClockSkew());
+            final AuthTokenParser authTokenParser = new AuthTokenParser(authToken);
             final AuthTokenValidatorData actualTokenData = authTokenParser.parseHeaderFromTokenString();
 
             simpleSubjectCertificateValidators.executeFor(actualTokenData);

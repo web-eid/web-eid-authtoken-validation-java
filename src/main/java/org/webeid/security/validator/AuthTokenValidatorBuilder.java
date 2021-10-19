@@ -166,20 +166,6 @@ public class AuthTokenValidatorBuilder {
     }
 
     /**
-     * Sets the tolerated clock skew of the client computer when verifying the token expiration field {@code exp}.
-     * <p>
-     * This is an optional configuration parameter, the default is 3 minutes.
-     *
-     * @param allowedClockSkew the tolerated clock skew of the client computer
-     * @return the builder instance for method chaining.
-     */
-    public AuthTokenValidatorBuilder withAllowedClientClockSkew(Duration allowedClockSkew) {
-        configuration.setAllowedClientClockSkew(allowedClockSkew);
-        LOG.debug("Allowed client clock skew set to {} second(s)", configuration.getAllowedClientClockSkew().getSeconds());
-        return this;
-    }
-
-    /**
      * Sets the expected site certificate fingerprint, i.e. the SHA-256 fingerprint of the HTTPS certificate
      * that the site is using, and turns on site certificate validation.
      *

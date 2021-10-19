@@ -35,6 +35,7 @@ public abstract class AbstractTestWithMockedDate extends AbstractTestWithCache {
     protected void setup() {
         super.setup();
         try {
+            // FIXME: remove this and replace old tokens with new ones.
             // Authentication token is valid until 2020-04-14
             setMockedDefaultJwtParserDate(Dates.create("2020-04-11"));
         } catch (ParseException | NoSuchFieldException | IllegalAccessException e) {

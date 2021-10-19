@@ -22,7 +22,6 @@
 
 package org.webeid.security.validator.validators;
 
-import io.jsonwebtoken.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.webeid.security.exceptions.TokenValidationException;
@@ -32,7 +31,6 @@ import org.webeid.security.exceptions.UserCertificateWrongPurposeException;
 import org.webeid.security.validator.AuthTokenValidatorData;
 
 import java.security.cert.CertificateParsingException;
-import java.util.Date;
 import java.util.List;
 
 public final class SubjectCertificatePurposeValidator {
@@ -65,13 +63,4 @@ public final class SubjectCertificatePurposeValidator {
         throw new IllegalStateException("Functional class");
     }
 
-    public static class DefaultClock implements Clock {
-
-        public static final Clock INSTANCE = new DefaultClock();
-
-        public Date now() {
-            return new Date();
-        }
-
-    }
 }
