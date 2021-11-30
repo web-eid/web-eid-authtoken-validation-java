@@ -23,31 +23,29 @@
 package eu.webeid.security.validator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.certificate.CertificateLoader;
 import eu.webeid.security.certificate.CertificateValidator;
 import eu.webeid.security.exceptions.JceException;
-import eu.webeid.security.validator.ocsp.OcspClient;
-import eu.webeid.security.validator.ocsp.OcspClientImpl;
-import eu.webeid.security.validator.ocsp.service.AiaOcspServiceConfiguration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import eu.webeid.security.authtoken.WebEidAuthToken;
-import eu.webeid.security.exceptions.SiteCertificateHashNotConfiguredException;
-import eu.webeid.security.exceptions.TokenParseException;
-import eu.webeid.security.exceptions.TokenValidationException;
+import eu.webeid.security.exceptions.AuthTokenParseException;
+import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.validator.certvalidators.SubjectCertificateExpiryValidator;
 import eu.webeid.security.validator.certvalidators.SubjectCertificateNotRevokedValidator;
 import eu.webeid.security.validator.certvalidators.SubjectCertificatePolicyValidator;
 import eu.webeid.security.validator.certvalidators.SubjectCertificatePurposeValidator;
 import eu.webeid.security.validator.certvalidators.SubjectCertificateTrustedValidator;
 import eu.webeid.security.validator.certvalidators.SubjectCertificateValidatorBatch;
+import eu.webeid.security.validator.ocsp.OcspClient;
+import eu.webeid.security.validator.ocsp.OcspClientImpl;
 import eu.webeid.security.validator.ocsp.OcspServiceProvider;
+import eu.webeid.security.validator.ocsp.service.AiaOcspServiceConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.security.cert.CertStore;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
-import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -103,7 +101,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
     }
 
     @Override
-    public WebEidAuthToken parse(String authToken) throws TokenValidationException {
+    public WebEidAuthToken parse(String authToken) throws AuthTokenException {
         try {
             LOG.info("Starting token parsing");
             validateTokenLength(authToken);
@@ -116,7 +114,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
     }
 
     @Override
-    public X509Certificate validate(WebEidAuthToken authToken, String currentChallengeNonce) throws TokenValidationException {
+    public X509Certificate validate(WebEidAuthToken authToken, String currentChallengeNonce) throws AuthTokenException {
         try {
             LOG.info("Starting token validation");
             return validateToken(authToken, currentChallengeNonce);
@@ -127,41 +125,36 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         }
     }
 
-    private void validateTokenLength(String authToken) throws TokenParseException {
+    private void validateTokenLength(String authToken) throws AuthTokenParseException {
         if (authToken == null || authToken.length() < TOKEN_MIN_LENGTH) {
-            throw new TokenParseException("Auth token is null or too short");
+            throw new AuthTokenParseException("Auth token is null or too short");
         }
         if (authToken.length() > TOKEN_MAX_LENGTH) {
-            throw new TokenParseException("Auth token is too long");
+            throw new AuthTokenParseException("Auth token is too long");
         }
     }
 
-    private WebEidAuthToken parseToken(String authToken) throws TokenParseException {
+    private WebEidAuthToken parseToken(String authToken) throws AuthTokenParseException {
         try {
             final WebEidAuthToken token = objectMapper.readValue(authToken, WebEidAuthToken.class);
             if (token == null) {
-                throw new TokenParseException("Web eID authentication token is null");
+                throw new AuthTokenParseException("Web eID authentication token is null");
             }
             return token;
         } catch (IOException e) {
-            throw new TokenParseException("Error parsing Web eID authentication token", e);
+            throw new AuthTokenParseException("Error parsing Web eID authentication token", e);
         }
     }
 
-    private X509Certificate validateToken(WebEidAuthToken token, String currentChallengeNonce) throws TokenValidationException {
-        if (!Objects.equals(token.getVersion(), CURRENT_TOKEN_FORMAT_VERSION)) {
-            throw new TokenParseException("Only token version '" + CURRENT_TOKEN_FORMAT_VERSION +
+    private X509Certificate validateToken(WebEidAuthToken token, String currentChallengeNonce) throws AuthTokenException {
+        if (token.getFormat() == null || !token.getFormat().startsWith(CURRENT_TOKEN_FORMAT_VERSION)) {
+            throw new AuthTokenParseException("Only token format version '" + CURRENT_TOKEN_FORMAT_VERSION +
                 "' is currently supported");
         }
-        // When the token signature contains the experimental origin certificate hash,
-        // the hash must be provided in the configuration.
-        if (token.getUseOriginCertHash() && configuration.getSiteCertificateSha256Hash() == null) {
-            throw new SiteCertificateHashNotConfiguredException();
+        if (token.getUnverifiedCertificate() == null || token.getUnverifiedCertificate().isEmpty()) {
+            throw new AuthTokenParseException("'unverifiedCertificate' field is missing, null or empty");
         }
-        if (token.getCertificate() == null || token.getCertificate().isEmpty()) {
-            throw new TokenParseException("'certificate' field is missing, null or empty");
-        }
-        final X509Certificate subjectCertificate = CertificateLoader.decodeCertificateFromBase64(token.getCertificate());
+        final X509Certificate subjectCertificate = CertificateLoader.decodeCertificateFromBase64(token.getUnverifiedCertificate());
 
         simpleSubjectCertificateValidators.executeFor(subjectCertificate);
         getCertTrustValidators().executeFor(subjectCertificate);
@@ -172,10 +165,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         authTokenSignatureValidator.validate(token.getAlgorithm(),
             token.getSignature(),
             subjectCertificate.getPublicKey(),
-            currentChallengeNonce,
-            token.getUseOriginCertHash() ?
-                configuration.getSiteCertificateSha256Hash() :
-                null);
+            currentChallengeNonce);
 
         return subjectCertificate;
     }

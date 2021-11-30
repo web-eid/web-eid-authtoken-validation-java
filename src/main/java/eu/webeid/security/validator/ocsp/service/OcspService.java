@@ -23,7 +23,7 @@
 package eu.webeid.security.validator.ocsp.service;
 
 import org.bouncycastle.cert.X509CertificateHolder;
-import eu.webeid.security.exceptions.TokenValidationException;
+import eu.webeid.security.exceptions.AuthTokenException;
 
 import java.net.URI;
 import java.util.Date;
@@ -34,6 +34,6 @@ public interface OcspService {
 
     URI getAccessLocation();
 
-    void validateResponderCertificate(X509CertificateHolder cert, Date date) throws TokenValidationException;
+    void validateResponderCertificate(X509CertificateHolder cert, Date date) throws AuthTokenException;
 
 }

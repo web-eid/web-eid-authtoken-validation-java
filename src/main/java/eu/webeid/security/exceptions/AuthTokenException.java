@@ -23,15 +23,16 @@
 package eu.webeid.security.exceptions;
 
 /**
- * Thrown when authentication token parsing fails.
+ * Base class for all authentication token validation exceptions.
  */
-public class TokenParseException extends TokenValidationException {
+public abstract class AuthTokenException extends Exception {
 
-    public TokenParseException(String message) {
-        super(message);
+    protected AuthTokenException(String msg) {
+        super(msg);
     }
 
-    public TokenParseException(String message, Throwable cause) {
-        super(message, cause);
+    protected AuthTokenException(String msg, Throwable cause) {
+        super(msg, cause);
     }
+
 }

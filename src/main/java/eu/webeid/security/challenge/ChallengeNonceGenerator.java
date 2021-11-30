@@ -33,7 +33,7 @@ public interface ChallengeNonceGenerator {
      * Generates a cryptographic nonce, a large random number that can be used only once,
      * and stores it in a {@link ChallengeNonceStore}.
      *
-     * @return Base64-encoded nonce
+     * @return a {@link ChallengeNonce} that contains the Base64-encoded nonce and its expiry time
      */
-    String generateAndStoreNonce();
+    ChallengeNonce generateAndStoreNonce();
 }

@@ -23,7 +23,6 @@
 package eu.webeid.security.challenge;
 
 import eu.webeid.security.util.DateAndTime;
-import eu.webeid.security.validator.AuthTokenValidator;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -56,7 +55,7 @@ public class ChallengeNonceGeneratorBuilder {
     /**
      * Sets the challenge nonce store where the generated challenge nonces will be stored.
      *
-     * @param challengeNonceStore nonce store
+     * @param challengeNonceStore challenge nonce store
      * @return current builder instance
      */
     public ChallengeNonceGeneratorBuilder withChallengeNonceStore(ChallengeNonceStore challengeNonceStore) {

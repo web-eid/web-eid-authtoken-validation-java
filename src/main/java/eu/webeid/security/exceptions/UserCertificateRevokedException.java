@@ -25,7 +25,7 @@ package eu.webeid.security.exceptions;
 /**
  * Thrown when the user certificate has been revoked.
  */
-public class UserCertificateRevokedException extends TokenValidationException {
+public class UserCertificateRevokedException extends AuthTokenException {
     public UserCertificateRevokedException() {
         super("User certificate has been revoked");
     }

@@ -22,7 +22,7 @@
 
 package eu.webeid.security.validator.ocsp;
 
-import eu.webeid.security.exceptions.TokenValidationException;
+import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.validator.ocsp.service.AiaOcspService;
 import eu.webeid.security.validator.ocsp.service.AiaOcspServiceConfiguration;
 import eu.webeid.security.validator.ocsp.service.DesignatedOcspService;
@@ -51,10 +51,10 @@ public class OcspServiceProvider {
      *
      * @param certificate subject certificate that is to be checked with OCSP
      * @return either the designated or AIA OCSP service instance
-     * @throws TokenValidationException when AIA URL is not found in certificate
+     * @throws AuthTokenException when AIA URL is not found in certificate
      * @throws CertificateEncodingException when certificate is invalid
      */
-    public OcspService getService(X509Certificate certificate) throws TokenValidationException, CertificateEncodingException {
+    public OcspService getService(X509Certificate certificate) throws AuthTokenException, CertificateEncodingException {
         if (designatedOcspService != null && designatedOcspService.supportsIssuerOf(certificate)) {
             return designatedOcspService;
         }

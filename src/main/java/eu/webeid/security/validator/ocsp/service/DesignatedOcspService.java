@@ -25,7 +25,7 @@ package eu.webeid.security.validator.ocsp.service;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import eu.webeid.security.exceptions.OCSPCertificateException;
-import eu.webeid.security.exceptions.TokenValidationException;
+import eu.webeid.security.exceptions.AuthTokenException;
 
 import java.net.URI;
 import java.security.cert.CertificateEncodingException;
@@ -59,7 +59,7 @@ public class DesignatedOcspService implements OcspService {
     }
 
     @Override
-    public void validateResponderCertificate(X509CertificateHolder cert, Date producedAt) throws TokenValidationException {
+    public void validateResponderCertificate(X509CertificateHolder cert, Date producedAt) throws AuthTokenException {
         try {
             final X509Certificate responderCertificate = certificateConverter.getCertificate(cert);
             // Certificate pinning is implemented simply by comparing the certificates or their public keys,

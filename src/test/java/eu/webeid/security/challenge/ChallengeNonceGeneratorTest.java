@@ -41,12 +41,12 @@ class ChallengeNonceGeneratorTest {
             .withNonceTtl(Duration.ofSeconds(1))
             .build();
 
-        final String nonce1 = challengeNonceGenerator.generateAndStoreNonce();
-        final String nonce2 = challengeNonceGenerator.generateAndStoreNonce();
+        final ChallengeNonce nonce1 = challengeNonceGenerator.generateAndStoreNonce();
+        final ChallengeNonce nonce2 = challengeNonceGenerator.generateAndStoreNonce();
 
-        assertThat(nonce1)
+        assertThat(nonce1.getBase64EncodedNonce())
             .hasSize(44) // Base64-encoded 32 bytes
-            .isNotEqualTo(nonce2);
+            .isNotEqualTo(nonce2.getBase64EncodedNonce());
 
         // It might be possible to add an entropy test by compressing the nonce bytes
         // and verifying that the result is longer than for non-random strings.

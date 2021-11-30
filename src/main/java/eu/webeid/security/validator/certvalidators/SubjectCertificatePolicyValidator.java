@@ -22,7 +22,7 @@
 
 package eu.webeid.security.validator.certvalidators;
 
-import eu.webeid.security.exceptions.TokenValidationException;
+import eu.webeid.security.exceptions.AuthTokenException;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x509.CertificatePolicies;
 import org.bouncycastle.asn1.x509.Extension;
@@ -52,7 +52,7 @@ public final class SubjectCertificatePolicyValidator {
      * @throws UserCertificateDisallowedPolicyException when user certificate policy does not match the configured policies.
      * @throws UserCertificateParseException when user certificate policy is invalid.
      */
-    public void validateCertificatePolicies(X509Certificate subjectCertificate) throws TokenValidationException {
+    public void validateCertificatePolicies(X509Certificate subjectCertificate) throws AuthTokenException {
         final byte[] extensionValue = subjectCertificate.getExtensionValue(Extension.certificatePolicies.getId());
         try {
             final CertificatePolicies policies = CertificatePolicies.getInstance(

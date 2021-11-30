@@ -22,7 +22,7 @@
 
 package eu.webeid.security.exceptions;
 
-public class OCSPCertificateException extends TokenValidationException {
+public class OCSPCertificateException extends AuthTokenException {
 
     public OCSPCertificateException(String message) {
         super(message);

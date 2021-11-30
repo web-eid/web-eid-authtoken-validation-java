@@ -23,14 +23,15 @@
 package eu.webeid.security.exceptions;
 
 /**
- * Thrown when authentication token signature validation fails.
+ * Thrown when authentication token parsing fails.
  */
-public class TokenSignatureValidationException extends TokenValidationException {
+public class AuthTokenParseException extends AuthTokenException {
 
-    public static final String MESSAGE = "Token signature validation has failed";
-
-    public TokenSignatureValidationException() {
-        super(MESSAGE);
+    public AuthTokenParseException(String message) {
+        super(message);
     }
 
+    public AuthTokenParseException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

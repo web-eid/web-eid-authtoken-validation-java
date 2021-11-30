@@ -22,7 +22,7 @@
 
 package eu.webeid.security.validator.certvalidators;
 
-import eu.webeid.security.exceptions.TokenValidationException;
+import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.security.validator.ocsp.*;
 import eu.webeid.security.validator.ocsp.service.OcspService;
@@ -80,9 +80,9 @@ public final class SubjectCertificateNotRevokedValidator {
      * Validates that the user certificate from the authentication token is not revoked with OCSP.
      *
      * @param subjectCertificate user certificate to be validated
-     * @throws TokenValidationException when user certificate is revoked or revocation check fails.
+     * @throws AuthTokenException when user certificate is revoked or revocation check fails.
      */
-    public void validateCertificateNotRevoked(X509Certificate subjectCertificate) throws TokenValidationException {
+    public void validateCertificateNotRevoked(X509Certificate subjectCertificate) throws AuthTokenException {
         try {
             OcspService ocspService = ocspServiceProvider.getService(subjectCertificate);
 
@@ -114,7 +114,7 @@ public final class SubjectCertificateNotRevokedValidator {
         }
     }
 
-    private void verifyOcspResponse(BasicOCSPResp basicResponse, OcspService ocspService, CertificateID requestCertificateId) throws TokenValidationException, OCSPException, CertificateException, OperatorCreationException {
+    private void verifyOcspResponse(BasicOCSPResp basicResponse, OcspService ocspService, CertificateID requestCertificateId) throws AuthTokenException, OCSPException, CertificateException, OperatorCreationException {
         // The verification algorithm follows RFC 2560, https://www.ietf.org/rfc/rfc2560.txt.
         //
         // 3.2.  Signed Response Acceptance Requirements

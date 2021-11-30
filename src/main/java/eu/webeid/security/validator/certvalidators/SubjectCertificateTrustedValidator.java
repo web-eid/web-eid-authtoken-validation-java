@@ -23,7 +23,7 @@
 package eu.webeid.security.validator.certvalidators;
 
 import eu.webeid.security.certificate.CertificateValidator;
-import eu.webeid.security.exceptions.TokenValidationException;
+import eu.webeid.security.exceptions.AuthTokenException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import eu.webeid.security.exceptions.CertificateNotTrustedException;
@@ -54,7 +54,7 @@ public final class SubjectCertificateTrustedValidator {
      * @param subjectCertificate user certificate to be validated
      * @throws CertificateNotTrustedException when user certificate is not signed by a trusted CA.
      */
-    public void validateCertificateTrusted(X509Certificate subjectCertificate) throws TokenValidationException {
+    public void validateCertificateTrusted(X509Certificate subjectCertificate) throws AuthTokenException {
         // Use the clock instance so that the date can be mocked in tests.
         final Date now = DateAndTime.DefaultClock.INSTANCE.now();
         subjectCertificateIssuerCertificate = CertificateValidator.validateIsSignedByTrustedCA(

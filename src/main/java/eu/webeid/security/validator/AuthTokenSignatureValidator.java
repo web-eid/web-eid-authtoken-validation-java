@@ -23,16 +23,19 @@ package eu.webeid.security.validator;
 
 import com.google.common.base.Strings;
 import com.google.common.primitives.Bytes;
+import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.exceptions.AuthTokenParseException;
+import eu.webeid.security.exceptions.AuthTokenSignatureValidationException;
 import eu.webeid.security.exceptions.ChallengeNullOrEmptyException;
-import eu.webeid.security.exceptions.TokenParseException;
-import eu.webeid.security.exceptions.TokenValidationException;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.impl.crypto.DefaultSignatureValidatorFactory;
 import io.jsonwebtoken.impl.crypto.SignatureValidator;
 import io.jsonwebtoken.security.SignatureException;
-import eu.webeid.security.exceptions.TokenSignatureValidationException;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -40,7 +43,6 @@ import java.util.Objects;
 import java.util.Set;
 
 import static eu.webeid.security.util.Base64Decoder.decodeBase64;
-import static eu.webeid.security.util.Sha256Digest.sha256Digest;
 
 public class AuthTokenSignatureValidator {
 
@@ -52,14 +54,14 @@ public class AuthTokenSignatureValidator {
         "RS256", "RS384", "RS512"  // RSASSA-PKCS1-v1_5
     ));
 
-    private final byte[] originHash;
+    private final byte[] originBytes;
 
     public AuthTokenSignatureValidator(URI siteOrigin) {
-        this.originHash = sha256Digest(siteOrigin.toString());
+        this.originBytes = siteOrigin.toString().getBytes(StandardCharsets.UTF_8);
     }
 
     // This method is based on the relevant subset of JJWT's DefaultJwtParser.parse().
-    public void validate(String algorithm, String signature, PublicKey publicKey, String currentChallengeNonce, byte[] originCertHash) throws TokenValidationException {
+    public void validate(String algorithm, String signature, PublicKey publicKey, String currentChallengeNonce) throws AuthTokenException {
         requireNotEmpty(algorithm, "algorithm");
         requireNotEmpty(signature, "signature");
         Objects.requireNonNull(publicKey);
@@ -68,42 +70,50 @@ public class AuthTokenSignatureValidator {
         }
 
         if (!ALLOWED_SIGNATURE_ALGORITHMS.contains(algorithm)) {
-            throw new TokenParseException("Unsupported signature algorithm");
+            throw new AuthTokenParseException("Unsupported signature algorithm");
         }
 
         SignatureAlgorithm signatureAlgorithm;
+        MessageDigest hashAlgorithm;
         try {
             signatureAlgorithm = SignatureAlgorithm.forName(algorithm);
+            hashAlgorithm = hashAlgorithmForName(algorithm);
         } catch (SignatureException e) {
             // Should not happen, see ALLOWED_SIGNATURE_ALGORITHMS check above.
-            throw new TokenParseException("Invalid signature algorithm", e);
+            throw new AuthTokenParseException("Invalid signature algorithm", e);
+        } catch (NoSuchAlgorithmException e) {
+            throw new AuthTokenParseException("Invalid hash algorithm", e);
         }
         if (signatureAlgorithm == null || signatureAlgorithm == SignatureAlgorithm.NONE) {
             // Should not happen, see ALLOWED_SIGNATURE_ALGORITHMS check above.
-            throw new TokenParseException("Invalid signature algorithm");
+            throw new AuthTokenParseException("Invalid signature algorithm");
         }
+        Objects.requireNonNull(hashAlgorithm, "hashAlgorithm");
         signatureAlgorithm.assertValidVerificationKey(publicKey);
         final SignatureValidator signatureValidator = DefaultSignatureValidatorFactory.INSTANCE
             .createSignatureValidator(signatureAlgorithm, publicKey);
         final byte[] decodedSignature = decodeBase64(signature);
 
-        final byte[] nonceHash = sha256Digest(currentChallengeNonce);
-        final byte[] concatSignedFields = originCertHash == null ?
-            Bytes.concat(originHash, nonceHash) :
-            Bytes.concat(originHash, nonceHash, originCertHash);
+        final byte[] originHash = hashAlgorithm.digest(originBytes);
+        final byte[] nonceHash = hashAlgorithm.digest(currentChallengeNonce.getBytes(StandardCharsets.UTF_8));
+        final byte[] concatSignedFields = Bytes.concat(originHash, nonceHash);
 
         // Note that in case of ECDSA, the eID card outputs raw R||S, but JCA's SHA384withECDSA signature
         // validation implementation requires the signature in DER encoding.
         // JJWT's EllipticCurveProvider.transcodeSignatureToDER() internally takes care of transcoding
         // raw R||S to DER as needed inside EllipticCurveProvider.isValid().
         if (!signatureValidator.isValid(concatSignedFields, decodedSignature)) {
-            throw new TokenSignatureValidationException();
+            throw new AuthTokenSignatureValidationException();
         }
     }
 
-    private void requireNotEmpty(String argument, String fieldName) throws TokenParseException {
+    private MessageDigest hashAlgorithmForName(String algorithm) throws NoSuchAlgorithmException {
+        return MessageDigest.getInstance("SHA-" + algorithm.substring(algorithm.length() - 3));
+    }
+
+    private void requireNotEmpty(String argument, String fieldName) throws AuthTokenParseException {
         if (Strings.isNullOrEmpty(argument)) {
-            throw new TokenParseException("'" + fieldName + "' is null or empty");
+            throw new AuthTokenParseException("'" + fieldName + "' is null or empty");
         }
     }
 

@@ -42,13 +42,14 @@ final class ChallengeNonceGeneratorImpl implements ChallengeNonceGenerator {
     }
 
     @Override
-    public String generateAndStoreNonce() {
+    public ChallengeNonce generateAndStoreNonce() {
         final byte[] nonceBytes = new byte[NONCE_LENGTH];
         secureRandom.nextBytes(nonceBytes);
         final ZonedDateTime expirationTime = DateAndTime.utcNow().plus(ttl);
         final String base64Nonce = Base64.getEncoder().encodeToString(nonceBytes);
-        challengeNonceStore.put(new ChallengeNonce(base64Nonce, expirationTime));
-        return base64Nonce;
+        final ChallengeNonce challengeNonce = new ChallengeNonce(base64Nonce, expirationTime);
+        challengeNonceStore.put(challengeNonce);
+        return challengeNonce;
     }
 
 }

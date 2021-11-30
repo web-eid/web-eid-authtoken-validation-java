@@ -23,14 +23,12 @@
 package eu.webeid.security.exceptions;
 
 /**
- * Base class for all authentication token validation exceptions.
+ * Thrown when authentication token signature validation fails.
  */
-public abstract class TokenValidationException extends Exception {
-    protected TokenValidationException(String msg) {
-        super(msg);
+public class AuthTokenSignatureValidationException extends AuthTokenException {
+
+    public AuthTokenSignatureValidationException() {
+        super("Token signature validation has failed");
     }
 
-    protected TokenValidationException(String msg, Throwable cause) {
-        super(msg, cause);
-    }
 }

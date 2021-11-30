@@ -25,7 +25,7 @@ package eu.webeid.security.validator.certvalidators;
 import eu.webeid.security.exceptions.UserCertificateWrongPurposeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import eu.webeid.security.exceptions.TokenValidationException;
+import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.UserCertificateMissingPurposeException;
 import eu.webeid.security.exceptions.UserCertificateParseException;
 
@@ -42,9 +42,9 @@ public final class SubjectCertificatePurposeValidator {
      * Validates that the purpose of the user certificate from the authentication token contains client authentication.
      *
      * @param subjectCertificate user certificate to be validated
-     * @throws TokenValidationException when the purpose of certificate does not contain client authentication
+     * @throws AuthTokenException when the purpose of certificate does not contain client authentication
      */
-    public static void validateCertificatePurpose(X509Certificate subjectCertificate) throws TokenValidationException {
+    public static void validateCertificatePurpose(X509Certificate subjectCertificate) throws AuthTokenException {
         try {
             final List<String> usages = subjectCertificate.getExtendedKeyUsage();
             if (usages == null || usages.isEmpty()) {

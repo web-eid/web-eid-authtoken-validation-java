@@ -22,7 +22,7 @@
 
 package eu.webeid.security.exceptions;
 
-public class CertificateDecodingException extends TokenValidationException {
+public class CertificateDecodingException extends AuthTokenException {
     public CertificateDecodingException(Throwable cause) {
         super("Certificate decoding from Base64 or parsing failed", cause);
     }

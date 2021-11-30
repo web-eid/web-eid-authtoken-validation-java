@@ -24,11 +24,10 @@ package eu.webeid.security.testutil;
 
 import eu.webeid.security.certificate.CertificateLoader;
 import eu.webeid.security.exceptions.JceException;
-import org.bouncycastle.asn1.ASN1ObjectIdentifier;
-import eu.webeid.security.exceptions.CertificateDecodingException;
 import eu.webeid.security.exceptions.OCSPCertificateException;
 import eu.webeid.security.validator.AuthTokenValidator;
 import eu.webeid.security.validator.AuthTokenValidatorBuilder;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 
 import java.io.IOException;
 import java.net.URI;
@@ -36,7 +35,6 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 
-import static eu.webeid.security.testutil.Certificates.getRiaSiteCertificateSha256Hash;
 import static eu.webeid.security.testutil.OcspServiceMaker.getDesignatedOcspServiceConfiguration;
 
 public final class AuthTokenValidators {
@@ -80,17 +78,6 @@ public final class AuthTokenValidators {
     public static AuthTokenValidator getAuthTokenValidatorWithDisallowedESTEIDPolicy() throws CertificateException, JceException, IOException {
         return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, getCACertificates())
             .withDisallowedCertificatePolicies(EST_IDEMIA_POLICY)
-            .withoutUserCertificateRevocationCheckWithOcsp()
-            .build();
-    }
-
-    public static AuthTokenValidator getAuthTokenValidatorWithCertHashCheck() throws CertificateException, JceException, IOException, CertificateDecodingException {
-        return getAuthTokenValidatorWithCertHashCheck(getRiaSiteCertificateSha256Hash());
-    }
-
-    public static AuthTokenValidator getAuthTokenValidatorWithCertHashCheck(byte[] certHash) throws CertificateException, JceException, IOException, CertificateDecodingException {
-        return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, getCACertificates())
-            .withSiteCertificateSha256Hash(certHash)
             .withoutUserCertificateRevocationCheckWithOcsp()
             .build();
     }
