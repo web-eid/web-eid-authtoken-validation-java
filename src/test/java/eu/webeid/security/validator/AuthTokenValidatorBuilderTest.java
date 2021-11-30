@@ -28,8 +28,6 @@ import org.junit.jupiter.api.Test;
 import java.net.URI;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static eu.webeid.security.testutil.AuthTokenValidators.getAuthTokenValidator;
-import static eu.webeid.security.testutil.AuthTokenValidators.getAuthTokenValidatorWithCertHashCheck;
 
 class AuthTokenValidatorBuilderTest {
 
@@ -81,13 +79,6 @@ class AuthTokenValidatorBuilderTest {
         assertThatThrownBy(() -> AuthTokenValidators.getAuthTokenValidator("https:///ria.ee"))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageStartingWith("An URI syntax exception occurred");
-    }
-
-    @Test
-    void testWrongSiteCertHashLength() {
-        assertThatThrownBy(() -> AuthTokenValidators.getAuthTokenValidatorWithCertHashCheck(new byte[2]))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Site certificate SHA-256 hash must be 32 bytes long");
     }
 
 }

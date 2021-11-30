@@ -32,6 +32,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import static eu.webeid.security.util.Base64Decoder.decodeBase64;
 
@@ -52,6 +53,7 @@ public final class CertificateLoader {
     }
 
     public static X509Certificate decodeCertificateFromBase64(String certificateInBase64) throws CertificateDecodingException {
+        Objects.requireNonNull(certificateInBase64, "certificateInBase64");
         try (final InputStream targetStream = new ByteArrayInputStream(decodeBase64(certificateInBase64))) {
             return (X509Certificate) CertificateFactory
                 .getInstance("X509")

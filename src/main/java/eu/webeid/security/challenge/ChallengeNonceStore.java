@@ -23,7 +23,7 @@
 package eu.webeid.security.challenge;
 
 import eu.webeid.security.exceptions.ChallengeNonceExpiredException;
-import eu.webeid.security.exceptions.TokenValidationException;
+import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.ChallengeNonceNotFoundException;
 
 import static eu.webeid.security.util.DateAndTime.utcNow;
@@ -35,7 +35,7 @@ public abstract class ChallengeNonceStore {
 
     public abstract void put(ChallengeNonce challengeNonce);
 
-    public final ChallengeNonce getAndRemove() throws TokenValidationException {
+    public final ChallengeNonce getAndRemove() throws AuthTokenException {
         final ChallengeNonce challengeNonce = getAndRemoveImpl();
         if (challengeNonce == null) {
             throw new ChallengeNonceNotFoundException();

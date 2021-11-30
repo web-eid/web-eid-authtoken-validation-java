@@ -26,7 +26,7 @@ package eu.webeid.security.exceptions;
  * Thrown when the token signature was calculated with the origin HTTPS certificate hash,
  * but it is not provided in the configuration.
  */
-public class SiteCertificateHashNotConfiguredException extends TokenValidationException {
+public class SiteCertificateHashNotConfiguredException extends AuthTokenException {
     public SiteCertificateHashNotConfiguredException() {
         super("Authentication token signature was calculated with the origin certificate hash, " +
             "but site certificate hash is not configured. Please provide it via " +

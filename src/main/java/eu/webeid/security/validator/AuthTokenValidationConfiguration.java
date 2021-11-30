@@ -50,7 +50,6 @@ public final class AuthTokenValidationConfiguration {
     private boolean isUserCertificateRevocationCheckWithOcspEnabled = true;
     private Duration ocspRequestTimeout = Duration.ofSeconds(5);
     private DesignatedOcspServiceConfiguration designatedOcspServiceConfiguration;
-    private byte[] siteCertificateSha256Hash;
     // Don't allow Estonian Mobile-ID policy by default.
     private Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies = Sets.newHashSet(
         SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V1,
@@ -70,7 +69,6 @@ public final class AuthTokenValidationConfiguration {
         this.isUserCertificateRevocationCheckWithOcspEnabled = other.isUserCertificateRevocationCheckWithOcspEnabled;
         this.ocspRequestTimeout = other.ocspRequestTimeout;
         this.designatedOcspServiceConfiguration = other.designatedOcspServiceConfiguration;
-        this.siteCertificateSha256Hash = other.siteCertificateSha256Hash;
         this.disallowedSubjectCertificatePolicies = Collections.unmodifiableSet(new HashSet<>(other.disallowedSubjectCertificatePolicies));
         this.nonceDisabledOcspUrls = Collections.unmodifiableSet(new HashSet<>(other.nonceDisabledOcspUrls));
     }
@@ -111,14 +109,6 @@ public final class AuthTokenValidationConfiguration {
         this.designatedOcspServiceConfiguration = designatedOcspServiceConfiguration;
     }
 
-    public void setSiteCertificateSha256Hash(byte[] siteCertificateSha256Hash) {
-        this.siteCertificateSha256Hash = siteCertificateSha256Hash;
-    }
-
-    public byte[] getSiteCertificateSha256Hash() {
-        return siteCertificateSha256Hash;
-    }
-
     public Collection<ASN1ObjectIdentifier> getDisallowedSubjectCertificatePolicies() {
         return disallowedSubjectCertificatePolicies;
     }
@@ -138,10 +128,6 @@ public final class AuthTokenValidationConfiguration {
         validateIsOriginURL(siteOrigin);
         if (trustedCACertificates.isEmpty()) {
             throw new IllegalArgumentException("At least one trusted certificate authority must be provided");
-        }
-        // If given, a SHA256 hash must be 32 bytes long.
-        if (siteCertificateSha256Hash!= null && siteCertificateSha256Hash.length != 32) {
-            throw new IllegalArgumentException("Site certificate SHA-256 hash must be 32 bytes long");
         }
         requirePositiveDuration(ocspRequestTimeout, "OCSP request timeout");
     }

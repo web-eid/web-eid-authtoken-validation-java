@@ -153,24 +153,6 @@ public class AuthTokenValidatorBuilder {
     }
 
     /**
-     * Sets the site certificate hash, i.e. the SHA-256 hash of the HTTPS certificate
-     * that the site is using.
-     * <p>
-     * When the experimental origin certificate validation support is enabled, then
-     * the origin certificate hash is used along with the origin and challenge nonce hashes
-     * during authentication token signature calculation. In this case the site certificate hash
-     * must be provided in configuration to verify the signature.
-     *
-     * @param certificateSha256Hash SHA-256 hash of the HTTPS certificate that the site is using
-     * @return the builder instance for method chaining.
-     */
-    public AuthTokenValidatorBuilder withSiteCertificateSha256Hash(byte[] certificateSha256Hash) {
-        configuration.setSiteCertificateSha256Hash(certificateSha256Hash);
-        LOG.debug("Site certificate hash validation is enabled, hash is {}", certificateSha256Hash);
-        return this;
-    }
-
-    /**
      * Validates the configuration and builds the {@link AuthTokenValidator} object with it.
      * The returned {@link AuthTokenValidator} object is immutable/thread-safe.
      *

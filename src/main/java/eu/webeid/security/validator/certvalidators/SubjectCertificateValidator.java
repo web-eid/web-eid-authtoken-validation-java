@@ -22,7 +22,7 @@
 
 package eu.webeid.security.validator.certvalidators;
 
-import eu.webeid.security.exceptions.TokenValidationException;
+import eu.webeid.security.exceptions.AuthTokenException;
 
 import java.security.cert.X509Certificate;
 
@@ -33,5 +33,5 @@ import java.security.cert.X509Certificate;
  */
 @FunctionalInterface
 public interface SubjectCertificateValidator {
-    void validate(X509Certificate subjectCertificate) throws TokenValidationException;
+    void validate(X509Certificate subjectCertificate) throws AuthTokenException;
 }

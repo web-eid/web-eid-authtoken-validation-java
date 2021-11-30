@@ -40,10 +40,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AuthTokenCertificateTest extends AbstractTestWithValidator {
 
     private static final String AUTH_TOKEN = "{\"algorithm\":\"ES384\"," +
-        "\"certificate\":\"X5C\"," +
-        "\"issuerApp\":\"https://web-eid.eu/web-eid-app/releases/2.0.0+0\"," +
+        "\"unverifiedCertificate\":\"X5C\"," +
+        "\"appVersion\":\"https://web-eid.eu/web-eid-app/releases/2.0.0+0\"," +
         "\"signature\":\"arx164xRiwhIQDINe0J+ZxJWZFOQTx0PBtOaWaxAe7gofEIHRIbV1w0sOCYBJnvmvMem9hU4nc2+iJx2x8poYck4Z6eI3GwtiksIec3XQ9ZIk1n/XchXnmPn3GYV+HzJ\"," +
-        "\"version\":\"web-eid:1\"}";
+        "\"format\":\"web-eid:1\"}";
 
     private static final String MISSING_PURPOSE_CERT = "MIICxjCCAa6gAwIBAgIJANTbd26vS6fmMA0GCSqGSIb3DQEBBQUAMBUxEzARBgNVBAMTCndlYi1laWQuZXUwHhcNMjAwOTI0MTIyNDMzWhcNMzAwOTIyMTIyNDMzWjAVMRMwEQYDVQQDEwp3ZWItZWlkLmV1MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAza5qBFu5fvs47rx3o9yzBVfIxHjMotID8ppkwWVen/uFxlqsRVi+XnWkggW+K8X45inAnBAVi1rIw7GQNdacSHglyvQfwM64AallmD0+K+QgbqxcO9fvRvlAeISENBc2bGgqTIytPEON5ZmazzbOZjqY3M1QcPlPZOeUm6M9ZcZFhsxpiB4gwZUic9tnCz9eujd6k6DzNVfSRaJcpGA5hJ9aKH4vXS3x7anewna+USEXkRb4Il5zSlZR0i1yrVA1YNOxCG/+GgWvXfvXwdQ0z9BpGwNEyc0mRDNx+umaTukz9t+7/qTcB2JLTuiwM9Gqg5sDDnzPlcZSa7GnIU0MLQIDAQABoxkwFzAVBgNVHREEDjAMggp3ZWItZWlkLmV1MA0GCSqGSIb3DQEBBQUAA4IBAQAYGkBhTlet47uw3JYunYo6dj4nGWSGV4x6LYjCp5QlAmGd28HpC1RFB3ba+inwW8SP69kEOcB0sJQAZ/tV90oCATNsy/Whg/TtiHISL2pr1dyBoKDRWbgTp8jjzcp2Bj9nL14aqpj1t4K1lcoYETX41yVmyyJu6VFs80M5T3yikm2giAhszjChnjyoT2kaEKoua9EUK9SS27pVltgbbvtmeTp3ZPHtBfiDOATL6E03RZ5WfMLRefI796a+RcznnudzQHhMSwcjLpMDgIWpUU4OU7RiwrU+S3MrvgzCjkWh2MGu/OGLB+d3JZoW+eCvigoshmAsbJCMLbh4N78BCPqk";
     private static final String WRONG_PURPOSE_CERT = "MIIEBDCCA2WgAwIBAgIQGIgoZxFL7VZbyFH7MAVEkTAKBggqhkjOPQQDBDBgMQswCQYDVQQGEwJFRTEbMBkGA1UECgwSU0sgSUQgU29sdXRpb25zIEFTMRcwFQYDVQRhDA5OVFJFRS0xMDc0NzAxMzEbMBkGA1UEAwwSVEVTVCBvZiBFU1RFSUQyMDE4MB4XDTE4MTAxODA5MjcyM1oXDTIzMTAxNzIxNTk1OVowfzELMAkGA1UEBhMCRUUxKjAoBgNVBAMMIUrDlUVPUkcsSkFBSy1LUklTVEpBTiwzODAwMTA4NTcxODEQMA4GA1UEBAwHSsOVRU9SRzEWMBQGA1UEKgwNSkFBSy1LUklTVEpBTjEaMBgGA1UEBRMRUE5PRUUtMzgwMDEwODU3MTgwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAAT3SZB34CUGYhQyLsLd9b2ihv35q7NT47Id9ugLIdgg3NSFDccH6rV16D2m8DKfuD2mn3V6QdaaZnbWF4YdDK1W0C9kLNsB70ob//y39pugMftepmQpJcBGPqug81tf5jujggHDMIIBvzAJBgNVHRMEAjAAMA4GA1UdDwEB/wQEAwIDiDBHBgNVHSAEQDA+MDIGCysGAQQBg5EhAQIBMCMwIQYIKwYBBQUHAgEWFWh0dHBzOi8vd3d3LnNrLmVlL0NQUzAIBgYEAI96AQIwHwYDVR0RBBgwFoEUMzgwMDEwODU3MThAZWVzdGkuZWUwHQYDVR0OBBYEFPhJx7ro54+N8r2ByiZXzZyWBbjFMGEGCCsGAQUFBwEDBFUwUzBRBgYEAI5GAQUwRzBFFj9odHRwczovL3NrLmVlL2VuL3JlcG9zaXRvcnkvY29uZGl0aW9ucy1mb3ItdXNlLW9mLWNlcnRpZmljYXRlcy8TAkVOMCAGA1UdJQEB/wQWMBQGCCsG/wUFBwMCBggrBgEFBQcDBDAfBgNVHSMEGDAWgBTAhJkpxE6fOwI09pnhClYACCk+ezBzBggrBgEFBQcBAQRnMGUwLAYIKwYBBQUHMAGGIGh0dHA6Ly9haWEuZGVtby5zay5lZS9lc3RlaWQyMDE4MDUGCCsGAQUFBzAChilodHRwOi8vYy5zay5lZS9UZXN0X29mX0VTVEVJRDIwMTguZGVyLmNydDAKBggqhkjOPQQDBAOBjAAwgYgCQgFi5XSCFGgsc8SKLWwMBWS0nu/20FjEqh6OGvsI4iPctNDkinsxcYgARdfqPsNnDX+KjALKPEKZCLKRixGL2kPLMgJCAQFXP9gstThxlj/1Q5YFb7KWhPWFiKgQEi9JdvxJQNXLkWV9onEh96mRFgv4IJJpGazuoSMZtzNpyBxmM0dwnxOf";
@@ -73,27 +73,27 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     }
 
     @Test
-    void whenCertificateFieldIsMissing_thenParsingFails() throws TokenValidationException {
-        final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "\"certificate\":\"X5C\",", "");
+    void whenCertificateFieldIsMissing_thenParsingFails() throws AuthTokenException {
+        final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "\"unverifiedCertificate\":\"X5C\",", "");
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
-            .isInstanceOf(TokenParseException.class)
-            .hasMessage("'certificate' field is missing, null or empty");
+            .isInstanceOf(AuthTokenParseException.class)
+            .hasMessage("'unverifiedCertificate' field is missing, null or empty");
     }
 
     @Test
-    void whenCertificateFieldIsEmpty_thenParsingFails() throws TokenValidationException {
+    void whenCertificateFieldIsEmpty_thenParsingFails() throws AuthTokenException {
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", "");
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
-            .isInstanceOf(TokenParseException.class)
-            .hasMessage("'certificate' field is missing, null or empty");
+            .isInstanceOf(AuthTokenParseException.class)
+            .hasMessage("'unverifiedCertificate' field is missing, null or empty");
     }
 
     @Test
-    void whenCertificateFieldIsArray_thenParsingFails() throws TokenValidationException {
+    void whenCertificateFieldIsArray_thenParsingFails() throws AuthTokenException {
         assertThatThrownBy(() -> replaceTokenField(AUTH_TOKEN, "\"X5C\"", "[1,2,3,4]"))
-            .isInstanceOf(TokenParseException.class)
+            .isInstanceOf(AuthTokenParseException.class)
             .hasMessage("Error parsing Web eID authentication token")
             .getCause()
             .isInstanceOf(MismatchedInputException.class)
@@ -101,7 +101,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     }
 
     @Test
-    void whenCertificateFieldIsNumber_thenParsingFails() throws TokenValidationException {
+    void whenCertificateFieldIsNumber_thenParsingFails() throws AuthTokenException {
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "\"X5C\"", "1234");
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
@@ -112,7 +112,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     }
 
     @Test
-    void whenCertificateFieldIsNotBase64_thenParsingFails() throws TokenValidationException {
+    void whenCertificateFieldIsNotBase64_thenParsingFails() throws AuthTokenException {
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", "This is not a certificate");
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
@@ -123,7 +123,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     }
 
     @Test
-    void whenCertificateFieldIsNotCertificate_thenParsingFails() throws TokenValidationException {
+    void whenCertificateFieldIsNotCertificate_thenParsingFails() throws AuthTokenException {
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", "VGhpcyBpcyBub3QgYSBjZXJ0aWZpY2F0ZQ");
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
@@ -134,7 +134,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     }
 
     @Test
-    void whenCertificatePurposeIsMissing_thenValidationFails() throws TokenValidationException {
+    void whenCertificatePurposeIsMissing_thenValidationFails() throws AuthTokenException {
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", MISSING_PURPOSE_CERT);
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
@@ -142,7 +142,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     }
 
     @Test
-    void whenCertificatePurposeIsWrong_thenValidationFails() throws TokenValidationException {
+    void whenCertificatePurposeIsWrong_thenValidationFails() throws AuthTokenException {
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", WRONG_PURPOSE_CERT);
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
@@ -150,7 +150,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     }
 
     @Test
-    void whenCertificatePolicyIsWrong_thenValidationFails() throws TokenValidationException {
+    void whenCertificatePolicyIsWrong_thenValidationFails() throws AuthTokenException {
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", WRONG_POLICY_CERT);
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
@@ -166,7 +166,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     }
 
     @Test
-    void whenUsingOldMobileIdCertificate_thenValidationFails() throws TokenValidationException {
+    void whenUsingOldMobileIdCertificate_thenValidationFails() throws AuthTokenException {
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", OLD_MOBILE_ID_CERT);
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
@@ -174,7 +174,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     }
 
     @Test
-    void whenUsingNewMobileIdCertificate_thenValidationFails() throws TokenValidationException {
+    void whenUsingNewMobileIdCertificate_thenValidationFails() throws AuthTokenException {
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", NEW_MOBILE_ID_CERT);
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
@@ -182,7 +182,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     }
 
     @Test
-    void whenCertificateIsExpiredRsa_thenValidationFails() throws TokenValidationException {
+    void whenCertificateIsExpiredRsa_thenValidationFails() throws AuthTokenException {
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", EXPIRED_RSA_CERT);
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
@@ -191,7 +191,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     }
 
     @Test
-    void whenCertificateIsExpiredEcdsa_thenValidationFails() throws TokenValidationException {
+    void whenCertificateIsExpiredEcdsa_thenValidationFails() throws AuthTokenException {
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", EXPIRED_ECDSA_CERT);
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))

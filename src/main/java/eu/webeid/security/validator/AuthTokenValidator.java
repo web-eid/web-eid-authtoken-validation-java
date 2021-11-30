@@ -24,7 +24,7 @@ package eu.webeid.security.validator;
 
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.certificate.CertificateData;
-import eu.webeid.security.exceptions.TokenValidationException;
+import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.util.TitleCase;
 
 import java.security.cert.X509Certificate;
@@ -41,9 +41,9 @@ public interface AuthTokenValidator {
      *
      * @param authToken the Web eID authentication token string, in Web eID JSON format
      * @return the Web eID authentication token
-     * @throws TokenValidationException when parsing fails
+     * @throws AuthTokenException when parsing fails
      */
-    WebEidAuthToken parse(String authToken) throws TokenValidationException;
+    WebEidAuthToken parse(String authToken) throws AuthTokenException;
 
     /**
      * Validates the Web eID authentication token signed by the subject and returns
@@ -55,8 +55,8 @@ public interface AuthTokenValidator {
      * @param authToken the Web eID authentication token
      * @param currentChallengeNonce the challenge nonce that is associated with the authentication token
      * @return validated subject certificate
-     * @throws TokenValidationException when validation fails
+     * @throws AuthTokenException when validation fails
      */
-    X509Certificate validate(WebEidAuthToken authToken, String currentChallengeNonce) throws TokenValidationException;
+    X509Certificate validate(WebEidAuthToken authToken, String currentChallengeNonce) throws AuthTokenException;
 
 }

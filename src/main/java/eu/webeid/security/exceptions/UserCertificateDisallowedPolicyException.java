@@ -25,7 +25,7 @@ package eu.webeid.security.exceptions;
 /**
  * Thrown when any of the configured disallowed policies is present in the user certificate.
  */
-public class UserCertificateDisallowedPolicyException extends TokenValidationException {
+public class UserCertificateDisallowedPolicyException extends AuthTokenException {
     public UserCertificateDisallowedPolicyException() {
         super("Disallowed user certificate policy");
     }

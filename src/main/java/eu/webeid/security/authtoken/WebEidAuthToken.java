@@ -27,18 +27,17 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class WebEidAuthToken {
 
-    private String certificate;
+    private String unverifiedCertificate;
     private String signature;
     private String algorithm;
-    private String version;
-    private boolean useOriginCertHash;
+    private String format;
 
-    public String getCertificate() {
-        return certificate;
+    public String getUnverifiedCertificate() {
+        return unverifiedCertificate;
     }
 
-    public void setCertificate(String certificate) {
-        this.certificate = certificate;
+    public void setUnverifiedCertificate(String unverifiedCertificate) {
+        this.unverifiedCertificate = unverifiedCertificate;
     }
 
     public String getSignature() {
@@ -57,20 +56,12 @@ public class WebEidAuthToken {
         this.algorithm = algorithm;
     }
 
-    public String getVersion() {
-        return version;
+    public String getFormat() {
+        return format;
     }
 
-    public void setVersion(String version) {
-        this.version = version;
-    }
-
-    public boolean getUseOriginCertHash() {
-        return useOriginCertHash;
-    }
-
-    public void setUseOriginCertHash(boolean useOriginCertHash) {
-        this.useOriginCertHash = useOriginCertHash;
+    public void setFormat(String format) {
+        this.format = format;
     }
 
 }

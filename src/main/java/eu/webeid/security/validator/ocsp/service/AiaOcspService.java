@@ -27,7 +27,7 @@ import eu.webeid.security.exceptions.OCSPCertificateException;
 import eu.webeid.security.validator.ocsp.OcspResponseValidator;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
-import eu.webeid.security.exceptions.TokenValidationException;
+import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 
 import java.net.URI;
@@ -52,7 +52,7 @@ public class AiaOcspService implements OcspService {
     private final URI url;
     private final boolean supportsNonce;
 
-    public AiaOcspService(AiaOcspServiceConfiguration configuration, X509Certificate certificate) throws TokenValidationException {
+    public AiaOcspService(AiaOcspServiceConfiguration configuration, X509Certificate certificate) throws AuthTokenException {
         Objects.requireNonNull(configuration);
         this.trustedCACertificateAnchors = configuration.getTrustedCACertificateAnchors();
         this.trustedCACertificateCertStore = configuration.getTrustedCACertificateCertStore();
@@ -71,7 +71,7 @@ public class AiaOcspService implements OcspService {
     }
 
     @Override
-    public void validateResponderCertificate(X509CertificateHolder cert, Date producedAt) throws TokenValidationException {
+    public void validateResponderCertificate(X509CertificateHolder cert, Date producedAt) throws AuthTokenException {
         try {
             final X509Certificate certificate = certificateConverter.getCertificate(cert);
             CertificateValidator.certificateIsValidOnDate(certificate, producedAt, "AIA OCSP responder");
@@ -83,7 +83,7 @@ public class AiaOcspService implements OcspService {
         }
     }
 
-    private static URI getOcspAiaUrlFromCertificate(X509Certificate certificate) throws TokenValidationException {
+    private static URI getOcspAiaUrlFromCertificate(X509Certificate certificate) throws AuthTokenException {
         final URI uri = getOcspUri(certificate);
         if (uri == null) {
             throw new UserCertificateOCSPCheckFailedException("Getting the AIA OCSP responder field from the certificate failed");

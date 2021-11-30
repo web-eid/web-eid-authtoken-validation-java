@@ -25,7 +25,7 @@ package eu.webeid.security.validator.certvalidators;
 import eu.webeid.security.certificate.CertificateValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import eu.webeid.security.exceptions.TokenValidationException;
+import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.util.DateAndTime;
 
 import java.security.cert.TrustAnchor;
@@ -48,9 +48,9 @@ public final class SubjectCertificateExpiryValidator {
      * and the validity of trusted CA certificates.
      *
      * @param subjectCertificate user certificate to be validated
-     * @throws TokenValidationException when a CA certificate or the user certificate is expired or not yet valid
+     * @throws AuthTokenException when a CA certificate or the user certificate is expired or not yet valid
      */
-    public void validateCertificateExpiry(X509Certificate subjectCertificate) throws TokenValidationException {
+    public void validateCertificateExpiry(X509Certificate subjectCertificate) throws AuthTokenException {
         // Use the clock instance so that the date can be mocked in tests.
         final Date now = DateAndTime.DefaultClock.INSTANCE.now();
         CertificateValidator.trustedCACertificatesAreValidOnDate(trustedCACertificateAnchors, now);
