@@ -31,11 +31,13 @@ import static eu.webeid.security.util.DateAndTime.utcNow;
 /**
  * A store for storing generated challenge nonces and accessing their generation time.
  */
-public abstract class ChallengeNonceStore {
+public interface ChallengeNonceStore {
 
-    public abstract void put(ChallengeNonce challengeNonce);
+    void put(ChallengeNonce challengeNonce);
 
-    public final ChallengeNonce getAndRemove() throws AuthTokenException {
+    ChallengeNonce getAndRemoveImpl();
+
+    default ChallengeNonce getAndRemove() throws AuthTokenException {
         final ChallengeNonce challengeNonce = getAndRemoveImpl();
         if (challengeNonce == null) {
             throw new ChallengeNonceNotFoundException();
@@ -45,7 +47,5 @@ public abstract class ChallengeNonceStore {
         }
         return challengeNonce;
     }
-
-    protected abstract ChallengeNonce getAndRemoveImpl();
 
 }
