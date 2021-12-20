@@ -28,7 +28,7 @@ package eu.webeid.security.exceptions;
 public class AuthTokenSignatureValidationException extends AuthTokenException {
 
     public AuthTokenSignatureValidationException() {
-        super("Token signature validation has failed");
+        super("Token signature validation has failed. Check that the origin and nonce are correct.");
     }
 
 }

@@ -22,20 +22,20 @@
 
 package eu.webeid.security.challenge;
 
-public class InMemoryChallengeNonceStore extends ChallengeNonceStore {
+public class InMemoryChallengeNonceStore implements ChallengeNonceStore {
 
     private ChallengeNonce challengeNonce;
 
     @Override
-    protected ChallengeNonce getAndRemoveImpl() {
-        final ChallengeNonce result = challengeNonce;
-        challengeNonce = null;
-        return result;
+    public void put(ChallengeNonce challengeNonce) {
+        this.challengeNonce = challengeNonce;
     }
 
     @Override
-    public void put(ChallengeNonce challengeNonce) {
-        this.challengeNonce = challengeNonce;
+    public ChallengeNonce getAndRemoveImpl() {
+        final ChallengeNonce result = challengeNonce;
+        challengeNonce = null;
+        return result;
     }
 
 }
