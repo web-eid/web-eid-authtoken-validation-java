@@ -117,7 +117,7 @@ import eu.webeid.security.certificate.CertificateLoader;
 ## 5. Configure the authentication token validator
 
 Once the prerequisites have been met, the authentication token validator itself can be configured.
-The mandatory parameters are the website origin (the URL serving the web application) and trusted certificate authorities.
+The mandatory parameters are the website origin (the URL serving the web application, see section [_Basic usage_](#basic-usage) below) and trusted certificate authorities.
 The authentication token validator will be used in the login processing component of your web application authentication framework; it is thread-safe and should be scoped as a singleton.
 
 ```java
@@ -262,7 +262,7 @@ The website back end must lookup the challenge nonce from its local store using 
 
 As described in section *[5. Configure the authentication token validator](#5-configure-the-authentication-token-validator)*, the mandatory authentication token validator configuration parameters are the website origin and trusted certificate authorities.
 
-**Origin** should be the URL serving the web application. Origin URL must be in the form of `"https://" <hostname> [ ":" <port> ]`  as defined in [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Location/origin) and not contain path or query components.
+**Origin** must be the URL serving the web application. Origin URL must be in the form of `"https://" <hostname> [ ":" <port> ]`  as defined in [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Location/origin) and not contain path or query components. Note that the `origin` URL must not end with a slash `/`.
 
 The **trusted certificate authority certificates** are used to validate that the user certificate from the authentication token and the OCSP responder certificate is signed by a trusted certificate authority. Intermediate CA certificates must be used instead of the root CA certificates so that revoked CA certificates can be removed. Trusted certificate authority certificates configuration is described in more detail in section *[4. Add trusted certificate authority certificates](#4-add-trusted-certificate-authority-certificates)*.
 
