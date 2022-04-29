@@ -271,7 +271,7 @@ Before validation, the previously issued **challenge nonce** must be looked up f
 The authentication token validator configuration and construction is described in more detail in section *[5. Configure the authentication token validator](#5-configure-the-authentication-token-validator)*. Once the validator object has been constructed, it can be used for validating authentication tokens as follows:
 
 ```java  
-String nonce = challengeNonceStore.getAndRemove().getBase64EncodedNonce();
+String challengeNonce = challengeNonceStore.getAndRemove().getBase64EncodedNonce();
 WebEidAuthToken token = tokenValidator.parse(tokenString);
 X509Certificate userCertificate = tokenValidator.validate(token, challengeNonce);
 ```
