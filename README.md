@@ -322,7 +322,7 @@ Note that there may be limitations to using AIA URLs as the services behind thes
 
 ## Possible validation errors  
 
-The `validate()` method of `AuthTokenValidator` returns the validated user certificate object if validation is successful or throws an exception if validation fails. All exceptions that can occur during validation derive from `TokenValidationException`, the list of available exceptions is available [here](src/main/java/org/webeid/security/exceptions/). Each exception file contains a documentation comment that describes under which conditions the exception is thrown.
+The `validate()` method of `AuthTokenValidator` returns the validated user certificate object if validation is successful or throws an exception if validation fails. All exceptions that can occur during validation derive from `AuthTokenException`, the list of available exceptions is available [here](src/main/java/org/webeid/security/exceptions/). Each exception file contains a documentation comment that describes under which conditions the exception is thrown.
 
 ## Stateful and stateless authentication
 
