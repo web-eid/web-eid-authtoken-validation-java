@@ -131,7 +131,7 @@ class SubjectCertificateNotRevokedValidatorTest {
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
             .getCause()
             .isInstanceOf(IOException.class)
-            .hasMessage("corrupted stream - out of bounds length found: 110 >= 7");
+            .hasMessage("DEF length 110 object truncated by 105");
     }
 
     @Test

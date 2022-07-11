@@ -23,7 +23,7 @@
 package eu.webeid.security.validator;
 
 import com.google.common.collect.Sets;
-import eu.webeid.security.util.SubjectCertificatePolicies;
+import eu.webeid.security.certificate.SubjectCertificatePolicies;
 import eu.webeid.security.validator.ocsp.service.DesignatedOcspServiceConfiguration;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 

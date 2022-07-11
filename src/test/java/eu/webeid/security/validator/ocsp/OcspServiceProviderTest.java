@@ -82,5 +82,4 @@ class OcspServiceProviderTest {
                 service2018.validateResponderCertificate(wrongResponderCert, new Date(1630000000000L)));
     }
 
-
 }

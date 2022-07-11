@@ -30,6 +30,8 @@ import org.bouncycastle.asn1.x509.PolicyInformation;
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
 import eu.webeid.security.exceptions.UserCertificateDisallowedPolicyException;
 import eu.webeid.security.exceptions.UserCertificateParseException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.security.cert.X509Certificate;
@@ -38,6 +40,8 @@ import java.util.Collection;
 import java.util.Optional;
 
 public final class SubjectCertificatePolicyValidator {
+
+    private static final Logger LOG = LoggerFactory.getLogger(SubjectCertificatePolicyValidator.class);
 
     private final Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies;
 
@@ -68,5 +72,6 @@ public final class SubjectCertificatePolicyValidator {
         } catch (IOException e) {
             throw new UserCertificateParseException(e);
         }
+        LOG.debug("User certificate does not contain disallowed policies.");
     }
 }

@@ -23,6 +23,7 @@
 package eu.webeid.security.challenge;
 
 import java.time.ZonedDateTime;
+import java.util.Objects;
 
 public class ChallengeNonce {
 
@@ -30,8 +31,8 @@ public class ChallengeNonce {
     private final ZonedDateTime expirationTime;
 
     public ChallengeNonce(String base64EncodedNonce, ZonedDateTime expirationTime) {
-        this.base64EncodedNonce = base64EncodedNonce;
-        this.expirationTime = expirationTime;
+        this.base64EncodedNonce = Objects.requireNonNull(base64EncodedNonce);
+        this.expirationTime = Objects.requireNonNull(expirationTime);
     }
 
     public ZonedDateTime getExpirationTime() {

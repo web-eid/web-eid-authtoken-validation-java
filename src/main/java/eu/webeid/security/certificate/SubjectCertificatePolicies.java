@@ -20,7 +20,7 @@
  * SOFTWARE.
  */
 
-package eu.webeid.security.util;
+package eu.webeid.security.certificate;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 
