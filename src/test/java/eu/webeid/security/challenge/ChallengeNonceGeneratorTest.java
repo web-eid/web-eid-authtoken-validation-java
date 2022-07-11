@@ -22,6 +22,7 @@
 
 package eu.webeid.security.challenge;
 
+import eu.webeid.security.exceptions.AuthTokenException;
 import org.junit.jupiter.api.Test;
 import eu.webeid.security.exceptions.ChallengeNonceExpiredException;
 import eu.webeid.security.exceptions.ChallengeNonceNotFoundException;
@@ -35,7 +36,7 @@ class ChallengeNonceGeneratorTest {
     final ChallengeNonceStore challengeNonceStore = new InMemoryChallengeNonceStore();
 
     @Test
-    void validateNonceGeneration() {
+    void validateNonceGeneration() throws AuthTokenException {
         final ChallengeNonceGenerator challengeNonceGenerator = new ChallengeNonceGeneratorBuilder()
             .withChallengeNonceStore(challengeNonceStore)
             .withNonceTtl(Duration.ofSeconds(1))
@@ -43,6 +44,9 @@ class ChallengeNonceGeneratorTest {
 
         final ChallengeNonce nonce1 = challengeNonceGenerator.generateAndStoreNonce();
         final ChallengeNonce nonce2 = challengeNonceGenerator.generateAndStoreNonce();
+        final ChallengeNonce nonce2fromStore = challengeNonceStore.getAndRemove();
+
+        assertThat(nonce2).isEqualTo(nonce2fromStore);
 
         assertThat(nonce1.getBase64EncodedNonce())
             .hasSize(44) // Base64-encoded 32 bytes

@@ -53,10 +53,10 @@ public final class SubjectCertificatePurposeValidator {
             if (!usages.contains(EXTENDED_KEY_USAGE_CLIENT_AUTHENTICATION)) {
                 throw new UserCertificateWrongPurposeException();
             }
-            LOG.debug("User certificate can be used for client authentication.");
         } catch (CertificateParsingException e) {
             throw new UserCertificateParseException(e);
         }
+        LOG.debug("User certificate can be used for client authentication.");
     }
 
     private SubjectCertificatePurposeValidator() {

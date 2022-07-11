@@ -44,7 +44,7 @@ public class ChallengeNonceGeneratorBuilder {
      * <p>
      * When the time-to-live passes, the nonce is considered to be expired.
      *
-     * @param duration time-to-live duration
+     * @param duration challenge nonce time-to-live duration
      * @return current builder instance
      */
     public ChallengeNonceGeneratorBuilder withNonceTtl(Duration duration) {

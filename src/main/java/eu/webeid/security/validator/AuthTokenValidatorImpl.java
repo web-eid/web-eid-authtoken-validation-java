@@ -159,9 +159,8 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         simpleSubjectCertificateValidators.executeFor(subjectCertificate);
         getCertTrustValidators().executeFor(subjectCertificate);
 
-        // It is guaranteed that if the signature verification succeeds, then the origin, challenge
-        // and, if part of the signature, origin certificate have been implicitly and correctly verified
-        // without the need to implement any additional checks.
+        // It is guaranteed that if the signature verification succeeds, then the origin and challenge
+        // have been implicitly and correctly verified without the need to implement any additional checks.
         authTokenSignatureValidator.validate(token.getAlgorithm(),
             token.getSignature(),
             subjectCertificate.getPublicKey(),

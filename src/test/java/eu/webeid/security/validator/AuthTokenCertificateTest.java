@@ -97,7 +97,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
             .hasMessage("Error parsing Web eID authentication token")
             .getCause()
             .isInstanceOf(MismatchedInputException.class)
-            .hasMessageStartingWith("Cannot deserialize instance of `java.lang.String` out of START_ARRAY token");
+            .hasMessageStartingWith("Cannot deserialize value of type `java.lang.String` from Array value");
     }
 
     @Test
@@ -211,7 +211,8 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
         mockDate("2018-10-17");
         assertThatThrownBy(() -> validator
             .validate(validAuthToken, VALID_CHALLENGE_NONCE))
-            .isInstanceOf(CertificateNotYetValidException.class);
+            .isInstanceOf(CertificateNotYetValidException.class)
+            .hasMessage("User certificate is not yet valid");
     }
 
     @Test
@@ -219,7 +220,8 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
         mockDate("2018-08-17");
         assertThatThrownBy(() -> validator
             .validate(validAuthToken, VALID_CHALLENGE_NONCE))
-            .isInstanceOf(CertificateNotYetValidException.class);
+            .isInstanceOf(CertificateNotYetValidException.class)
+            .hasMessage("Trusted CA certificate is not yet valid");
     }
 
     @Test
