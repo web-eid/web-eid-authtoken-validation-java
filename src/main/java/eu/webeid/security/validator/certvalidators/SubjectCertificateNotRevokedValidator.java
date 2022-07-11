@@ -139,10 +139,11 @@ public final class SubjectCertificateNotRevokedValidator {
         // We assume that the responder includes its certificate in the certs field of the response
         // that helps us to verify it. According to RFC 2560 this field is optional, but including it
         // is standard practice.
-        if (basicResponse.getCerts().length != 1) {
-            throw new UserCertificateOCSPCheckFailedException("OCSP response must contain one responder certificate, "
-                + "received " + basicResponse.getCerts().length + " certificates instead");
+        if (basicResponse.getCerts().length < 1) {
+            throw new UserCertificateOCSPCheckFailedException("OCSP response must contain the responder certificate, "
+                + "but none was provided");
         }
+        // The first certificate is the responder certificate, other certificates, if given, are the certificate's chain.
         final X509CertificateHolder responderCert = basicResponse.getCerts()[0];
         OcspResponseValidator.validateResponseSignature(basicResponse, responderCert);
 
