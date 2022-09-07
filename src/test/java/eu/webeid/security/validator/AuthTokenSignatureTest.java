@@ -22,20 +22,19 @@
 
 package eu.webeid.security.validator;
 
-import eu.webeid.security.certificate.CertificateData;
-import eu.webeid.security.testutil.AuthTokenValidators;
-import eu.webeid.security.util.TitleCase;
-import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.Test;
 import eu.webeid.security.authtoken.WebEidAuthToken;
+import eu.webeid.security.certificate.CertificateData;
 import eu.webeid.security.exceptions.AuthTokenSignatureValidationException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
+import eu.webeid.security.testutil.AuthTokenValidators;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.security.cert.X509Certificate;
 
+import static eu.webeid.security.util.Strings.toTitleCase;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static eu.webeid.security.testutil.AuthTokenValidators.getAuthTokenValidator;
 
 class AuthTokenSignatureTest extends AbstractTestWithValidator {
 
@@ -51,9 +50,9 @@ class AuthTokenSignatureTest extends AbstractTestWithValidator {
 
         Assertions.assertThat(CertificateData.getSubjectCN(result))
             .isEqualTo("JÕEORG\\,JAAK-KRISTJAN\\,38001085718");
-        Assertions.assertThat(TitleCase.toTitleCase(CertificateData.getSubjectGivenName(result)))
+        Assertions.assertThat(toTitleCase(CertificateData.getSubjectGivenName(result)))
             .isEqualTo("Jaak-Kristjan");
-        Assertions.assertThat(TitleCase.toTitleCase(CertificateData.getSubjectSurname(result)))
+        Assertions.assertThat(toTitleCase(CertificateData.getSubjectSurname(result)))
             .isEqualTo("Jõeorg");
         assertThat(CertificateData.getSubjectIdCode(result))
             .isEqualTo("PNOEE-38001085718");

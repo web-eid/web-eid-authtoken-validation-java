@@ -22,7 +22,6 @@
 
 package eu.webeid.security.validator;
 
-import com.google.common.collect.Sets;
 import eu.webeid.security.certificate.SubjectCertificatePolicies;
 import eu.webeid.security.validator.ocsp.service.DesignatedOcspServiceConfiguration;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
@@ -37,6 +36,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Objects;
 
+import static eu.webeid.security.util.Collections.newHashSet;
 import static eu.webeid.security.util.DateAndTime.requirePositiveDuration;
 import static eu.webeid.security.validator.ocsp.OcspUrl.AIA_ESTEID_2015;
 
@@ -51,14 +51,14 @@ public final class AuthTokenValidationConfiguration {
     private Duration ocspRequestTimeout = Duration.ofSeconds(5);
     private DesignatedOcspServiceConfiguration designatedOcspServiceConfiguration;
     // Don't allow Estonian Mobile-ID policy by default.
-    private Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies = Sets.newHashSet(
+    private Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies = newHashSet(
         SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V1,
         SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V2,
         SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V3,
         SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY
     );
     // Disable OCSP nonce extension for EstEID 2015 cards by default.
-    private Collection<URI> nonceDisabledOcspUrls = Sets.newHashSet(AIA_ESTEID_2015);
+    private Collection<URI> nonceDisabledOcspUrls = newHashSet(AIA_ESTEID_2015);
 
     AuthTokenValidationConfiguration() {
     }
@@ -158,4 +158,5 @@ public final class AuthTokenValidationConfiguration {
             throw new IllegalArgumentException("An URI syntax exception occurred");
         }
     }
+
 }

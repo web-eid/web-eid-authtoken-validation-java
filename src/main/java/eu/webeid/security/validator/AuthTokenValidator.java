@@ -25,7 +25,7 @@ package eu.webeid.security.validator;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.certificate.CertificateData;
 import eu.webeid.security.exceptions.AuthTokenException;
-import eu.webeid.security.util.TitleCase;
+import eu.webeid.security.util.Strings;
 
 import java.security.cert.X509Certificate;
 
@@ -49,7 +49,7 @@ public interface AuthTokenValidator {
      * Validates the Web eID authentication token signed by the subject and returns
      * the subject certificate that can be used for retrieving information about the subject.
      * <p>
-     * See {@link CertificateData} and {@link TitleCase} for convenience methods for retrieving user
+     * See {@link CertificateData} and {@link Strings} for convenience methods for retrieving user
      * information from the certificate.
      *
      * @param authToken the Web eID authentication token
