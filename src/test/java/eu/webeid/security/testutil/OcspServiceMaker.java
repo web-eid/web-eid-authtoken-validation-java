@@ -22,7 +22,6 @@
 
 package eu.webeid.security.testutil;
 
-import com.google.common.collect.Sets;
 import eu.webeid.security.certificate.CertificateValidator;
 import eu.webeid.security.exceptions.JceException;
 import eu.webeid.security.exceptions.OCSPCertificateException;
@@ -39,6 +38,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static eu.webeid.security.testutil.Certificates.*;
+import static eu.webeid.security.util.Collections.newHashSet;
 import static eu.webeid.security.validator.ocsp.OcspUrl.AIA_ESTEID_2015;
 
 public class OcspServiceMaker {
@@ -77,7 +77,7 @@ public class OcspServiceMaker {
 
     private static AiaOcspServiceConfiguration getAiaOcspServiceConfiguration() throws JceException {
         return new AiaOcspServiceConfiguration(
-            Sets.newHashSet(AIA_ESTEID_2015, TEST_ESTEID_2015),
+            newHashSet(AIA_ESTEID_2015, TEST_ESTEID_2015),
             CertificateValidator.buildTrustAnchorsFromCertificates(TRUSTED_CA_CERTIFICATES),
             CertificateValidator.buildCertStoreFromCertificates(TRUSTED_CA_CERTIFICATES));
     }

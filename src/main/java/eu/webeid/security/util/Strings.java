@@ -22,7 +22,7 @@
 
 package eu.webeid.security.util;
 
-public final class TitleCase {
+public final class Strings {
 
     public static String toTitleCase(String input) {
         final StringBuilder titleCase = new StringBuilder(input.length());
@@ -41,7 +41,11 @@ public final class TitleCase {
         return titleCase.toString();
     }
 
-    private TitleCase() {
+    public static boolean isNullOrEmpty(String argument) {
+        return argument == null || argument.isEmpty();
+    }
+
+    private Strings() {
         throw new IllegalStateException("Utility class");
     }
 

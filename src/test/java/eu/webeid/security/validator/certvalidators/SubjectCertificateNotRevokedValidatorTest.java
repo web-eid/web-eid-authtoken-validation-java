@@ -22,7 +22,6 @@
 
 package eu.webeid.security.validator.certvalidators;
 
-import com.google.common.io.ByteStreams;
 import eu.webeid.security.exceptions.JceException;
 import eu.webeid.security.validator.ocsp.OcspClient;
 import eu.webeid.security.validator.ocsp.OkHttpOcspClient;
@@ -241,15 +240,16 @@ class SubjectCertificateNotRevokedValidatorTest {
     @Test
     void whenOcspResponseUnknown_thenThrows() throws Exception {
         final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider("https://web-eid-test.free.beeceptor.com");
-        final Response response = getResponseBuilder()
+        try (final Response response = getResponseBuilder()
             .body(ResponseBody.create(getOcspResponseBytesFromResources("ocsp_response_unknown.der"), OCSP_RESPONSE))
-            .build();
-        final OcspClient client = (url, request) -> new OCSPResp(Objects.requireNonNull(response.body()).bytes());
-        final SubjectCertificateNotRevokedValidator validator = new SubjectCertificateNotRevokedValidator(trustedValidator, client, ocspServiceProvider);
-        assertThatExceptionOfType(UserCertificateRevokedException.class)
-            .isThrownBy(() ->
-                validator.validateCertificateNotRevoked(estEid2018Cert))
-            .withMessage("User certificate has been revoked: Unknown status");
+            .build()) {
+            final OcspClient client = (url, request) -> new OCSPResp(Objects.requireNonNull(response.body()).bytes());
+            final SubjectCertificateNotRevokedValidator validator = new SubjectCertificateNotRevokedValidator(trustedValidator, client, ocspServiceProvider);
+            assertThatExceptionOfType(UserCertificateRevokedException.class)
+                .isThrownBy(() ->
+                    validator.validateCertificateNotRevoked(estEid2018Cert))
+                .withMessage("User certificate has been revoked: Unknown status");
+        }
     }
 
     @Test
@@ -320,7 +320,7 @@ class SubjectCertificateNotRevokedValidatorTest {
 
     private static byte[] getOcspResponseBytesFromResources(String resource) throws IOException {
         try (final InputStream resourceAsStream = ClassLoader.getSystemResourceAsStream(resource)) {
-            return ByteStreams.toByteArray(Objects.requireNonNull(resourceAsStream));
+            return toByteArray(resourceAsStream);
         }
     }
 
@@ -348,6 +348,17 @@ class SubjectCertificateNotRevokedValidatorTest {
             .message("testing")
             .protocol(Protocol.HTTP_1_1)
             .code(200);
+    }
+
+    private static byte[] toByteArray(InputStream resourceAsStream) throws IOException {
+        Objects.requireNonNull(resourceAsStream);
+        int bytesAvailable = resourceAsStream.available();
+        byte[] result = new byte[bytesAvailable];
+        int bytesRead = resourceAsStream.read(result);
+        if (bytesRead != bytesAvailable) {
+            throw new RuntimeException("Short read while loading resources");
+        }
+        return result;
     }
 
 }

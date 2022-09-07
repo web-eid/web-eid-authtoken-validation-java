@@ -22,10 +22,11 @@
 
 package eu.webeid.security.validator.certvalidators;
 
-import com.google.common.collect.Lists;
 import eu.webeid.security.exceptions.AuthTokenException;
 
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public final class SubjectCertificateValidatorBatch {
@@ -33,7 +34,9 @@ public final class SubjectCertificateValidatorBatch {
     private final List<SubjectCertificateValidator> validatorList;
 
     public static SubjectCertificateValidatorBatch createFrom(SubjectCertificateValidator... validatorList) {
-        return new SubjectCertificateValidatorBatch(Lists.newArrayList(validatorList));
+        final List<SubjectCertificateValidator> list = new ArrayList<>();
+        Collections.addAll(list, validatorList);
+        return new SubjectCertificateValidatorBatch(list);
     }
 
     public void executeFor(X509Certificate subjectCertificate) throws AuthTokenException {

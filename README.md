@@ -280,7 +280,7 @@ The `validate()` method returns the validated user certificate object if validat
 
 ```java  
 import eu.webeid.security.certificate;
-import static eu.webeid.security.util.TitleCase.toTitleCase;
+import static eu.webeid.security.util.Strings.toTitleCase;
 
 ...
     

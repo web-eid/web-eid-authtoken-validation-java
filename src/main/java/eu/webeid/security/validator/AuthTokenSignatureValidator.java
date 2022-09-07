@@ -21,8 +21,6 @@
  */
 package eu.webeid.security.validator;
 
-import com.google.common.base.Strings;
-import com.google.common.primitives.Bytes;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.AuthTokenParseException;
 import eu.webeid.security.exceptions.AuthTokenSignatureValidationException;
@@ -43,6 +41,8 @@ import java.util.Objects;
 import java.util.Set;
 
 import static eu.webeid.security.util.Base64Decoder.decodeBase64;
+import static eu.webeid.security.util.Collections.concat;
+import static eu.webeid.security.util.Strings.isNullOrEmpty;
 
 public class AuthTokenSignatureValidator {
 
@@ -65,7 +65,7 @@ public class AuthTokenSignatureValidator {
         requireNotEmpty(algorithm, "algorithm");
         requireNotEmpty(signature, "signature");
         Objects.requireNonNull(publicKey);
-        if (Strings.isNullOrEmpty(currentChallengeNonce)) {
+        if (isNullOrEmpty(currentChallengeNonce)) {
             throw new ChallengeNullOrEmptyException();
         }
 
@@ -96,7 +96,7 @@ public class AuthTokenSignatureValidator {
 
         final byte[] originHash = hashAlgorithm.digest(originBytes);
         final byte[] nonceHash = hashAlgorithm.digest(currentChallengeNonce.getBytes(StandardCharsets.UTF_8));
-        final byte[] concatSignedFields = Bytes.concat(originHash, nonceHash);
+        final byte[] concatSignedFields = concat(originHash, nonceHash);
 
         // Note that in case of ECDSA, the eID card outputs raw R||S, but JCA's SHA384withECDSA signature
         // validation implementation requires the signature in DER encoding.
@@ -112,7 +112,7 @@ public class AuthTokenSignatureValidator {
     }
 
     private void requireNotEmpty(String argument, String fieldName) throws AuthTokenParseException {
-        if (Strings.isNullOrEmpty(argument)) {
+        if (isNullOrEmpty(argument)) {
             throw new AuthTokenParseException("'" + fieldName + "' is null or empty");
         }
     }
