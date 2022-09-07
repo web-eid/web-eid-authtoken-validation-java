@@ -38,16 +38,16 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.Objects;
 
-public class OcspClientImpl implements OcspClient {
+public class OkHttpOcspClient implements OcspClient {
 
-    private static final Logger LOG = LoggerFactory.getLogger(OcspClientImpl.class);
+    private static final Logger LOG = LoggerFactory.getLogger(OkHttpOcspClient.class);
     private static final MediaType OCSP_REQUEST_TYPE = MediaType.get("application/ocsp-request");
     private static final MediaType OCSP_RESPONSE_TYPE = MediaType.get("application/ocsp-response");
 
     private final OkHttpClient httpClient;
 
     public static OcspClient build(Duration ocspRequestTimeout) {
-        return new OcspClientImpl(
+        return new OkHttpOcspClient(
             new OkHttpClient.Builder()
                 .connectTimeout(ocspRequestTimeout)
                 .callTimeout(ocspRequestTimeout)
@@ -58,8 +58,8 @@ public class OcspClientImpl implements OcspClient {
     /**
      * Use OkHttpClient to fetch the OCSP response from the OCSP responder service.
      *
-     * @param uri        OCSP server URL
-     * @param ocspReq    OCSP request
+     * @param uri     OCSP server URL
+     * @param ocspReq OCSP request
      * @return OCSP response from the server
      * @throws IOException if the request could not be executed due to cancellation, a connectivity problem or timeout,
      *                     or if the response status is not successful, or if response has wrong content type.
@@ -89,7 +89,7 @@ public class OcspClientImpl implements OcspClient {
         }
     }
 
-    private OcspClientImpl(OkHttpClient httpClient) {
+    public OkHttpOcspClient(OkHttpClient httpClient) {
         this.httpClient = httpClient;
     }
 

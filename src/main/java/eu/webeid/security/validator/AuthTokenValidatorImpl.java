@@ -36,7 +36,6 @@ import eu.webeid.security.validator.certvalidators.SubjectCertificatePurposeVali
 import eu.webeid.security.validator.certvalidators.SubjectCertificateTrustedValidator;
 import eu.webeid.security.validator.certvalidators.SubjectCertificateValidatorBatch;
 import eu.webeid.security.validator.ocsp.OcspClient;
-import eu.webeid.security.validator.ocsp.OcspClientImpl;
 import eu.webeid.security.validator.ocsp.OcspServiceProvider;
 import eu.webeid.security.validator.ocsp.service.AiaOcspServiceConfiguration;
 import org.slf4j.Logger;
@@ -46,6 +45,7 @@ import java.io.IOException;
 import java.security.cert.CertStore;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -73,8 +73,9 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
 
     /**
      * @param configuration configuration parameters for the token validator
+     * @param ocspClient    client for communicating with the OCSP service
      */
-    AuthTokenValidatorImpl(AuthTokenValidationConfiguration configuration) throws JceException {
+    AuthTokenValidatorImpl(AuthTokenValidationConfiguration configuration, OcspClient ocspClient) throws JceException {
         // Copy the configuration object to make AuthTokenValidatorImpl immutable and thread-safe.
         this.configuration = configuration.copy();
 
@@ -89,7 +90,8 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         );
 
         if (configuration.isUserCertificateRevocationCheckWithOcspEnabled()) {
-            ocspClient = OcspClientImpl.build(configuration.getOcspRequestTimeout());
+            // The OCSP client may be provided by the API consumer.
+            this.ocspClient = Objects.requireNonNull(ocspClient, "OCSP client must not be null when OCSP check is enabled");
             ocspServiceProvider = new OcspServiceProvider(
                 configuration.getDesignatedOcspServiceConfiguration(),
                 new AiaOcspServiceConfiguration(configuration.getNonceDisabledOcspUrls(),
