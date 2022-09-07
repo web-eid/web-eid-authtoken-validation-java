@@ -91,11 +91,11 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     }
 
     @Test
-    void whenCertificateFieldIsArray_thenParsingFails() throws AuthTokenException {
+    void whenCertificateFieldIsArray_thenParsingFails() {
         assertThatThrownBy(() -> replaceTokenField(AUTH_TOKEN, "\"X5C\"", "[1,2,3,4]"))
             .isInstanceOf(AuthTokenParseException.class)
             .hasMessage("Error parsing Web eID authentication token")
-            .getCause()
+            .cause()
             .isInstanceOf(MismatchedInputException.class)
             .hasMessageStartingWith("Cannot deserialize value of type `java.lang.String` from Array value");
     }
@@ -106,7 +106,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
             .isInstanceOf(CertificateDecodingException.class)
-            .getCause()
+            .cause()
             .isInstanceOf(CertificateException.class)
             .hasMessage("Could not parse certificate: java.io.IOException: Empty input");
     }
@@ -117,7 +117,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
             .isInstanceOf(CertificateDecodingException.class)
-            .getCause()
+            .cause()
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Illegal base64 character 20");
     }
@@ -128,7 +128,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
             .isInstanceOf(CertificateDecodingException.class)
-            .getCause()
+            .cause()
             .isInstanceOf(CertificateException.class)
             .hasMessage("Could not parse certificate: java.io.IOException: Empty input");
     }

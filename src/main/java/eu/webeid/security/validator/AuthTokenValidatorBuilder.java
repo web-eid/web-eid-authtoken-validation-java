@@ -23,6 +23,8 @@
 package eu.webeid.security.validator;
 
 import eu.webeid.security.exceptions.JceException;
+import eu.webeid.security.validator.ocsp.OcspClient;
+import eu.webeid.security.validator.ocsp.OkHttpOcspClient;
 import eu.webeid.security.validator.ocsp.service.DesignatedOcspServiceConfiguration;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.slf4j.Logger;
@@ -42,6 +44,7 @@ public class AuthTokenValidatorBuilder {
     private static final Logger LOG = LoggerFactory.getLogger(AuthTokenValidatorBuilder.class);
 
     private final AuthTokenValidationConfiguration configuration = new AuthTokenValidationConfiguration();
+    private OcspClient ocspClient;
 
     /**
      * Sets the expected site origin, i.e. the domain that the application is running on.
@@ -153,6 +156,19 @@ public class AuthTokenValidatorBuilder {
     }
 
     /**
+     * Uses the provided OCSP client instance during user certificate revocation check with OCSP.
+     * The provided client instance must be thread-safe.
+     *
+     * @param ocspClient OCSP client instance
+     * @return the builder instance for method chaining
+     */
+    public AuthTokenValidatorBuilder withOcspClient(OcspClient ocspClient) {
+        this.ocspClient = ocspClient;
+        LOG.debug("Using the OCSP client provided by API consumer");
+        return this;
+    }
+
+    /**
      * Validates the configuration and builds the {@link AuthTokenValidator} object with it.
      * The returned {@link AuthTokenValidator} object is immutable/thread-safe.
      *
@@ -163,7 +179,10 @@ public class AuthTokenValidatorBuilder {
      */
     public AuthTokenValidator build() throws NullPointerException, IllegalArgumentException, JceException {
         configuration.validate();
-        return new AuthTokenValidatorImpl(configuration);
+        if (configuration.isUserCertificateRevocationCheckWithOcspEnabled() && ocspClient == null) {
+            ocspClient = OkHttpOcspClient.build(configuration.getOcspRequestTimeout());
+        }
+        return new AuthTokenValidatorImpl(configuration, ocspClient);
     }
 
 }

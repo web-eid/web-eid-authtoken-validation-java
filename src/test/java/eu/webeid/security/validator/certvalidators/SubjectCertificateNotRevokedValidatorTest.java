@@ -25,8 +25,12 @@ package eu.webeid.security.validator.certvalidators;
 import com.google.common.io.ByteStreams;
 import eu.webeid.security.exceptions.JceException;
 import eu.webeid.security.validator.ocsp.OcspClient;
-import eu.webeid.security.validator.ocsp.OcspClientImpl;
-import okhttp3.*;
+import eu.webeid.security.validator.ocsp.OkHttpOcspClient;
+import okhttp3.MediaType;
+import okhttp3.Protocol;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 import org.bouncycastle.asn1.ocsp.OCSPResponseStatus;
 import org.bouncycastle.cert.ocsp.OCSPException;
 import org.bouncycastle.cert.ocsp.OCSPResp;
@@ -58,7 +62,7 @@ class SubjectCertificateNotRevokedValidatorTest {
 
     private static final MediaType OCSP_RESPONSE = MediaType.get("application/ocsp-response");
 
-    private final OcspClient ocspClient = OcspClientImpl.build(Duration.ofSeconds(5));
+    private final OcspClient ocspClient = OkHttpOcspClient.build(Duration.ofSeconds(5));
     private SubjectCertificateTrustedValidator trustedValidator;
     private X509Certificate estEid2018Cert;
 
@@ -102,7 +106,7 @@ class SubjectCertificateNotRevokedValidatorTest {
         assertThatCode(() ->
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
-            .getCause()
+            .cause()
             .isInstanceOf(IOException.class)
             .hasMessageMatching("invalid.invalid: (Name or service not known|"
                 + "Temporary failure in name resolution)");
@@ -115,7 +119,7 @@ class SubjectCertificateNotRevokedValidatorTest {
         assertThatCode(() ->
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
-            .getCause()
+            .cause()
             .isInstanceOf(IOException.class)
             .hasMessageStartingWith("OCSP request was not successful, response: Response{");
     }
@@ -129,7 +133,7 @@ class SubjectCertificateNotRevokedValidatorTest {
         assertThatCode(() ->
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
-            .getCause()
+            .cause()
             .isInstanceOf(IOException.class)
             .hasMessage("DEF length 110 object truncated by 105");
     }
@@ -179,7 +183,7 @@ class SubjectCertificateNotRevokedValidatorTest {
         assertThatCode(() ->
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
-            .getCause()
+            .cause()
             .isInstanceOf(OCSPException.class)
             .hasMessage("exception processing sig: java.lang.IllegalArgumentException: invalid info structure in RSA public key");
     }
@@ -193,7 +197,7 @@ class SubjectCertificateNotRevokedValidatorTest {
         assertThatCode(() ->
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
-            .getCause()
+            .cause()
             .isInstanceOf(OCSPException.class)
             .hasMessage("problem decoding object: java.io.IOException: unknown tag 23 encountered");
     }

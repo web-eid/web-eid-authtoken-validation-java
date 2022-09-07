@@ -27,6 +27,7 @@ import eu.webeid.security.exceptions.JceException;
 import eu.webeid.security.exceptions.OCSPCertificateException;
 import eu.webeid.security.validator.AuthTokenValidator;
 import eu.webeid.security.validator.AuthTokenValidatorBuilder;
+import eu.webeid.security.validator.ocsp.OcspClient;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 
 import java.io.IOException;
@@ -56,6 +57,12 @@ public final class AuthTokenValidators {
             .withOcspRequestTimeout(Duration.ofSeconds(1))
             .withNonceDisabledOcspUrls(URI.create("http://example.org"))
             .withoutUserCertificateRevocationCheckWithOcsp()
+            .build();
+    }
+
+    public static AuthTokenValidator getAuthTokenValidatorWithOverriddenOcspClient(OcspClient ocspClient) throws CertificateException, JceException, IOException {
+        return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, getCACertificates())
+            .withOcspClient(ocspClient)
             .build();
     }
 
