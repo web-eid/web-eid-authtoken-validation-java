@@ -27,7 +27,6 @@ import eu.webeid.security.certificate.CertificateData;
 import eu.webeid.security.exceptions.AuthTokenSignatureValidationException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
 import eu.webeid.security.testutil.AuthTokenValidators;
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.security.cert.X509Certificate;
@@ -48,11 +47,11 @@ class AuthTokenSignatureTest extends AbstractTestWithValidator {
     void whenValidTokenAndNonce_thenValidationSucceeds() throws Exception {
         final X509Certificate result = validator.validate(validAuthToken, VALID_CHALLENGE_NONCE);
 
-        Assertions.assertThat(CertificateData.getSubjectCN(result))
+        assertThat(CertificateData.getSubjectCN(result))
             .isEqualTo("JÕEORG\\,JAAK-KRISTJAN\\,38001085718");
-        Assertions.assertThat(toTitleCase(CertificateData.getSubjectGivenName(result)))
+        assertThat(toTitleCase(CertificateData.getSubjectGivenName(result)))
             .isEqualTo("Jaak-Kristjan");
-        Assertions.assertThat(toTitleCase(CertificateData.getSubjectSurname(result)))
+        assertThat(toTitleCase(CertificateData.getSubjectSurname(result)))
             .isEqualTo("Jõeorg");
         assertThat(CertificateData.getSubjectIdCode(result))
             .isEqualTo("PNOEE-38001085718");
