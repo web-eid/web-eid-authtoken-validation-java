@@ -105,6 +105,9 @@ public final class SubjectCertificateNotRevokedValidator {
             }
 
             final BasicOCSPResp basicResponse = (BasicOCSPResp) response.getResponseObject();
+            if (basicResponse == null) {
+                throw new UserCertificateOCSPCheckFailedException("Missing Basic OCSP Response");
+            }
             verifyOcspResponse(basicResponse, ocspService, certificateId);
             if (ocspService.doesSupportNonce()) {
                 checkNonce(request, basicResponse);
@@ -173,6 +176,10 @@ public final class SubjectCertificateNotRevokedValidator {
     private static void checkNonce(OCSPReq request, BasicOCSPResp response) throws UserCertificateOCSPCheckFailedException {
         final Extension requestNonce = request.getExtension(OCSPObjectIdentifiers.id_pkix_ocsp_nonce);
         final Extension responseNonce = response.getExtension(OCSPObjectIdentifiers.id_pkix_ocsp_nonce);
+        if (requestNonce == null || responseNonce == null) {
+            throw new UserCertificateOCSPCheckFailedException("OCSP request or response nonce extension missing, " +
+                "possible replay attack");
+        }
         if (!requestNonce.equals(responseNonce)) {
             throw new UserCertificateOCSPCheckFailedException("OCSP request and response nonces differ, " +
                 "possible replay attack");
