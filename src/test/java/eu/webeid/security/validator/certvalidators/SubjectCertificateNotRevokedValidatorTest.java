@@ -238,6 +238,7 @@ class SubjectCertificateNotRevokedValidatorTest {
     }
 
     @Test
+    @Disabled("A new designated test OCSP responder certificate was issued so the responder certificate in ocsp_response_unknown.der is no longer valid")
     void whenOcspResponseUnknown_thenThrows() throws Exception {
         final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider("https://web-eid-test.free.beeceptor.com");
         try (final Response response = getResponseBuilder()

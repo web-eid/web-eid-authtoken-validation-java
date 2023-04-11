@@ -93,7 +93,7 @@ public class OcspServiceMaker {
     private static DesignatedOcspServiceConfiguration getDesignatedOcspServiceConfiguration(boolean doesSupportNonce, String ocspServiceAccessLocation) throws CertificateException, IOException, OCSPCertificateException {
         return new DesignatedOcspServiceConfiguration(
             URI.create(ocspServiceAccessLocation),
-            getTestSkOcspResponder2020(),
+            getTestSkOcspResponder2023(),
             TRUSTED_CA_CERTIFICATES,
             doesSupportNonce);
     }

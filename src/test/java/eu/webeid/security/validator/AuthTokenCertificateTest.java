@@ -30,6 +30,7 @@ import eu.webeid.security.testutil.AuthTokenValidators;
 import eu.webeid.security.testutil.Dates;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.security.cert.CertificateException;
@@ -253,6 +254,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     }
 
     @Test
+    @Disabled("A new designated test OCSP responder certificate was issued whose validity period no longer overlaps with the revoked certificate")
     void whenCertificateIsRevoked_thenOcspCheckWithDesignatedOcspServiceFails() throws Exception {
         mockDate("2020-01-01");
         final AuthTokenValidator validatorWithOcspCheck = AuthTokenValidators.getAuthTokenValidatorWithDesignatedOcspCheck();
