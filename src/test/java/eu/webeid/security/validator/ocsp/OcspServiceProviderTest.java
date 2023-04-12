@@ -44,7 +44,7 @@ class OcspServiceProviderTest {
         assertThat(service.getAccessLocation()).isEqualTo(new URI("http://demo.sk.ee/ocsp"));
         assertThat(service.doesSupportNonce()).isTrue();
         assertThatCode(() ->
-            service.validateResponderCertificate(new X509CertificateHolder(getTestSkOcspResponder2020().getEncoded()), new Date(1630000000000L)))
+            service.validateResponderCertificate(new X509CertificateHolder(getTestSkOcspResponder2023().getEncoded()), new Date(1681000000000L)))
             .doesNotThrowAnyException();
         assertThatCode(() ->
             service.validateResponderCertificate(new X509CertificateHolder(getTestEsteid2018CA().getEncoded()), new Date(1630000000000L)))

@@ -41,13 +41,13 @@ public class Certificates {
     private static X509Certificate jaakKristjanEsteid2018Cert;
     private static X509Certificate mariliisEsteid2015Cert;
     private static X509Certificate organizationCert;
-    private static X509Certificate testSkOcspResponder2020;
+    private static X509Certificate testSkOcspResponder2023;
 
     static void loadCertificates() throws CertificateException, IOException {
-        X509Certificate[] certificates = CertificateLoader.loadCertificatesFromResources("TEST_of_ESTEID-SK_2015.cer", "TEST_of_ESTEID2018.cer", "TEST_of_SK_OCSP_RESPONDER_2020.cer");
+        X509Certificate[] certificates = CertificateLoader.loadCertificatesFromResources("TEST_of_ESTEID-SK_2015.cer", "TEST_of_ESTEID2018.cer", "TEST_of_ESTEID-SK_2018_AIA_OCSP_RESPONDER_202304.der");
         testEsteid2015CA = certificates[0];
         testEsteid2018CA = certificates[1];
-        testSkOcspResponder2020 = certificates[2];
+        testSkOcspResponder2023 = certificates[2];
     }
 
     public static X509Certificate getTestEsteid2018CA() throws CertificateException, IOException {
@@ -64,11 +64,11 @@ public class Certificates {
         return testEsteid2015CA;
     }
 
-    public static X509Certificate getTestSkOcspResponder2020() throws CertificateException, IOException {
-        if (testSkOcspResponder2020 == null) {
+    public static X509Certificate getTestSkOcspResponder2023() throws CertificateException, IOException {
+        if (testSkOcspResponder2023 == null) {
             loadCertificates();
         }
-        return testSkOcspResponder2020;
+        return testSkOcspResponder2023;
     }
 
     public static X509Certificate getJaakKristjanEsteid2018Cert() throws CertificateDecodingException {
