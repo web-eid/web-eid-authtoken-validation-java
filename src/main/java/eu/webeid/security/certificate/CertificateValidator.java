@@ -72,6 +72,7 @@ public final class CertificateValidator {
 
         try {
             final PKIXBuilderParameters pkixBuilderParameters = new PKIXBuilderParameters(trustedCACertificateAnchors, selector);
+            // Certificate revocation check is intentionally disabled as we do the OCSP check with SubjectCertificateNotRevokedValidator ourselves.
             pkixBuilderParameters.setRevocationEnabled(false);
             pkixBuilderParameters.setDate(date);
             pkixBuilderParameters.addCertStore(trustedCACertificateCertStore);

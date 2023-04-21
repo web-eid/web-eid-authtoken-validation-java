@@ -22,6 +22,9 @@
 
 package eu.webeid.security.validator.ocsp;
 
+import eu.webeid.security.exceptions.OCSPCertificateException;
+import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
+import eu.webeid.security.exceptions.UserCertificateRevokedException;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.ocsp.BasicOCSPResp;
 import org.bouncycastle.cert.ocsp.CertificateStatus;
@@ -32,9 +35,6 @@ import org.bouncycastle.cert.ocsp.UnknownStatus;
 import org.bouncycastle.operator.ContentVerifierProvider;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
-import eu.webeid.security.exceptions.OCSPCertificateException;
-import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
-import eu.webeid.security.exceptions.UserCertificateRevokedException;
 
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateParsingException;
@@ -89,14 +89,14 @@ public final class OcspResponseValidator {
         //   revocation information is available all the time.
         final Date notAllowedBefore = new Date(producedAt.getTime() - ALLOWED_TIME_SKEW);
         final Date notAllowedAfter = new Date(producedAt.getTime() + ALLOWED_TIME_SKEW);
-        if (notAllowedAfter.before(certStatusResponse.getThisUpdate()) ||
-            notAllowedBefore.after(certStatusResponse.getNextUpdate() != null ?
-                certStatusResponse.getNextUpdate() :
-                certStatusResponse.getThisUpdate())) {
+        final Date thisUpdate = certStatusResponse.getThisUpdate();
+        final Date nextUpdate = certStatusResponse.getNextUpdate() != null ? certStatusResponse.getNextUpdate() : thisUpdate;
+        if (notAllowedAfter.before(thisUpdate) ||
+            notAllowedBefore.after(nextUpdate)) {
             throw new UserCertificateOCSPCheckFailedException("Certificate status update time check failed: " +
                 "notAllowedBefore: " + toUtcString(notAllowedBefore) +
                 ", notAllowedAfter: " + toUtcString(notAllowedAfter) +
-                ", thisUpdate: " + toUtcString(certStatusResponse.getThisUpdate()) +
+                ", thisUpdate: " + toUtcString(thisUpdate) +
                 ", nextUpdate: " + toUtcString(certStatusResponse.getNextUpdate()));
         }
     }

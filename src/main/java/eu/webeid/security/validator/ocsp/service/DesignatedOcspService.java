@@ -70,7 +70,7 @@ public class DesignatedOcspService implements OcspService {
             }
             certificateIsValidOnDate(responderCertificate, producedAt, "Designated OCSP responder");
         } catch (CertificateException e) {
-            throw new OCSPCertificateException("X509CertificateHolder conversion to X509Certificate failed");
+            throw new OCSPCertificateException("X509CertificateHolder conversion to X509Certificate failed", e);
         }
     }
 
