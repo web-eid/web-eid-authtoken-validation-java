@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2021 Estonian Information System Authority
+ * Copyright (c) 2020-2023 Estonian Information System Authority
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,7 +22,7 @@
 
 /*
  * Copyright 2017 The Netty Project
- * Copyright (c) 2020-2021 Estonian Information System Authority
+ * Copyright (c) 2020-2023 Estonian Information System Authority
  *
  * The Netty Project and The Web eID Project license this file to you under the
  * Apache License, version 2.0 (the "License"); you may not use this file except

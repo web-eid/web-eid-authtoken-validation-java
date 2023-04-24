@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2021 Estonian Information System Authority
+ * Copyright (c) 2020-2023 Estonian Information System Authority
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -33,15 +33,16 @@ import java.net.URI;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.util.Objects;
+import java.util.Optional;
 
 public final class OcspUrl {
 
     public static final URI AIA_ESTEID_2015 = URI.create("http://aia.sk.ee/esteid2015");
 
     /**
-     * Returns the OCSP responder {@link URI} or {@code null} if it doesn't have one.
+     * Returns the OCSP responder {@link URI} or an empty {@code Optional} if it doesn't have one.
      */
-    public static URI getOcspUri(X509Certificate certificate) {
+    public static Optional<URI> getOcspUri(X509Certificate certificate) {
         Objects.requireNonNull(certificate, "certificate");
         final X509CertificateHolder certificateHolder;
         try {
@@ -54,13 +55,13 @@ public final class OcspUrl {
                     accessDescription.getAccessLocation().getTagNo() == GeneralName.uniformResourceIdentifier) {
                     final String accessLocationUrl = ((ASN1String) accessDescription.getAccessLocation().getName())
                         .getString();
-                    return URI.create(accessLocationUrl);
+                    return Optional.of(URI.create(accessLocationUrl));
                 }
             }
         } catch (IOException | CertificateEncodingException | IllegalArgumentException | NullPointerException e) {
-            return null;
+            return Optional.empty();
         }
-        return null;
+        return Optional.empty();
     }
 
     private OcspUrl() {

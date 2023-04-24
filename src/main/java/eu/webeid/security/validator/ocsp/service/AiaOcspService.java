@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2021 Estonian Information System Authority
+ * Copyright (c) 2020-2023 Estonian Information System Authority
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,12 +23,12 @@
 package eu.webeid.security.validator.ocsp.service;
 
 import eu.webeid.security.certificate.CertificateValidator;
+import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.OCSPCertificateException;
+import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.security.validator.ocsp.OcspResponseValidator;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
-import eu.webeid.security.exceptions.AuthTokenException;
-import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 
 import java.net.URI;
 import java.security.cert.CertStore;
@@ -84,11 +84,9 @@ public class AiaOcspService implements OcspService {
     }
 
     private static URI getOcspAiaUrlFromCertificate(X509Certificate certificate) throws AuthTokenException {
-        final URI uri = getOcspUri(certificate);
-        if (uri == null) {
-            throw new UserCertificateOCSPCheckFailedException("Getting the AIA OCSP responder field from the certificate failed");
-        }
-        return uri;
+        return getOcspUri(certificate).orElseThrow(() ->
+            new UserCertificateOCSPCheckFailedException("Getting the AIA OCSP responder field from the certificate failed")
+        );
     }
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2021 Estonian Information System Authority
+ * Copyright (c) 2020-2023 Estonian Information System Authority
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -72,6 +72,7 @@ public final class CertificateValidator {
 
         try {
             final PKIXBuilderParameters pkixBuilderParameters = new PKIXBuilderParameters(trustedCACertificateAnchors, selector);
+            // Certificate revocation check is intentionally disabled as we do the OCSP check with SubjectCertificateNotRevokedValidator ourselves.
             pkixBuilderParameters.setRevocationEnabled(false);
             pkixBuilderParameters.setDate(date);
             pkixBuilderParameters.addCertStore(trustedCACertificateCertStore);

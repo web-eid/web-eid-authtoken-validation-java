@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2021 Estonian Information System Authority
+ * Copyright (c) 2020-2023 Estonian Information System Authority
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -70,7 +70,7 @@ public class DesignatedOcspService implements OcspService {
             }
             certificateIsValidOnDate(responderCertificate, producedAt, "Designated OCSP responder");
         } catch (CertificateException e) {
-            throw new OCSPCertificateException("X509CertificateHolder conversion to X509Certificate failed");
+            throw new OCSPCertificateException("X509CertificateHolder conversion to X509Certificate failed", e);
         }
     }
 
