@@ -244,6 +244,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     }
 
     @Test
+    @Disabled("A new designated test OCSP responder certificate was issued whose validity period no longer overlaps with the revoked certificate")
     void whenCertificateIsRevoked_thenOcspCheckFails() throws Exception {
         mockDate("2020-01-01");
         final AuthTokenValidator validatorWithOcspCheck = AuthTokenValidators.getAuthTokenValidatorWithOcspCheck();
