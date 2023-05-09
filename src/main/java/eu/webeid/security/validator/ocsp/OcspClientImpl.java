@@ -22,12 +22,6 @@
 
 package eu.webeid.security.validator.ocsp;
 
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
 import org.bouncycastle.cert.ocsp.OCSPReq;
 import org.bouncycastle.cert.ocsp.OCSPResp;
 import org.slf4j.Logger;
@@ -35,28 +29,31 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.Objects;
 
-public class OkHttpOcspClient implements OcspClient {
+public class OcspClientImpl implements OcspClient {
 
-    private static final Logger LOG = LoggerFactory.getLogger(OkHttpOcspClient.class);
-    private static final MediaType OCSP_REQUEST_TYPE = MediaType.get("application/ocsp-request");
-    private static final MediaType OCSP_RESPONSE_TYPE = MediaType.get("application/ocsp-response");
+    private static final Logger LOG = LoggerFactory.getLogger(OcspClientImpl.class);
+    private static final String OCSP_REQUEST_TYPE = "application/ocsp-request";
+    private static final String OCSP_RESPONSE_TYPE = "application/ocsp-response";
+    public static final String CONTENT_TYPE = "Content-Type";
 
-    private final OkHttpClient httpClient;
+    private final HttpClient httpClient;
+    private final Duration ocspRequestTimeout;
 
     public static OcspClient build(Duration ocspRequestTimeout) {
-        return new OkHttpOcspClient(
-            new OkHttpClient.Builder()
+        return new OcspClientImpl(
+            HttpClient.newBuilder()
                 .connectTimeout(ocspRequestTimeout)
-                .callTimeout(ocspRequestTimeout)
-                .build()
-        );
+                .build(),
+            ocspRequestTimeout);
     }
 
     /**
-     * Use OkHttpClient to fetch the OCSP response from the OCSP responder service.
+     * Use the built-in HttpClient to fetch the OCSP response from the OCSP responder service.
      *
      * @param uri     OCSP server URL
      * @param ocspReq OCSP request
@@ -66,31 +63,36 @@ public class OkHttpOcspClient implements OcspClient {
      */
     @Override
     public OCSPResp request(URI uri, OCSPReq ocspReq) throws IOException {
-        final RequestBody requestBody = RequestBody.create(ocspReq.getEncoded(), OCSP_REQUEST_TYPE);
-        final Request request = new Request.Builder()
-            .url(uri.toURL())
-            .post(requestBody)
+        final HttpRequest request = HttpRequest.newBuilder()
+            .uri(uri)
+            .header(CONTENT_TYPE, OCSP_REQUEST_TYPE)
+            .POST(HttpRequest.BodyPublishers.ofByteArray(ocspReq.getEncoded()))
+            .timeout(ocspRequestTimeout)
             .build();
 
-        try (final Response response = httpClient.newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("OCSP request was not successful, response: " + response);
-            } else {
-                LOG.debug("OCSP response: {}", response);
-            }
-            try (final ResponseBody responseBody = Objects.requireNonNull(response.body(), "response body")) {
-                Objects.requireNonNull(responseBody.contentType(), "response content type");
-                if (!OCSP_RESPONSE_TYPE.type().equals(responseBody.contentType().type()) ||
-                    !OCSP_RESPONSE_TYPE.subtype().equals(responseBody.contentType().subtype())) {
-                    throw new IOException("OCSP response content type is not " + OCSP_RESPONSE_TYPE);
-                }
-                return new OCSPResp(responseBody.bytes());
-            }
+        final HttpResponse<byte[]> response;
+        try {
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while sending OCSP request", e);
         }
+
+        if (response.statusCode() != 200) {
+            throw new IOException("OCSP request was not successful, response: " + response);
+        } else {
+            LOG.debug("OCSP response: {}", response);
+        }
+        final String contentType = response.headers().firstValue(CONTENT_TYPE).orElse("");
+        if (!contentType.startsWith(OCSP_RESPONSE_TYPE)) {
+            throw new IOException("OCSP response content type is not " + OCSP_RESPONSE_TYPE);
+        }
+        return new OCSPResp(response.body());
     }
 
-    public OkHttpOcspClient(OkHttpClient httpClient) {
+    public OcspClientImpl(HttpClient httpClient, Duration ocspRequestTimeout) {
         this.httpClient = httpClient;
+        this.ocspRequestTimeout = ocspRequestTimeout;
     }
 
 }

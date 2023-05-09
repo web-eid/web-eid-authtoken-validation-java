@@ -47,6 +47,7 @@ public final class DateAndTime {
 
         public static final Clock INSTANCE = new DefaultClock();
 
+        @Override
         public Date now() {
             return new Date();
         }

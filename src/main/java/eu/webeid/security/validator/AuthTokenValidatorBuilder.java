@@ -24,7 +24,7 @@ package eu.webeid.security.validator;
 
 import eu.webeid.security.exceptions.JceException;
 import eu.webeid.security.validator.ocsp.OcspClient;
-import eu.webeid.security.validator.ocsp.OkHttpOcspClient;
+import eu.webeid.security.validator.ocsp.OcspClientImpl;
 import eu.webeid.security.validator.ocsp.service.DesignatedOcspServiceConfiguration;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.slf4j.Logger;
@@ -180,7 +180,7 @@ public class AuthTokenValidatorBuilder {
     public AuthTokenValidator build() throws NullPointerException, IllegalArgumentException, JceException {
         configuration.validate();
         if (configuration.isUserCertificateRevocationCheckWithOcspEnabled() && ocspClient == null) {
-            ocspClient = OkHttpOcspClient.build(configuration.getOcspRequestTimeout());
+            ocspClient = OcspClientImpl.build(configuration.getOcspRequestTimeout());
         }
         return new AuthTokenValidatorImpl(configuration, ocspClient);
     }
