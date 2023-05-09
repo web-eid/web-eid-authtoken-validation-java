@@ -26,7 +26,6 @@ import eu.webeid.security.exceptions.JceException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
 import eu.webeid.security.testutil.AuthTokenValidators;
 import eu.webeid.security.validator.AuthTokenValidator;
-import okhttp3.OkHttpClient;
 import org.bouncycastle.cert.ocsp.OCSPReq;
 import org.bouncycastle.cert.ocsp.OCSPResp;
 import org.junit.jupiter.api.Disabled;
@@ -34,7 +33,9 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.http.HttpClient;
 import java.security.cert.CertificateException;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -50,10 +51,10 @@ class OcspClientOverrideTest extends AbstractTestWithValidator {
     }
 
     @Test
-    @Disabled("Demonstrates how to configure the OkHttpClient instance for OkHttpOcspClient")
+    @Disabled("Demonstrates how to configure the built-in HttpClient instance for OcspClientImpl")
     void whenOkHttpOcspClientIsExtended_thenOcspCallSucceeds() throws JceException, CertificateException, IOException {
         final AuthTokenValidator validator = AuthTokenValidators.getAuthTokenValidatorWithOverriddenOcspClient(
-            new OkHttpOcspClient(new OkHttpClient.Builder().build())
+            new OcspClientImpl(HttpClient.newBuilder().build(), Duration.ofSeconds(5))
         );
         assertThatCode(() -> validator.validate(validAuthToken, VALID_CHALLENGE_NONCE))
             .doesNotThrowAnyException();

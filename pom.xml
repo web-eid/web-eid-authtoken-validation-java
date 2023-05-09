@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <artifactId>authtoken-validation</artifactId>
     <groupId>org.webeid.security</groupId>
-    <version>2.1.2</version>
+    <version>3.0.0</version>
     <packaging>jar</packaging>
     <name>authtoken-validation</name>
     <description>Web eID authentication token validation library for Java</description>
@@ -13,12 +13,11 @@
     <properties>
         <maven.version>3.3.9</maven.version>
         <maven-surefire-plugin.version>2.22.2</maven-surefire-plugin.version>
-        <java.version>1.8</java.version>
+        <java.version>11</java.version>
         <jjwt.version>0.11.5</jjwt.version>
         <jackson.version>2.13.4.2</jackson.version>
         <slf4j.version>1.7.36</slf4j.version>
         <bouncycastle.version>1.70</bouncycastle.version>
-        <okhttp.version>4.10.0</okhttp.version>
         <junit-jupiter.version>5.8.2</junit-jupiter.version>
         <assertj.version>3.23.1</assertj.version>
         <mockito.version>4.6.1</mockito.version>
@@ -63,11 +62,6 @@
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcpkix-jdk15on</artifactId>
             <version>${bouncycastle.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.squareup.okhttp3</groupId>
-            <artifactId>okhttp</artifactId>
-            <version>${okhttp.version}</version>
         </dependency>
 
         <dependency>
