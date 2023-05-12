@@ -22,11 +22,11 @@
 
 package eu.webeid.security.validator;
 
+import eu.webeid.security.authtoken.WebEidAuthToken;
+import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.exceptions.AuthTokenParseException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
 import org.junit.jupiter.api.Test;
-import eu.webeid.security.authtoken.WebEidAuthToken;
-import eu.webeid.security.exceptions.AuthTokenParseException;
-import eu.webeid.security.exceptions.AuthTokenException;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
