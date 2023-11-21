@@ -5,14 +5,12 @@
     <modelVersion>4.0.0</modelVersion>
     <artifactId>authtoken-validation</artifactId>
     <groupId>org.webeid.security</groupId>
-    <version>3.0.1-SNAPSHOT</version>
+    <version>3.0.1</version>
     <packaging>jar</packaging>
     <name>authtoken-validation</name>
     <description>Web eID authentication token validation library for Java</description>
 
     <properties>
-        <maven.version>3.3.9</maven.version>
-        <maven-surefire-plugin.version>2.22.2</maven-surefire-plugin.version>
         <java.version>11</java.version>
         <jjwt.version>0.11.5</jjwt.version>
         <bouncycastle.version>1.76</bouncycastle.version>
@@ -21,6 +19,9 @@
         <junit-jupiter.version>5.9.2</junit-jupiter.version>
         <assertj.version>3.24.2</assertj.version>
         <mockito.version>5.2.0</mockito.version>
+        <maven-surefire-plugin.version>2.22.2</maven-surefire-plugin.version>
+        <maven-source-plugin.version>3.3.0</maven-source-plugin.version>
+        <maven-javadoc-plugin.version>3.6.2</maven-javadoc-plugin.version>
         <jacoco.version>0.8.5</jacoco.version>
         <sonar.coverage.jacoco.xmlReportPaths>
             ${project.basedir}/../jacoco-coverage-report/target/site/jacoco-aggregate/jacoco.xml
@@ -98,8 +99,36 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven-surefire-plugin.version}</version>
             </plugin>
+            <!-- Build source JAR during packaging -->
             <plugin>
-                <!-- Generate a coverage XML file for Sonar -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>${maven-source-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Build Javacdoc JAR during packaging -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>${maven-javadoc-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Generate a coverage XML file for Sonar -->
+            <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>${jacoco.version}</version>
