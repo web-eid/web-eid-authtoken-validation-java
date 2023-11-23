@@ -89,7 +89,7 @@ public final class OcspRequestBuilder {
     }
 
     private void addNonce(OCSPReqBuilder builder) {
-        final byte[] nonce = new byte[8];
+        final byte[] nonce = new byte[32];
         GENERATOR.nextBytes(nonce);
 
         final Extension[] extensions = new Extension[]{
