@@ -61,7 +61,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     protected void setup() {
         super.setup();
         // Ensure that the certificates do not expire.
-        mockDate("2021-03-01");
+        mockDate("2021-08-01");
     }
 
     @AfterEach
@@ -168,6 +168,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
 
     @Test
     void whenUsingOldMobileIdCertificate_thenValidationFails() throws AuthTokenException {
+        mockDate("2021-03-01");
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", OLD_MOBILE_ID_CERT);
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
@@ -227,7 +228,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
 
     @Test
     void whenUserCertificateIsNoLongerValid_thenValidationFails() {
-        mockDate("2024-10-19");
+        mockDate("2026-10-19");
         assertThatThrownBy(() -> validator
             .validate(validAuthToken, VALID_CHALLENGE_NONCE))
             .isInstanceOf(CertificateExpiredException.class)
