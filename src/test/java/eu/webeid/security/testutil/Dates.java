@@ -47,16 +47,18 @@ public final class Dates {
     }
 
     private static void setClockField(Class<? extends Clock> cls, Date date) throws NoSuchFieldException, IllegalAccessException {
-        final Field clockField = cls.getDeclaredField("INSTANCE");
+        final Field clockField = cls.getDeclaredField("instance");
         setFinalStaticField(clockField, (Clock) () -> date);
     }
 
     private static void setFinalStaticField(Field field, Object newValue) throws NoSuchFieldException, IllegalAccessException {
         field.setAccessible(true);
 
+        /* https://stackoverflow.com/questions/56039341/get-declared-fields-of-java-lang-reflect-fields-in-jdk12
         final Field modifiersField = Field.class.getDeclaredField("modifiers");
         modifiersField.setAccessible(true);
         modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
+        */
 
         field.set(null, newValue);
     }

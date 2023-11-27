@@ -45,7 +45,11 @@ public final class DateAndTime {
 
     public static class DefaultClock implements Clock {
 
-        public static final Clock INSTANCE = new DefaultClock();
+        protected static Clock instance = new DefaultClock();
+
+        public static Clock getInstance() {
+            return instance;
+        }
 
         @Override
         public Date now() {

@@ -56,7 +56,7 @@ public final class SubjectCertificateTrustedValidator {
      */
     public void validateCertificateTrusted(X509Certificate subjectCertificate) throws AuthTokenException {
         // Use the clock instance so that the date can be mocked in tests.
-        final Date now = DateAndTime.DefaultClock.INSTANCE.now();
+        final Date now = DateAndTime.DefaultClock.getInstance().now();
         subjectCertificateIssuerCertificate = CertificateValidator.validateIsSignedByTrustedCA(
             subjectCertificate,
             trustedCACertificateAnchors,
