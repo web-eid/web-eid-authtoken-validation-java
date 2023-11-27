@@ -52,7 +52,7 @@ public final class SubjectCertificateExpiryValidator {
      */
     public void validateCertificateExpiry(X509Certificate subjectCertificate) throws AuthTokenException {
         // Use the clock instance so that the date can be mocked in tests.
-        final Date now = DateAndTime.DefaultClock.INSTANCE.now();
+        final Date now = DateAndTime.DefaultClock.getInstance().now();
         CertificateValidator.trustedCACertificatesAreValidOnDate(trustedCACertificateAnchors, now);
         LOG.debug("CA certificates are valid.");
         CertificateValidator.certificateIsValidOnDate(subjectCertificate, now, "User");

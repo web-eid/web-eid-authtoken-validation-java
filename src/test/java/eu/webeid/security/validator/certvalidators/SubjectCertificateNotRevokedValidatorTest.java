@@ -114,14 +114,14 @@ class SubjectCertificateNotRevokedValidatorTest {
 
     @Test
     void whenOcspRequestFails_thenThrows() throws Exception {
-        final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider("https://web-eid-test.free.beeceptor.com");
+        final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider("http://demo.sk.ee/ocsps");
         final SubjectCertificateNotRevokedValidator validator = new SubjectCertificateNotRevokedValidator(trustedValidator, ocspClient, ocspServiceProvider);
         assertThatCode(() ->
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
             .cause()
             .isInstanceOf(IOException.class)
-            .hasMessageStartingWith("OCSP request was not successful, response: (POST https://web-eid-test.free.beeceptor.com) 404");
+            .hasMessageStartingWith("OCSP request was not successful, response: (POST http://demo.sk.ee/ocsps) 404");
     }
 
     @Test
