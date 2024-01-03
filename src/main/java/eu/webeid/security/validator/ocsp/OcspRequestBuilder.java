@@ -48,6 +48,7 @@ import org.bouncycastle.cert.ocsp.OCSPException;
 import org.bouncycastle.cert.ocsp.OCSPReq;
 import org.bouncycastle.cert.ocsp.OCSPReqBuilder;
 
+import java.io.IOException;
 import java.security.SecureRandom;
 import java.util.Objects;
 
@@ -82,19 +83,23 @@ public final class OcspRequestBuilder {
         builder.addRequest(Objects.requireNonNull(certificateId, "certificateId"));
 
         if (ocspNonceEnabled) {
-            addNonce(builder);
+            try {
+                addNonce(builder);
+            } catch (IOException e) {
+                throw new OCSPException("Failed to generate OCSP NONCE extension", e);
+            }
         }
 
         return builder.build();
     }
 
-    private void addNonce(OCSPReqBuilder builder) {
+    private void addNonce(OCSPReqBuilder builder) throws IOException {
         final byte[] nonce = new byte[32];
         GENERATOR.nextBytes(nonce);
 
         final Extension[] extensions = new Extension[]{
             new Extension(OCSPObjectIdentifiers.id_pkix_ocsp_nonce, false,
-                new DEROctetString(nonce))
+                new DEROctetString(new DEROctetString(nonce)))
         };
         builder.setRequestExtensions(new Extensions(extensions));
     }
