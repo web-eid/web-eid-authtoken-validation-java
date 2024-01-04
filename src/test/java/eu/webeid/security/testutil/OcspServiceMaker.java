@@ -40,7 +40,6 @@ import static eu.webeid.security.testutil.Certificates.getTestEsteid2015CA;
 import static eu.webeid.security.testutil.Certificates.getTestEsteid2018CA;
 import static eu.webeid.security.testutil.Certificates.getTestSkOcspResponder2020;
 import static eu.webeid.security.util.Collections.newHashSet;
-import static eu.webeid.security.validator.ocsp.OcspUrl.AIA_ESTEID_2015;
 
 public class OcspServiceMaker {
 
@@ -74,7 +73,7 @@ public class OcspServiceMaker {
 
     private static AiaOcspServiceConfiguration getAiaOcspServiceConfiguration() throws JceException {
         return new AiaOcspServiceConfiguration(
-            newHashSet(AIA_ESTEID_2015, TEST_ESTEID_2015),
+            newHashSet(TEST_ESTEID_2015),
             CertificateValidator.buildTrustAnchorsFromCertificates(TRUSTED_CA_CERTIFICATES),
             CertificateValidator.buildCertStoreFromCertificates(TRUSTED_CA_CERTIFICATES));
     }

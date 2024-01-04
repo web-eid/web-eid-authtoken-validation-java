@@ -38,7 +38,6 @@ import java.util.Objects;
 
 import static eu.webeid.security.util.Collections.newHashSet;
 import static eu.webeid.security.util.DateAndTime.requirePositiveDuration;
-import static eu.webeid.security.validator.ocsp.OcspUrl.AIA_ESTEID_2015;
 
 /**
  * Stores configuration parameters for {@link AuthTokenValidatorImpl}.
@@ -57,8 +56,7 @@ public final class AuthTokenValidationConfiguration {
         SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V3,
         SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY
     );
-    // Disable OCSP nonce extension for EstEID 2015 cards by default.
-    private Collection<URI> nonceDisabledOcspUrls = newHashSet(AIA_ESTEID_2015);
+    private Collection<URI> nonceDisabledOcspUrls = new HashSet<>();
 
     AuthTokenValidationConfiguration() {
     }
