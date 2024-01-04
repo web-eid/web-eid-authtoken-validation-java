@@ -100,7 +100,7 @@ import eu.webeid.security.challenge.ChallengeNonceStore;
 
 You must explicitly specify which **intermediate** certificate authorities (CAs) are trusted to issue the eID authentication and OCSP responder certificates. CA certificates can be loaded from either the truststore file, resources or any stream source. We use the [`CertificateLoader`](https://github.com/web-eid/web-eid-authtoken-validation-java/blob/main/src/main/java/eu/webeid/security/certificate/CertificateLoader.java) helper class to load CA certificates from resources here, but consider using [the truststore file](https://github.com/web-eid/web-eid-spring-boot-example/blob/main/src/main/java/eu/webeid/example/config/ValidationConfiguration.java#L104-L123) instead.
 
-First, copy the trusted certificates, for example `ESTEID-SK_2015.cer` and `ESTEID2018.cer`, to `resources/cacerts/`, then load the certificates as follows:
+First, copy the trusted certificates, for example `ESTEID2018.cer`, to `resources/cacerts/`, then load the certificates as follows:
 
 ```java
 import java.security.cert.X509Certificate;
@@ -109,7 +109,7 @@ import eu.webeid.security.certificate.CertificateLoader;
 ...
     private X509Certificate[] trustedIntermediateCACertificates() {
          return CertificateLoader.loadCertificatesFromResources(
-             "cacerts/ESTEID-SK_2015.cer", "cacerts/ESTEID2018.cer");
+             "cacerts/ESTEID2018.cer");
     }
 ...
 ```
@@ -301,7 +301,7 @@ The following additional configuration options are available in `AuthTokenValida
 - `withOcspClient(OcspClient ocspClient)` - uses the provided OCSP client instance during user certificate revocation check with OCSP. The provided client instance must be thread-safe. This gives the possibility to either configure the request timeouts, proxies etc of the `OkHttpClient` instance used by `OkHttpOcspClient` or provide an implementation that uses an altogether different HTTP client, for example the built-in `HttpClient` provided by Java 9+. See examples in `OcspClientOverrideTest`.
 - `withOcspRequestTimeout(Duration ocspRequestTimeout)` – sets both the connection and response timeout of user certificate revocation check OCSP requests. Default is 5 seconds.
 - `withDisallowedCertificatePolicies(ASN1ObjectIdentifier... policies)` – adds the given policies to the list of disallowed user certificate policies. In order for the user certificate to be considered valid, it must not contain any policies present in this list. Contains the Estonian Mobile-ID policies by default as it must not be possible to authenticate with a Mobile-ID certificate when an eID smart card is expected.
-- `withNonceDisabledOcspUrls(URI... urls)` – adds the given URLs to the list of OCSP responder access location URLs for which the nonce protocol extension will be disabled. Some OCSP responders don't support the nonce extension. Contains the ESTEID-2015 OCSP responder URL by default.
+- `withNonceDisabledOcspUrls(URI... urls)` – adds the given URLs to the list of OCSP responder access location URLs for which the nonce protocol extension will be disabled. Some OCSP responders don't support the nonce extension.
 
 Extended configuration example:  
 
