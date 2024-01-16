@@ -23,9 +23,9 @@ Add the following lines to Maven `pom.xml` to include the Web eID authentication
 ```xml
 <dependencies>
     <dependency>
-        <groupId>eu.webeid.security</groupId>
+        <groupId>org.webeid.security</groupId>
         <artifactId>authtoken-validation</artifactId>
-        <version>3.0.0</version>
+        <version>3.0.1</version>
     </dependency>
 </dependencies>
 
@@ -156,9 +156,9 @@ public class ChallengeController {
 
     @GetMapping("challenge")
     public ChallengeDTO challenge() {
-        // a simple DTO with a single 'challenge' field
+        // a simple DTO with a single 'nonce' field
         final ChallengeDTO challenge = new ChallengeDTO();
-        challenge.setNonce(nonceGenerator.generateAndStoreNonce());
+        challenge.setNonce(nonceGenerator.generateAndStoreNonce().getBase64EncodedNonce());
         return challenge;
     }
 }
