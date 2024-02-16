@@ -113,7 +113,7 @@
                     </execution>
                 </executions>
             </plugin>
-            <!-- Build Javacdoc JAR during packaging -->
+            <!-- Build Javadoc JAR during packaging -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
@@ -152,7 +152,7 @@
 
     <!-- For publishing the library to GitHub Packages/GitLab Package Repository -->
     <distributionManagement>
-        <!-- Github Packages does not currently support public access, so disabled until it does.
+        <!-- GitHub Packages does not currently support public access, so disabled until it does.
              See https://github.community/t/download-from-github-package-registry-without-authentication/14407
         <repository>
             <id>github</id>

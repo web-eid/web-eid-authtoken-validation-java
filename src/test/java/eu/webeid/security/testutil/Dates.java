@@ -23,44 +23,19 @@
 package eu.webeid.security.testutil;
 
 import com.fasterxml.jackson.databind.util.StdDateFormat;
-import io.jsonwebtoken.Clock;
-import eu.webeid.security.util.DateAndTime;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.text.ParseException;
 import java.util.Date;
 
 public final class Dates {
     private static final StdDateFormat STD_DATE_FORMAT = new StdDateFormat();
 
-    public static Date create(String iso8601Date) throws ParseException {
-        return STD_DATE_FORMAT.parse(iso8601Date);
-    }
-
-    public static void setMockedCertificateValidatorDate(Date mockedDate) throws NoSuchFieldException, IllegalAccessException {
-        setClockField(DateAndTime.DefaultClock.class, mockedDate);
-    }
-
-    public static void resetMockedCertificateValidatorDate() throws NoSuchFieldException, IllegalAccessException {
-        setClockField(DateAndTime.DefaultClock.class, new Date());
-    }
-
-    private static void setClockField(Class<? extends Clock> cls, Date date) throws NoSuchFieldException, IllegalAccessException {
-        final Field clockField = cls.getDeclaredField("instance");
-        setFinalStaticField(clockField, (Clock) () -> date);
-    }
-
-    private static void setFinalStaticField(Field field, Object newValue) throws NoSuchFieldException, IllegalAccessException {
-        field.setAccessible(true);
-
-        /* https://stackoverflow.com/questions/56039341/get-declared-fields-of-java-lang-reflect-fields-in-jdk12
-        final Field modifiersField = Field.class.getDeclaredField("modifiers");
-        modifiersField.setAccessible(true);
-        modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
-        */
-
-        field.set(null, newValue);
+    public static Date create(String iso8601Date) {
+        try {
+            return STD_DATE_FORMAT.parse(iso8601Date);
+        } catch (ParseException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 }

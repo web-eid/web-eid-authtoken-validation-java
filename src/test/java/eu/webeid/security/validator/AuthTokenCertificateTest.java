@@ -24,19 +24,32 @@ package eu.webeid.security.validator;
 
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import eu.webeid.security.authtoken.WebEidAuthToken;
-import eu.webeid.security.exceptions.*;
+import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.exceptions.AuthTokenParseException;
+import eu.webeid.security.exceptions.CertificateDecodingException;
+import eu.webeid.security.exceptions.CertificateExpiredException;
+import eu.webeid.security.exceptions.CertificateNotTrustedException;
+import eu.webeid.security.exceptions.CertificateNotYetValidException;
+import eu.webeid.security.exceptions.UserCertificateDisallowedPolicyException;
+import eu.webeid.security.exceptions.UserCertificateMissingPurposeException;
+import eu.webeid.security.exceptions.UserCertificateRevokedException;
+import eu.webeid.security.exceptions.UserCertificateWrongPurposeException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
 import eu.webeid.security.testutil.AuthTokenValidators;
 import eu.webeid.security.testutil.Dates;
+import eu.webeid.security.util.DateAndTime;
+import io.jsonwebtoken.Clock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 import java.security.cert.CertificateException;
-import java.text.ParseException;
+import java.util.Date;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mockStatic;
 
 class AuthTokenCertificateTest extends AbstractTestWithValidator {
 
@@ -56,21 +69,20 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     private static final String EXPIRED_ECDSA_CERT = "MIIF0TCCA7mgAwIBAgIQMBVFXroEt3hZ8FHcKKE65TANBgkqhkiG9w0BAQsFADBjMQswCQYDVQQGEwJFRTEiMCAGA1UECgwZQVMgU2VydGlmaXRzZWVyaW1pc2tlc2t1czEXMBUGA1UEYQwOTlRSRUUtMTA3NDcwMTMxFzAVBgNVBAMMDkVTVEVJRC1TSyAyMDE1MB4XDTE3MTAyNTA4NTcwMFoXDTIxMDIxMDIxNTk1OVowgYsxCzAJBgNVBAYTAkVFMQ8wDQYDVQQKDAZFU1RFSUQxFzAVBgNVBAsMDmF1dGhlbnRpY2F0aW9uMR4wHAYDVQQDDBVUT09NLE1BUlQsMzc2MDIwNDAzMzQxDTALBgNVBAQMBFRPT00xDTALBgNVBCoMBE1BUlQxFDASBgNVBAUTCzM3NjAyMDQwMzM0MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAExS1YQQBDLVvOi0a2GA5Y34AXODpx0AL8eKDOB7BjwBc/FAyVExhfb6O+lT5Tnaec3GnT4JNRyeV8d82L8cyOgFn4PWc+5cjFdmcZjJbtCvgyBOQQ831tteIDL2XSrvZEo4ICBDCCAgAwCQYDVR0TBAIwADAOBgNVHQ8BAf8EBAMCA4gwUwYDVR0gBEwwSjA+BgkrBgEEAc4fAQEwMTAvBggrBgEFBQcCARYjaHR0cHM6Ly93d3cuc2suZWUvcmVwb3NpdG9vcml1bS9DUFMwCAYGBACPegECMB8GA1UdEQQYMBaBFG1hcnQudG9vbS4zQGVlc3RpLmVlMB0GA1UdDgQWBBSzneoLqtqbvHvJ19cjhp2XR5ovQTAgBgNVHSUBAf8EFjAUBggrBgEFBQcDAgYIKwYBBQUHAwQwHwYDVR0jBBgwFoAUs6uIvJnVYqSFKgjNtB1yO4NyR1EwYQYIKwYBBQUHAQMEVTBTMFEGBgQAjkYBBTBHMEUWP2h0dHBzOi8vc2suZWUvZW4vcmVwb3NpdG9yeS9jb25kaXRpb25zLWZvci11c2Utb2YtY2VydGlmaWNhdGVzLxMCRU4wagYIKwYBBQUHAQEEXjBcMCcGCCsGAQUFBzABhhtodHRwOi8vYWlhLnNrLmVlL2VzdGVpZDIwMTUwMQYIKwYBBQUHMAKGJWh0dHA6Ly9jLnNrLmVlL0VTVEVJRC1TS18yMDE1LmRlci5jcnQwPAYDVR0fBDUwMzAxoC+gLYYraHR0cDovL3d3dy5zay5lZS9jcmxzL2VzdGVpZC9lc3RlaWQyMDE1LmNybDANBgkqhkiG9w0BAQsFAAOCAgEAOXTvktUXqPgaK/uxzgH0xSEYClBAWIQaNgpqY5lwsQtgQnpfKlsADqMZxCp7UuuMvQmpDbBxv1kIr0oG1uUXrUtPw81XOH1ClwPPXWpg9VRTAetNbHTBbHDyzuXQMNeDmrntChs+BteletejGD+aYG39HGMlrMbGQZOgvQrpYHMDek0ckCPEsZRXqUP0g7Ie7uBQhz5At7l4EDAeOW8xGoI6t+Ke4GedccXKef60w2ZIIDzvOFHPTc6POCsIlFtF/nCKwVi7GoQKjbUbM5OdBLZ0jyLq2LvzZuT86Jo8wObziuSzApGlBexHAqLrR83q+/Xl61yPnFf3w2kAfS9kBjeunzTH7Jm3pNT3Zq9JRLvEDqtpOPqr4zm9nG6OSghFU6tySkpQ5HiakGpMcnt5o5KuXhQ+Dg317tdXPyQkSiuJ9NfEBW0ijrwO12SVRzYo/jRl4ZQUkAEEUSMEsC6gTsZypPdIsLDVoQWTytHDU89s1xJDn4HulPl12dFnrhlLeX4RxOjDxppZxdjBU0FoJoDB0qwEAN2TMAPJWh+Pp9mFuS/u0dht9sKvAkpx+o0Z7v7QMz03XlzCHOLTIK+f81Rjokl8f+wiog5Ojj0wZkDe6DuQC9L5uDey3PJHv3naVovhs7jrEJu+yrsLue/OHhAgWRh2S75/wlVPHPEE44k=";
     private static final String REVOKED_CERT = "MIIERDCCA6agAwIBAgIQSs8/WoDixVxbKRhNnF/GEzAKBggqhkjOPQQDBDBgMQswCQYDVQQGEwJFRTEbMBkGA1UECgwSU0sgSUQgU29sdXRpb25zIEFTMRcwFQYDVQRhDA5OVFJFRS0xMDc0NzAxMzEbMBkGA1UEAwwSVEVTVCBvZiBFU1RFSUQyMDE4MB4XDTE4MDYxOTE0NTA1M1oXDTIwMDEwMjIxNTk1OVowfzELMAkGA1UEBhMCRUUxKjAoBgNVBAMMIUrDlUVPUkcsSkFBSy1LUklTVEpBTiwzODAwMTA4NTcxODEQMA4GA1UEBAwHSsOVRU9SRzEWMBQGA1UEKgwNSkFBSy1LUklTVEpBTjEaMBgGA1UEBRMRUE5PRUUtMzgwMDEwODU3MTgwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAAR/jopNG3KL0ZQUvO4OGSvcaqUtFDm3azOtsM2VRp666r0d36Zh0Zx/xej8f+SzEfWvvDT1HQLo3USiSbYn1FyNHTNxifV+Zvf6StXJAkdu24d1UvKbf+LylglO/yS7o4ijggIEMIICADAJBgNVHRMEAjAAMA4GA1UdDwEB/wQEAwIDiDBHBgNVHSAEQDA+MDIGCysGAQQBg5F/AQIBMCMwIQYIKwYBBQUHAgEWFWh0dHBzOi8vd3d3LnNrLmVlL0NQUzAIBgYEAI96AQIwHwYDVR0RBBgwFoEUMzgwMDEwODU3MThAZWVzdGkuZWUwHQYDVR0OBBYEFEQA6/1GXJtp+6czUzorhEJ7B95pMGEGCCsGAQUFBwEDBFUwUzBRBgYEAI5GAQUwRzBFFj9odHRwczovL3NrLmVlL2VuL3JlcG9zaXRvcnkvY29uZGl0aW9ucy1mb3ItdXNlLW9mLWNlcnRpZmljYXRlcy8TAkVOMCAGA1UdJQEB/wQWMBQGCCsGAQUFBwMCBggrBgEFBQcDBDAfBgNVHSMEGDAWgBTAhJkpxE6fOwI09pnhClYACCk+ezB/BggrBgEFBQcBAQRzMHEwLAYIKwYBBQUHMAGGIGh0dHA6Ly9haWEuZGVtby5zay5lZS9lc3RlaWQyMDE4MEEGCCsGAQUFBzAChjVodHRwczovL3NrLmVlL3VwbG9hZC9maWxlcy9URVNUX29mX0VTVEVJRDIwMTguZGVyLmNydDAzBgNVHR8ELDAqMCigJqAkhiJodHRwOi8vYy5zay5lZS90ZXN0X2VzdGVpZDIwMTguY3JsMAoGCCqGSM49BAMEA4GLADCBhwJBcmcfLC+HcSJ6BuRrDGL+K+7BAW8BfAiiWWAuBV4ebLkbbAWmkc9dSKgr4BEGEt90xDTQ85yW4SjGulFXu9C3yQsCQgETaXTs3Hp6vDAcQYL8Bx4BO3DwJbDuD4BUJyT0+9HQiFCQmTQ4xrNjeaeOwRWyMOM9z5ORMeJCiQUyil1x4YPIbg==";
 
+    private MockedStatic<DateAndTime.DefaultClock> mockedClock;
+
     @Override
     @BeforeEach
     protected void setup() {
         super.setup();
+        mockedClock = mockStatic(DateAndTime.DefaultClock.class);
         // Ensure that the certificates do not expire.
         mockDate("2021-08-01");
     }
 
     @AfterEach
     public void tearDown() {
-        try {
-            Dates.resetMockedCertificateValidatorDate();
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new RuntimeException(e);
-        }
+        mockedClock.close();
     }
 
     @Test
@@ -275,11 +287,8 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     }
 
     private void mockDate(String date) {
-        try {
-            Dates.setMockedCertificateValidatorDate(Dates.create(date));
-        } catch (ParseException | NoSuchFieldException | IllegalAccessException e) {
-            throw new RuntimeException(e);
-        }
+        final Date theDate = Dates.create(date);
+        mockedClock.when(DateAndTime.DefaultClock::getInstance).thenReturn((Clock) () -> theDate);
     }
 
 }
