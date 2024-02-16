@@ -45,7 +45,8 @@ public final class DateAndTime {
 
     public static class DefaultClock implements Clock {
 
-        protected static Clock instance = new DefaultClock();
+        // Allows mocking of time-dependent behavior with Mockito.mockStatic().
+        private static final Clock instance = new DefaultClock();
 
         public static Clock getInstance() {
             return instance;
