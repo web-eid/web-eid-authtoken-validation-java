@@ -26,6 +26,7 @@ import eu.webeid.security.exceptions.CertificateNotTrustedException;
 import eu.webeid.security.exceptions.JceException;
 import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.security.exceptions.UserCertificateRevokedException;
+import eu.webeid.security.util.DateAndTime;
 import eu.webeid.security.validator.ocsp.OcspClient;
 import eu.webeid.security.validator.ocsp.OcspClientImpl;
 import eu.webeid.security.validator.ocsp.OcspServiceProvider;
@@ -53,11 +54,13 @@ import java.util.Objects;
 
 import static eu.webeid.security.testutil.Certificates.getJaakKristjanEsteid2018Cert;
 import static eu.webeid.security.testutil.Certificates.getTestEsteid2018CA;
+import static eu.webeid.security.testutil.DateMocker.mockDate;
 import static eu.webeid.security.testutil.OcspServiceMaker.getAiaOcspServiceProvider;
 import static eu.webeid.security.testutil.OcspServiceMaker.getDesignatedOcspServiceProvider;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 class SubjectCertificateNotRevokedValidatorTest {
@@ -223,10 +226,13 @@ class SubjectCertificateNotRevokedValidatorTest {
         final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidatorWithAiaOcsp(
             getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_revoked.der"))
         );
-        assertThatExceptionOfType(UserCertificateRevokedException.class)
-            .isThrownBy(() ->
-                validator.validateCertificateNotRevoked(estEid2018Cert))
-            .withMessage("User certificate has been revoked: Revocation reason: 0");
+        try (var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
+            mockDate("2021-09-18", mockedClock);
+            assertThatExceptionOfType(UserCertificateRevokedException.class)
+                .isThrownBy(() ->
+                    validator.validateCertificateNotRevoked(estEid2018Cert))
+                .withMessage("User certificate has been revoked: Revocation reason: 0");
+        }
     }
 
     @Test
@@ -234,10 +240,13 @@ class SubjectCertificateNotRevokedValidatorTest {
         final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider("https://web-eid-test.free.beeceptor.com");
         final HttpResponse<byte[]> response = getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_unknown.der"));
         final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidator(getMockClient(response), ocspServiceProvider);
-        assertThatExceptionOfType(UserCertificateRevokedException.class)
-            .isThrownBy(() ->
-                validator.validateCertificateNotRevoked(estEid2018Cert))
-            .withMessage("User certificate has been revoked: Unknown status");
+        try (var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
+            mockDate("2021-09-18T00:16:25", mockedClock);
+            assertThatExceptionOfType(UserCertificateRevokedException.class)
+                .isThrownBy(() ->
+                    validator.validateCertificateNotRevoked(estEid2018Cert))
+                .withMessage("User certificate has been revoked: Unknown status");
+        }
     }
 
     @Test
@@ -256,10 +265,13 @@ class SubjectCertificateNotRevokedValidatorTest {
         final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidatorWithAiaOcsp(
             getMockedResponse(getOcspResponseBytesFromResources())
         );
-        assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
-            .isThrownBy(() ->
-                validator.validateCertificateNotRevoked(estEid2018Cert))
-            .withMessage("User certificate revocation check has failed: OCSP request and response nonces differ, possible replay attack");
+        try (var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
+            mockDate("2021-09-17T18:25:24", mockedClock);
+            assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
+                .isThrownBy(() ->
+                    validator.validateCertificateNotRevoked(estEid2018Cert))
+                .withMessage("User certificate revocation check has failed: OCSP request and response nonces differ, possible replay attack");
+        }
     }
 
     private static byte[] buildOcspResponseBodyWithInternalErrorStatus() throws IOException {

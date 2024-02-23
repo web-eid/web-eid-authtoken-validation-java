@@ -25,6 +25,7 @@ package eu.webeid.security.validator.ocsp;
 import eu.webeid.security.exceptions.OCSPCertificateException;
 import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.security.exceptions.UserCertificateRevokedException;
+import eu.webeid.security.util.DateAndTime;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.ocsp.BasicOCSPResp;
 import org.bouncycastle.cert.ocsp.CertificateStatus;
@@ -54,7 +55,7 @@ public final class OcspResponseValidator {
      */
     private static final String OID_OCSP_SIGNING = "1.3.6.1.5.5.7.3.9";
 
-    private static final long ALLOWED_TIME_SKEW = TimeUnit.MINUTES.toMillis(15);
+    static final long ALLOWED_TIME_SKEW_MILLIS = TimeUnit.MINUTES.toMillis(15);
 
     public static void validateHasSigningExtension(X509Certificate certificate) throws OCSPCertificateException {
         Objects.requireNonNull(certificate, "certificate");
@@ -77,7 +78,7 @@ public final class OcspResponseValidator {
         }
     }
 
-    public static void validateCertificateStatusUpdateTime(SingleResp certStatusResponse, Date producedAt) throws UserCertificateOCSPCheckFailedException {
+    public static void validateCertificateStatusUpdateTime(SingleResp certStatusResponse) throws UserCertificateOCSPCheckFailedException {
         // From RFC 2560, https://www.ietf.org/rfc/rfc2560.txt:
         // 4.2.2.  Notes on OCSP Responses
         // 4.2.2.1.  Time
@@ -87,8 +88,9 @@ public final class OcspResponseValidator {
         //   SHOULD be considered unreliable.
         //   If nextUpdate is not set, the responder is indicating that newer
         //   revocation information is available all the time.
-        final Date notAllowedBefore = new Date(producedAt.getTime() - ALLOWED_TIME_SKEW);
-        final Date notAllowedAfter = new Date(producedAt.getTime() + ALLOWED_TIME_SKEW);
+        final Date now = DateAndTime.DefaultClock.getInstance().now();
+        final Date notAllowedBefore = new Date(now.getTime() - ALLOWED_TIME_SKEW_MILLIS);
+        final Date notAllowedAfter = new Date(now.getTime() + ALLOWED_TIME_SKEW_MILLIS);
         final Date thisUpdate = certStatusResponse.getThisUpdate();
         final Date nextUpdate = certStatusResponse.getNextUpdate() != null ? certStatusResponse.getNextUpdate() : thisUpdate;
         if (notAllowedAfter.before(thisUpdate) ||
@@ -118,7 +120,7 @@ public final class OcspResponseValidator {
         }
     }
 
-    private static String toUtcString(Date date) {
+    static String toUtcString(Date date) {
         if (date == null) {
             return String.valueOf((Object) null);
         }

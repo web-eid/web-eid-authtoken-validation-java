@@ -36,9 +36,7 @@ import eu.webeid.security.exceptions.UserCertificateRevokedException;
 import eu.webeid.security.exceptions.UserCertificateWrongPurposeException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
 import eu.webeid.security.testutil.AuthTokenValidators;
-import eu.webeid.security.testutil.Dates;
 import eu.webeid.security.util.DateAndTime;
-import io.jsonwebtoken.Clock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -46,8 +44,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
 import java.security.cert.CertificateException;
-import java.util.Date;
 
+import static eu.webeid.security.testutil.DateMocker.mockDate;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mockStatic;
 
@@ -71,13 +69,14 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
 
     private MockedStatic<DateAndTime.DefaultClock> mockedClock;
 
+
     @Override
     @BeforeEach
     protected void setup() {
         super.setup();
         mockedClock = mockStatic(DateAndTime.DefaultClock.class);
         // Ensure that the certificates do not expire.
-        mockDate("2021-08-01");
+        mockDate("2021-08-01", mockedClock);
     }
 
     @AfterEach
@@ -180,7 +179,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
 
     @Test
     void whenUsingOldMobileIdCertificate_thenValidationFails() throws AuthTokenException {
-        mockDate("2021-03-01");
+        mockDate("2021-03-01", mockedClock);
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", OLD_MOBILE_ID_CERT);
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
@@ -222,7 +221,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
 
     @Test
     void whenUserCertificateIsNotYetValid_thenValidationFails() {
-        mockDate("2018-10-17");
+        mockDate("2018-10-17", mockedClock);
         assertThatThrownBy(() -> validator
             .validate(validAuthToken, VALID_CHALLENGE_NONCE))
             .isInstanceOf(CertificateNotYetValidException.class)
@@ -231,7 +230,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
 
     @Test
     void whenTrustedCACertificateIsNotYetValid_thenValidationFails() {
-        mockDate("2018-08-17");
+        mockDate("2018-08-17", mockedClock);
         assertThatThrownBy(() -> validator
             .validate(validAuthToken, VALID_CHALLENGE_NONCE))
             .isInstanceOf(CertificateNotYetValidException.class)
@@ -240,7 +239,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
 
     @Test
     void whenUserCertificateIsNoLongerValid_thenValidationFails() {
-        mockDate("2026-10-19");
+        mockDate("2026-10-19", mockedClock);
         assertThatThrownBy(() -> validator
             .validate(validAuthToken, VALID_CHALLENGE_NONCE))
             .isInstanceOf(CertificateExpiredException.class)
@@ -249,7 +248,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
 
     @Test
     void whenTrustedCACertificateIsNoLongerValid_thenValidationFails() {
-        mockDate("2033-10-19");
+        mockDate("2033-10-19", mockedClock);
         assertThatThrownBy(() -> validator
             .validate(validAuthToken, VALID_CHALLENGE_NONCE))
             .isInstanceOf(CertificateExpiredException.class)
@@ -259,7 +258,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     @Test
     @Disabled("A new designated test OCSP responder certificate was issued whose validity period no longer overlaps with the revoked certificate")
     void whenCertificateIsRevoked_thenOcspCheckFails() throws Exception {
-        mockDate("2020-01-01");
+        mockDate("2020-01-01", mockedClock);
         final AuthTokenValidator validatorWithOcspCheck = AuthTokenValidators.getAuthTokenValidatorWithOcspCheck();
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", REVOKED_CERT);
         assertThatThrownBy(() -> validatorWithOcspCheck
@@ -270,7 +269,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     @Test
     @Disabled("A new designated test OCSP responder certificate was issued whose validity period no longer overlaps with the revoked certificate")
     void whenCertificateIsRevoked_thenOcspCheckWithDesignatedOcspServiceFails() throws Exception {
-        mockDate("2020-01-01");
+        mockDate("2020-01-01", mockedClock);
         final AuthTokenValidator validatorWithOcspCheck = AuthTokenValidators.getAuthTokenValidatorWithDesignatedOcspCheck();
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", REVOKED_CERT);
         assertThatThrownBy(() -> validatorWithOcspCheck
@@ -284,11 +283,6 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
         assertThatThrownBy(() -> validatorWithWrongTrustedCA
             .validate(validAuthToken, VALID_CHALLENGE_NONCE))
             .isInstanceOf(CertificateNotTrustedException.class);
-    }
-
-    private void mockDate(String date) {
-        final Date theDate = Dates.create(date);
-        mockedClock.when(DateAndTime.DefaultClock::getInstance).thenReturn((Clock) () -> theDate);
     }
 
 }

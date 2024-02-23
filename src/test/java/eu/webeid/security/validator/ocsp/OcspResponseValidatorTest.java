@@ -22,68 +22,92 @@
 
 package eu.webeid.security.validator.ocsp;
 
-import eu.webeid.security.testutil.Dates;
+import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 import org.bouncycastle.cert.ocsp.SingleResp;
 import org.junit.jupiter.api.Test;
-import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
+import static eu.webeid.security.validator.ocsp.OcspResponseValidator.ALLOWED_TIME_SKEW_MILLIS;
+import static eu.webeid.security.validator.ocsp.OcspResponseValidator.toUtcString;
+import static eu.webeid.security.validator.ocsp.OcspResponseValidator.validateCertificateStatusUpdateTime;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static eu.webeid.security.validator.ocsp.OcspResponseValidator.validateCertificateStatusUpdateTime;
 
 class OcspResponseValidatorTest {
 
     @Test
-    void whenThisUpdateDayBeforeProducedAt_thenThrows() throws Exception {
+    void whenThisAndNextUpdateWithinSkew_thenValidationSucceeds() {
         final SingleResp mockResponse = mock(SingleResp.class);
-        // yyyy-MM-dd'T'HH:mm:ss.SSSZ
-        when(mockResponse.getThisUpdate()).thenReturn(Dates.create("2021-09-01T00:00:00.000Z"));
-        final Date producedAt = Dates.create("2021-09-02T00:00:00.000Z");
+        var now = Instant.now();
+        var allowedSkewBeforeNow = Date.from(now.minus(ALLOWED_TIME_SKEW_MILLIS + 1000, ChronoUnit.MILLIS));
+        var allowedSkewAfterNow = Date.from(now.minus(ALLOWED_TIME_SKEW_MILLIS - 1000, ChronoUnit.MILLIS));
+        when(mockResponse.getThisUpdate()).thenReturn(allowedSkewBeforeNow);
+        when(mockResponse.getNextUpdate()).thenReturn(allowedSkewAfterNow);
+        assertThatCode(() -> validateCertificateStatusUpdateTime(mockResponse))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenThisUpdateHalfHourBeforeNow_thenThrows() {
+        final SingleResp mockResponse = mock(SingleResp.class);
+        var now = Instant.now();
+        var halfHourBeforeNow = Date.from(now.minus(30, ChronoUnit.MINUTES));
+        when(mockResponse.getThisUpdate()).thenReturn(halfHourBeforeNow);
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
-                validateCertificateStatusUpdateTime(mockResponse, producedAt))
+                validateCertificateStatusUpdateTime(mockResponse))
             .withMessage("User certificate revocation check has failed: "
                 + "Certificate status update time check failed: "
-                + "notAllowedBefore: 2021-09-01 23:45:00 UTC, "
-                + "notAllowedAfter: 2021-09-02 00:15:00 UTC, "
-                + "thisUpdate: 2021-09-01 00:00:00 UTC, "
+                + getNotAllowedBeforeAndAfter()
+                + "thisUpdate: " + toUtcString(halfHourBeforeNow) + ", "
                 + "nextUpdate: null");
     }
 
     @Test
-    void whenThisUpdateDayAfterProducedAt_thenThrows() throws Exception {
+    void whenThisUpdateHalfHourAfterNow_thenThrows() {
         final SingleResp mockResponse = mock(SingleResp.class);
-        when(mockResponse.getThisUpdate()).thenReturn(Dates.create("2021-09-02"));
-        final Date producedAt = Dates.create("2021-09-01");
+        var now = Instant.now();
+        var halfHourAfterNow = Date.from(now.plus(30, ChronoUnit.MINUTES));
+        when(mockResponse.getThisUpdate()).thenReturn(halfHourAfterNow);
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
-                validateCertificateStatusUpdateTime(mockResponse, producedAt))
+                validateCertificateStatusUpdateTime(mockResponse))
             .withMessage("User certificate revocation check has failed: "
                 + "Certificate status update time check failed: "
-                + "notAllowedBefore: 2021-08-31 23:45:00 UTC, "
-                + "notAllowedAfter: 2021-09-01 00:15:00 UTC, "
-                + "thisUpdate: 2021-09-02 00:00:00 UTC, "
+                + getNotAllowedBeforeAndAfter()
+                + "thisUpdate: " + toUtcString(halfHourAfterNow) + ", "
                 + "nextUpdate: null");
     }
 
     @Test
-    void whenNextUpdateDayBeforeProducedAt_thenThrows() throws Exception {
+    void whenNextUpdateHalfHourBeforeNow_thenThrows() {
         final SingleResp mockResponse = mock(SingleResp.class);
-        when(mockResponse.getThisUpdate()).thenReturn(Dates.create("2021-09-02"));
-        when(mockResponse.getNextUpdate()).thenReturn(Dates.create("2021-09-01"));
-        final Date producedAt = Dates.create("2021-09-02");
+        var now = Instant.now();
+        var allowedSkewBeforeNow = Date.from(now.minus(ALLOWED_TIME_SKEW_MILLIS + 1000, ChronoUnit.MILLIS));
+        var halfHourBeforeNow = Date.from(now.minus(30, ChronoUnit.MINUTES));
+        when(mockResponse.getThisUpdate()).thenReturn(allowedSkewBeforeNow);
+        when(mockResponse.getNextUpdate()).thenReturn(halfHourBeforeNow);
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
-                validateCertificateStatusUpdateTime(mockResponse, producedAt))
+                validateCertificateStatusUpdateTime(mockResponse))
             .withMessage("User certificate revocation check has failed: "
                 + "Certificate status update time check failed: "
-                + "notAllowedBefore: 2021-09-01 23:45:00 UTC, "
-                + "notAllowedAfter: 2021-09-02 00:15:00 UTC, "
-                + "thisUpdate: 2021-09-02 00:00:00 UTC, "
-                + "nextUpdate: 2021-09-01 00:00:00 UTC");
+                + getNotAllowedBeforeAndAfter()
+                + "thisUpdate: " + toUtcString(allowedSkewBeforeNow) + ", "
+                + "nextUpdate: " + toUtcString(halfHourBeforeNow));
+    }
+
+    private static String getNotAllowedBeforeAndAfter() {
+        final var now = Instant.now();
+        final var notAllowedBefore = new Date(now.toEpochMilli() - ALLOWED_TIME_SKEW_MILLIS);
+        final var notAllowedAfter = new Date(now.toEpochMilli() + ALLOWED_TIME_SKEW_MILLIS);
+        return "notAllowedBefore: " + toUtcString(notAllowedBefore) + ", "
+            + "notAllowedAfter: " + toUtcString(notAllowedAfter) + ", ";
     }
 
 }
