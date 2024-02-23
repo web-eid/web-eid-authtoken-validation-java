@@ -166,7 +166,7 @@ public final class SubjectCertificateNotRevokedValidator {
         //      be available about the status of the certificate (nextUpdate) is
         //      greater than the current time.
 
-        OcspResponseValidator.validateCertificateStatusUpdateTime(certStatusResponse, producedAt);
+        OcspResponseValidator.validateCertificateStatusUpdateTime(certStatusResponse);
 
         // Now we can accept the signed response as valid and validate the certificate status.
         OcspResponseValidator.validateSubjectCertificateStatus(certStatusResponse);
