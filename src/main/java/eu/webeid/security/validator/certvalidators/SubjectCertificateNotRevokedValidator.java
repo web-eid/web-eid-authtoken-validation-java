@@ -24,7 +24,11 @@ package eu.webeid.security.validator.certvalidators;
 
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
-import eu.webeid.security.validator.ocsp.*;
+import eu.webeid.security.validator.ocsp.DigestCalculatorImpl;
+import eu.webeid.security.validator.ocsp.OcspClient;
+import eu.webeid.security.validator.ocsp.OcspRequestBuilder;
+import eu.webeid.security.validator.ocsp.OcspResponseValidator;
+import eu.webeid.security.validator.ocsp.OcspServiceProvider;
 import eu.webeid.security.validator.ocsp.service.OcspService;
 import org.bouncycastle.asn1.ocsp.OCSPObjectIdentifiers;
 import org.bouncycastle.asn1.ocsp.OCSPResponseStatus;
@@ -41,10 +45,6 @@ import org.bouncycastle.operator.DigestCalculator;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import eu.webeid.security.validator.ocsp.Digester;
-import eu.webeid.security.validator.ocsp.OcspClient;
-import eu.webeid.security.validator.ocsp.OcspRequestBuilder;
-import eu.webeid.security.validator.ocsp.OcspServiceProvider;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -58,7 +58,7 @@ import java.util.Objects;
 public final class SubjectCertificateNotRevokedValidator {
 
     private static final Logger LOG = LoggerFactory.getLogger(SubjectCertificateNotRevokedValidator.class);
-    private static final DigestCalculator DIGEST_CALCULATOR = Digester.sha1();
+    private static final DigestCalculator DIGEST_CALCULATOR = DigestCalculatorImpl.sha1();
 
     private final SubjectCertificateTrustedValidator trustValidator;
     private final OcspClient ocspClient;
@@ -86,10 +86,6 @@ public final class SubjectCertificateNotRevokedValidator {
         try {
             OcspService ocspService = ocspServiceProvider.getService(subjectCertificate);
 
-            if (!ocspService.doesSupportNonce()) {
-                LOG.debug("Disabling OCSP nonce extension");
-            }
-
             final CertificateID certificateId = getCertificateId(subjectCertificate,
                 Objects.requireNonNull(trustValidator.getSubjectCertificateIssuerCertificate()));
 
@@ -97,6 +93,10 @@ public final class SubjectCertificateNotRevokedValidator {
                 .withCertificateId(certificateId)
                 .enableOcspNonce(ocspService.doesSupportNonce())
                 .build();
+
+            if (!ocspService.doesSupportNonce()) {
+                LOG.debug("Disabling OCSP nonce extension");
+            }
 
             LOG.debug("Sending OCSP request");
             final OCSPResp response = Objects.requireNonNull(ocspClient.request(ocspService.getAccessLocation(), request));
