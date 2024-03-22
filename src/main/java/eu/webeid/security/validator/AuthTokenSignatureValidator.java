@@ -25,11 +25,12 @@ import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.AuthTokenParseException;
 import eu.webeid.security.exceptions.AuthTokenSignatureValidationException;
 import eu.webeid.security.exceptions.ChallengeNullOrEmptyException;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.impl.crypto.DefaultSignatureValidatorFactory;
-import io.jsonwebtoken.impl.crypto.SignatureValidator;
-import io.jsonwebtoken.security.SignatureException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.impl.security.DefaultVerifySecureDigestRequest;
+import io.jsonwebtoken.security.SignatureAlgorithm;
+import io.jsonwebtoken.security.VerifySecureDigestRequest;
 
+import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -73,25 +74,20 @@ public class AuthTokenSignatureValidator {
             throw new AuthTokenParseException("Unsupported signature algorithm");
         }
 
-        SignatureAlgorithm signatureAlgorithm;
+        final SignatureAlgorithm signatureAlgorithm = (SignatureAlgorithm) Jwts.SIG.get().forKey(algorithm);
+        if (signatureAlgorithm == null) {
+            // Should not happen, see ALLOWED_SIGNATURE_ALGORITHMS check above.
+            throw new AuthTokenParseException("JJWT does not support signature algorithm: " + algorithm);
+        }
         MessageDigest hashAlgorithm;
         try {
-            signatureAlgorithm = SignatureAlgorithm.forName(algorithm);
             hashAlgorithm = hashAlgorithmForName(algorithm);
-        } catch (SignatureException e) {
-            // Should not happen, see ALLOWED_SIGNATURE_ALGORITHMS check above.
-            throw new AuthTokenParseException("Invalid signature algorithm", e);
         } catch (NoSuchAlgorithmException e) {
+            // Should not happen, see ALLOWED_SIGNATURE_ALGORITHMS check above.
             throw new AuthTokenParseException("Invalid hash algorithm", e);
         }
-        if (signatureAlgorithm == null || signatureAlgorithm == SignatureAlgorithm.NONE) {
-            // Should not happen, see ALLOWED_SIGNATURE_ALGORITHMS check above.
-            throw new AuthTokenParseException("Invalid signature algorithm");
-        }
         Objects.requireNonNull(hashAlgorithm, "hashAlgorithm");
-        signatureAlgorithm.assertValidVerificationKey(publicKey);
-        final SignatureValidator signatureValidator = DefaultSignatureValidatorFactory.INSTANCE
-            .createSignatureValidator(signatureAlgorithm, publicKey);
+
         final byte[] decodedSignature = decodeBase64(signature);
 
         final byte[] originHash = hashAlgorithm.digest(originBytes);
@@ -100,9 +96,13 @@ public class AuthTokenSignatureValidator {
 
         // Note that in case of ECDSA, the eID card outputs raw R||S, but JCA's SHA384withECDSA signature
         // validation implementation requires the signature in DER encoding.
-        // JJWT's EllipticCurveProvider.transcodeSignatureToDER() internally takes care of transcoding
-        // raw R||S to DER as needed inside EllipticCurveProvider.isValid().
-        if (!signatureValidator.isValid(concatSignedFields, decodedSignature)) {
+        // JJWT internally takes care of transcoding raw R||S to DER as needed.
+        final VerifySecureDigestRequest<PublicKey> verificationRequest =
+            new DefaultVerifySecureDigestRequest<>(
+                new ByteArrayInputStream(concatSignedFields),
+                null, null,
+                publicKey, decodedSignature);
+        if (!signatureAlgorithm.verify(verificationRequest)) {
             throw new AuthTokenSignatureValidationException();
         }
     }
