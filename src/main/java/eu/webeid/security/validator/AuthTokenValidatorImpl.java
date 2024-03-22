@@ -23,6 +23,7 @@
 package eu.webeid.security.validator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.certificate.CertificateLoader;
 import eu.webeid.security.certificate.CertificateValidator;
@@ -57,7 +58,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
     private static final int TOKEN_MAX_LENGTH = 10000;
     private static final Logger LOG = LoggerFactory.getLogger(AuthTokenValidatorImpl.class);
 
-    private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final ObjectReader OBJECT_READER = new ObjectMapper().readerFor(WebEidAuthToken.class);
 
     private final AuthTokenValidationConfiguration configuration;
     private final SubjectCertificateValidatorBatch simpleSubjectCertificateValidators;
@@ -138,7 +139,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
 
     private WebEidAuthToken parseToken(String authToken) throws AuthTokenParseException {
         try {
-            final WebEidAuthToken token = objectMapper.readValue(authToken, WebEidAuthToken.class);
+            final WebEidAuthToken token = OBJECT_READER.readValue(authToken);
             if (token == null) {
                 throw new AuthTokenParseException("Web eID authentication token is null");
             }

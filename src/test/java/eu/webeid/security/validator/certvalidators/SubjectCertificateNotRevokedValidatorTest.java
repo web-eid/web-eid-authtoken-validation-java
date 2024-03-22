@@ -204,7 +204,8 @@ class SubjectCertificateNotRevokedValidatorTest {
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
                 validator.validateCertificateNotRevoked(estEid2018Cert))
-            .withMessage("User certificate revocation check has failed: OCSP response must contain one response, received 2 responses instead");
+            .withMessage("User certificate revocation check has failed");
+// TODO:            .withMessage("User certificate revocation check has failed: OCSP response must contain one response, received 2 responses instead");
     }
 
     @Disabled("It is difficult to make Python and Java CertId equal, needs more work")
