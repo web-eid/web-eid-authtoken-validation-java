@@ -36,13 +36,12 @@ import java.security.SecureRandom;
 import java.util.Objects;
 
 /**
- * This is a simplified version of Bouncy Castle's {@link OCSPReqBuilder}.
- *
- * @see OCSPReqBuilder
+ * This is a wrapper around Bouncy Castle's {@link OCSPReqBuilder} that
+ * adds the OCSP nonce extension to the request if needed.
  */
 public final class OcspRequestBuilder {
 
-    private static final SecureRandom GENERATOR = new SecureRandom();
+    private static final SecureRandom RANDOM_GENERATOR = new SecureRandom();
 
     private boolean ocspNonceEnabled = true;
     private CertificateID certificateId;
@@ -69,7 +68,7 @@ public final class OcspRequestBuilder {
             try {
                 addNonce(builder);
             } catch (IOException e) {
-                throw new OCSPException("Failed to generate OCSP NONCE extension", e);
+                throw new OCSPException("Failed to generate OCSP nonce extension", e);
             }
         }
 
@@ -78,10 +77,11 @@ public final class OcspRequestBuilder {
 
     private void addNonce(OCSPReqBuilder builder) throws IOException {
         final byte[] nonce = new byte[32];
-        GENERATOR.nextBytes(nonce);
+        RANDOM_GENERATOR.nextBytes(nonce);
 
         final Extension[] extensions = new Extension[]{
             new Extension(OCSPObjectIdentifiers.id_pkix_ocsp_nonce, false,
+                // Follow OpenSSL OCSP nonce encoding convention and add double octet string header.
                 new DEROctetString(new DEROctetString(nonce)))
         };
         builder.setRequestExtensions(new Extensions(extensions));
