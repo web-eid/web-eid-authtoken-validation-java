@@ -32,9 +32,9 @@ import java.net.URISyntaxException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 
 import static eu.webeid.security.util.Collections.newHashSet;
 import static eu.webeid.security.util.DateAndTime.requirePositiveDuration;
@@ -48,6 +48,8 @@ public final class AuthTokenValidationConfiguration {
     private Collection<X509Certificate> trustedCACertificates = new HashSet<>();
     private boolean isUserCertificateRevocationCheckWithOcspEnabled = true;
     private Duration ocspRequestTimeout = Duration.ofSeconds(5);
+    private Duration allowedOcspResponseTimeSkew = Duration.ofMinutes(15);
+    private Duration maxOcspResponseThisUpdateAge = Duration.ofMinutes(2);
     private DesignatedOcspServiceConfiguration designatedOcspServiceConfiguration;
     // Don't allow Estonian Mobile-ID policy by default.
     private Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies = newHashSet(
@@ -63,12 +65,14 @@ public final class AuthTokenValidationConfiguration {
 
     private AuthTokenValidationConfiguration(AuthTokenValidationConfiguration other) {
         this.siteOrigin = other.siteOrigin;
-        this.trustedCACertificates = Collections.unmodifiableSet(new HashSet<>(other.trustedCACertificates));
+        this.trustedCACertificates = Set.copyOf(other.trustedCACertificates);
         this.isUserCertificateRevocationCheckWithOcspEnabled = other.isUserCertificateRevocationCheckWithOcspEnabled;
         this.ocspRequestTimeout = other.ocspRequestTimeout;
+        this.allowedOcspResponseTimeSkew = other.allowedOcspResponseTimeSkew;
+        this.maxOcspResponseThisUpdateAge = other.maxOcspResponseThisUpdateAge;
         this.designatedOcspServiceConfiguration = other.designatedOcspServiceConfiguration;
-        this.disallowedSubjectCertificatePolicies = Collections.unmodifiableSet(new HashSet<>(other.disallowedSubjectCertificatePolicies));
-        this.nonceDisabledOcspUrls = Collections.unmodifiableSet(new HashSet<>(other.nonceDisabledOcspUrls));
+        this.disallowedSubjectCertificatePolicies = Set.copyOf(other.disallowedSubjectCertificatePolicies);
+        this.nonceDisabledOcspUrls = Set.copyOf(other.nonceDisabledOcspUrls);
     }
 
     void setSiteOrigin(URI siteOrigin) {
@@ -97,6 +101,22 @@ public final class AuthTokenValidationConfiguration {
 
     void setOcspRequestTimeout(Duration ocspRequestTimeout) {
         this.ocspRequestTimeout = ocspRequestTimeout;
+    }
+
+    public Duration getAllowedOcspResponseTimeSkew() {
+        return allowedOcspResponseTimeSkew;
+    }
+
+    public void setAllowedOcspResponseTimeSkew(Duration allowedOcspResponseTimeSkew) {
+        this.allowedOcspResponseTimeSkew = allowedOcspResponseTimeSkew;
+    }
+
+    public Duration getMaxOcspResponseThisUpdateAge() {
+        return maxOcspResponseThisUpdateAge;
+    }
+
+    public void setMaxOcspResponseThisUpdateAge(Duration maxOcspResponseThisUpdateAge) {
+        this.maxOcspResponseThisUpdateAge = maxOcspResponseThisUpdateAge;
     }
 
     public DesignatedOcspServiceConfiguration getDesignatedOcspServiceConfiguration() {
@@ -128,6 +148,8 @@ public final class AuthTokenValidationConfiguration {
             throw new IllegalArgumentException("At least one trusted certificate authority must be provided");
         }
         requirePositiveDuration(ocspRequestTimeout, "OCSP request timeout");
+        requirePositiveDuration(allowedOcspResponseTimeSkew, "Allowed OCSP response time-skew");
+        requirePositiveDuration(maxOcspResponseThisUpdateAge, "Max OCSP response thisUpdate age");
     }
 
     AuthTokenValidationConfiguration copy() {

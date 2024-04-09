@@ -23,9 +23,9 @@
 package eu.webeid.security.certificate;
 
 import eu.webeid.security.exceptions.CertificateExpiredException;
+import eu.webeid.security.exceptions.CertificateNotTrustedException;
 import eu.webeid.security.exceptions.CertificateNotYetValidException;
 import eu.webeid.security.exceptions.JceException;
-import eu.webeid.security.exceptions.CertificateNotTrustedException;
 
 import java.security.GeneralSecurityException;
 import java.security.InvalidAlgorithmParameterException;
@@ -40,7 +40,6 @@ import java.security.cert.TrustAnchor;
 import java.security.cert.X509CertSelector;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Date;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -91,9 +90,8 @@ public final class CertificateValidator {
     }
 
     public static Set<TrustAnchor> buildTrustAnchorsFromCertificates(Collection<X509Certificate> certificates) {
-        return Collections.unmodifiableSet(certificates.stream()
-            .map(cert -> new TrustAnchor(cert, null))
-            .collect(Collectors.toSet()));
+        return certificates.stream()
+            .map(cert -> new TrustAnchor(cert, null)).collect(Collectors.toUnmodifiableSet());
     }
 
     public static CertStore buildCertStoreFromCertificates(Collection<X509Certificate> certificates) throws JceException {
