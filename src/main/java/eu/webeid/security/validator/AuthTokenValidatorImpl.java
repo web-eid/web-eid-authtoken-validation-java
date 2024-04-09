@@ -27,9 +27,9 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.certificate.CertificateLoader;
 import eu.webeid.security.certificate.CertificateValidator;
-import eu.webeid.security.exceptions.JceException;
-import eu.webeid.security.exceptions.AuthTokenParseException;
 import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.exceptions.AuthTokenParseException;
+import eu.webeid.security.exceptions.JceException;
 import eu.webeid.security.validator.certvalidators.SubjectCertificateExpiryValidator;
 import eu.webeid.security.validator.certvalidators.SubjectCertificateNotRevokedValidator;
 import eu.webeid.security.validator.certvalidators.SubjectCertificatePolicyValidator;
@@ -64,10 +64,8 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
     private final SubjectCertificateValidatorBatch simpleSubjectCertificateValidators;
     private final Set<TrustAnchor> trustedCACertificateAnchors;
     private final CertStore trustedCACertificateCertStore;
-    // OcspClient uses OkHttp internally.
-    // OkHttp performs best when a single OkHttpClient instance is created and reused for all HTTP calls.
-    // This is because each client holds its own connection pool and thread pools.
-    // Reusing connections and threads reduces latency and saves memory.
+    // OcspClient uses built-in HttpClient internally by default.
+    // A single HttpClient instance is reused for all HTTP calls to utilize connection and thread pools.
     private OcspClient ocspClient;
     private OcspServiceProvider ocspServiceProvider;
     private final AuthTokenSignatureValidator authTokenSignatureValidator;
@@ -186,7 +184,11 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         return SubjectCertificateValidatorBatch.createFrom(
             certTrustedValidator::validateCertificateTrusted
         ).addOptional(configuration.isUserCertificateRevocationCheckWithOcspEnabled(),
-            new SubjectCertificateNotRevokedValidator(certTrustedValidator, ocspClient, ocspServiceProvider)::validateCertificateNotRevoked
+            new SubjectCertificateNotRevokedValidator(certTrustedValidator,
+                ocspClient, ocspServiceProvider,
+                configuration.getAllowedOcspResponseTimeSkew(),
+                configuration.getMaxOcspResponseThisUpdateAge()
+            )::validateCertificateNotRevoked
         );
     }
 

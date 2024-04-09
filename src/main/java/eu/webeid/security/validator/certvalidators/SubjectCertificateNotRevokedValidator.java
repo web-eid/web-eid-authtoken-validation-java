@@ -52,6 +52,7 @@ import java.security.Security;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.Date;
 import java.util.Objects;
 
@@ -63,6 +64,8 @@ public final class SubjectCertificateNotRevokedValidator {
     private final SubjectCertificateTrustedValidator trustValidator;
     private final OcspClient ocspClient;
     private final OcspServiceProvider ocspServiceProvider;
+    private final Duration allowedOcspResponseTimeSkew;
+    private final Duration maxOcspResponseThisUpdateAge;
 
     static {
         Security.addProvider(new BouncyCastleProvider());
@@ -70,10 +73,14 @@ public final class SubjectCertificateNotRevokedValidator {
 
     public SubjectCertificateNotRevokedValidator(SubjectCertificateTrustedValidator trustValidator,
                                                  OcspClient ocspClient,
-                                                 OcspServiceProvider ocspServiceProvider) {
+                                                 OcspServiceProvider ocspServiceProvider,
+                                                 Duration allowedOcspResponseTimeSkew,
+                                                 Duration maxOcspResponseThisUpdateAge) {
         this.trustValidator = trustValidator;
         this.ocspClient = ocspClient;
         this.ocspServiceProvider = ocspServiceProvider;
+        this.allowedOcspResponseTimeSkew = allowedOcspResponseTimeSkew;
+        this.maxOcspResponseThisUpdateAge = maxOcspResponseThisUpdateAge;
     }
 
     /**
@@ -166,7 +173,7 @@ public final class SubjectCertificateNotRevokedValidator {
         //      be available about the status of the certificate (nextUpdate) is
         //      greater than the current time.
 
-        OcspResponseValidator.validateCertificateStatusUpdateTime(certStatusResponse);
+        OcspResponseValidator.validateCertificateStatusUpdateTime(certStatusResponse, allowedOcspResponseTimeSkew, maxOcspResponseThisUpdateAge);
 
         // Now we can accept the signed response as valid and validate the certificate status.
         OcspResponseValidator.validateSubjectCertificateStatus(certStatusResponse);

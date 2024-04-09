@@ -57,6 +57,7 @@ import static eu.webeid.security.testutil.Certificates.getTestEsteid2018CA;
 import static eu.webeid.security.testutil.DateMocker.mockDate;
 import static eu.webeid.security.testutil.OcspServiceMaker.getAiaOcspServiceProvider;
 import static eu.webeid.security.testutil.OcspServiceMaker.getDesignatedOcspServiceProvider;
+import static eu.webeid.security.validator.AuthTokenValidatorBuilderTest.CONFIGURATION;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.Mockito.mock;
@@ -88,7 +89,7 @@ class SubjectCertificateNotRevokedValidatorTest {
     @Disabled("As new designated test OCSP responder certificates are issued more frequently now, it is no longer feasible to keep the certificates up to date")
     void whenValidDesignatedOcspResponderConfiguration_thenSucceeds() throws Exception {
         final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider();
-        final SubjectCertificateNotRevokedValidator validator = new SubjectCertificateNotRevokedValidator(trustedValidator, ocspClient, ocspServiceProvider);
+        final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidator(ocspServiceProvider);
         assertThatCode(() ->
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .doesNotThrowAnyException();
@@ -98,7 +99,7 @@ class SubjectCertificateNotRevokedValidatorTest {
     @Disabled("As new designated test OCSP responder certificates are issued more frequently now, it is no longer feasible to keep the certificates up to date")
     void whenValidOcspNonceDisabledConfiguration_thenSucceeds() throws Exception {
         final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider(false);
-        final SubjectCertificateNotRevokedValidator validator = new SubjectCertificateNotRevokedValidator(trustedValidator, ocspClient, ocspServiceProvider);
+        final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidator(ocspServiceProvider);
         assertThatCode(() ->
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .doesNotThrowAnyException();
@@ -107,7 +108,7 @@ class SubjectCertificateNotRevokedValidatorTest {
     @Test
     void whenOcspUrlIsInvalid_thenThrows() throws Exception {
         final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider("http://invalid.invalid");
-        final SubjectCertificateNotRevokedValidator validator = new SubjectCertificateNotRevokedValidator(trustedValidator, ocspClient, ocspServiceProvider);
+        final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidator(ocspServiceProvider);
         assertThatCode(() ->
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
@@ -118,7 +119,7 @@ class SubjectCertificateNotRevokedValidatorTest {
     @Test
     void whenOcspRequestFails_thenThrows() throws Exception {
         final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider("http://demo.sk.ee/ocsps");
-        final SubjectCertificateNotRevokedValidator validator = new SubjectCertificateNotRevokedValidator(trustedValidator, ocspClient, ocspServiceProvider);
+        final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidator(ocspServiceProvider);
         assertThatCode(() ->
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
@@ -326,8 +327,12 @@ class SubjectCertificateNotRevokedValidatorTest {
         return getSubjectCertificateNotRevokedValidator(getMockClient(response), getAiaOcspServiceProvider());
     }
 
+    private SubjectCertificateNotRevokedValidator getSubjectCertificateNotRevokedValidator(OcspServiceProvider ocspServiceProvider) throws JceException {
+        return getSubjectCertificateNotRevokedValidator(ocspClient, ocspServiceProvider);
+    }
+
     private SubjectCertificateNotRevokedValidator getSubjectCertificateNotRevokedValidator(OcspClient client, OcspServiceProvider ocspServiceProvider) throws JceException {
-        return new SubjectCertificateNotRevokedValidator(trustedValidator, client, ocspServiceProvider);
+        return new SubjectCertificateNotRevokedValidator(trustedValidator, client, ocspServiceProvider, CONFIGURATION.getAllowedOcspResponseTimeSkew(), CONFIGURATION.getMaxOcspResponseThisUpdateAge());
     }
 
     private static void setSubjectCertificateIssuerCertificate(SubjectCertificateTrustedValidator trustedValidator) throws NoSuchFieldException, IllegalAccessException, CertificateException, IOException {

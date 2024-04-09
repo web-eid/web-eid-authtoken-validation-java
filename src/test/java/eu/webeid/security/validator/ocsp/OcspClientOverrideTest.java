@@ -52,7 +52,7 @@ class OcspClientOverrideTest extends AbstractTestWithValidator {
 
     @Test
     @Disabled("Demonstrates how to configure the built-in HttpClient instance for OcspClientImpl")
-    void whenOkHttpOcspClientIsExtended_thenOcspCallSucceeds() throws JceException, CertificateException, IOException {
+    void whenOcspClientIsConfiguredWithCustomHttpClient_thenOcspCallSucceeds() throws JceException, CertificateException, IOException {
         final AuthTokenValidator validator = AuthTokenValidators.getAuthTokenValidatorWithOverriddenOcspClient(
             new OcspClientImpl(HttpClient.newBuilder().build(), Duration.ofSeconds(5))
         );

@@ -26,12 +26,12 @@ import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 import org.bouncycastle.cert.ocsp.SingleResp;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
-import static eu.webeid.security.validator.ocsp.OcspResponseValidator.ALLOWED_TIME_SKEW_MILLIS;
-import static eu.webeid.security.validator.ocsp.OcspResponseValidator.toUtcString;
+import static eu.webeid.security.validator.AuthTokenValidatorBuilderTest.CONFIGURATION;
 import static eu.webeid.security.validator.ocsp.OcspResponseValidator.validateCertificateStatusUpdateTime;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -40,16 +40,35 @@ import static org.mockito.Mockito.when;
 
 class OcspResponseValidatorTest {
 
+    private static final Duration TIME_SKEW = CONFIGURATION.getAllowedOcspResponseTimeSkew();
+    private static final Duration THIS_UPDATE_AGE = CONFIGURATION.getMaxOcspResponseThisUpdateAge();
+
     @Test
     void whenThisAndNextUpdateWithinSkew_thenValidationSucceeds() {
         final SingleResp mockResponse = mock(SingleResp.class);
         var now = Instant.now();
-        var allowedSkewBeforeNow = Date.from(now.minus(ALLOWED_TIME_SKEW_MILLIS + 1000, ChronoUnit.MILLIS));
-        var allowedSkewAfterNow = Date.from(now.minus(ALLOWED_TIME_SKEW_MILLIS - 1000, ChronoUnit.MILLIS));
-        when(mockResponse.getThisUpdate()).thenReturn(allowedSkewBeforeNow);
-        when(mockResponse.getNextUpdate()).thenReturn(allowedSkewAfterNow);
-        assertThatCode(() -> validateCertificateStatusUpdateTime(mockResponse))
+        var thisUpdateWithinAgeLimit = getThisUpdateWithinAgeLimit(now);
+        var nextUpdateWithinAgeLimit = Date.from(now.minus(THIS_UPDATE_AGE.minusSeconds(2)));
+        when(mockResponse.getThisUpdate()).thenReturn(thisUpdateWithinAgeLimit);
+        when(mockResponse.getNextUpdate()).thenReturn(nextUpdateWithinAgeLimit);
+        assertThatCode(() -> validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE))
             .doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenNextUpdateBeforeThisUpdate_thenThrows() {
+        final SingleResp mockResponse = mock(SingleResp.class);
+        var now = Instant.now();
+        var thisUpdateWithinAgeLimit = getThisUpdateWithinAgeLimit(now);
+        var beforeThisUpdate = new Date(thisUpdateWithinAgeLimit.getTime() - 1000);
+        when(mockResponse.getThisUpdate()).thenReturn(thisUpdateWithinAgeLimit);
+        when(mockResponse.getNextUpdate()).thenReturn(beforeThisUpdate);
+        assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
+            .isThrownBy(() ->
+                validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE))
+            .withMessageStartingWith("User certificate revocation check has failed: "
+                + "Certificate status update time check failed: "
+                + "nextUpdate '" + beforeThisUpdate.toInstant() + "' is before thisUpdate '" + thisUpdateWithinAgeLimit.toInstant() + "'");
     }
 
     @Test
@@ -60,12 +79,10 @@ class OcspResponseValidatorTest {
         when(mockResponse.getThisUpdate()).thenReturn(halfHourBeforeNow);
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
-                validateCertificateStatusUpdateTime(mockResponse))
-            .withMessage("User certificate revocation check has failed: "
+                validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE))
+            .withMessageStartingWith("User certificate revocation check has failed: "
                 + "Certificate status update time check failed: "
-                + getNotAllowedBeforeAndAfter()
-                + "thisUpdate: " + toUtcString(halfHourBeforeNow) + ", "
-                + "nextUpdate: null");
+                + "thisUpdate '" + halfHourBeforeNow.toInstant() + "' is too old, minimum time allowed: ");
     }
 
     @Test
@@ -76,38 +93,30 @@ class OcspResponseValidatorTest {
         when(mockResponse.getThisUpdate()).thenReturn(halfHourAfterNow);
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
-                validateCertificateStatusUpdateTime(mockResponse))
-            .withMessage("User certificate revocation check has failed: "
+                validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE))
+            .withMessageStartingWith("User certificate revocation check has failed: "
                 + "Certificate status update time check failed: "
-                + getNotAllowedBeforeAndAfter()
-                + "thisUpdate: " + toUtcString(halfHourAfterNow) + ", "
-                + "nextUpdate: null");
+                + "thisUpdate '" + halfHourAfterNow.toInstant() + "' is too far in the future, latest allowed: ");
     }
 
     @Test
     void whenNextUpdateHalfHourBeforeNow_thenThrows() {
         final SingleResp mockResponse = mock(SingleResp.class);
         var now = Instant.now();
-        var allowedSkewBeforeNow = Date.from(now.minus(ALLOWED_TIME_SKEW_MILLIS + 1000, ChronoUnit.MILLIS));
+        var thisUpdateWithinAgeLimit = getThisUpdateWithinAgeLimit(now);
         var halfHourBeforeNow = Date.from(now.minus(30, ChronoUnit.MINUTES));
-        when(mockResponse.getThisUpdate()).thenReturn(allowedSkewBeforeNow);
+        when(mockResponse.getThisUpdate()).thenReturn(thisUpdateWithinAgeLimit);
         when(mockResponse.getNextUpdate()).thenReturn(halfHourBeforeNow);
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
-                validateCertificateStatusUpdateTime(mockResponse))
+                validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE))
             .withMessage("User certificate revocation check has failed: "
                 + "Certificate status update time check failed: "
-                + getNotAllowedBeforeAndAfter()
-                + "thisUpdate: " + toUtcString(allowedSkewBeforeNow) + ", "
-                + "nextUpdate: " + toUtcString(halfHourBeforeNow));
+                + "nextUpdate '" + halfHourBeforeNow.toInstant() + "' is in the past");
     }
 
-    private static String getNotAllowedBeforeAndAfter() {
-        final var now = Instant.now();
-        final var notAllowedBefore = new Date(now.toEpochMilli() - ALLOWED_TIME_SKEW_MILLIS);
-        final var notAllowedAfter = new Date(now.toEpochMilli() + ALLOWED_TIME_SKEW_MILLIS);
-        return "notAllowedBefore: " + toUtcString(notAllowedBefore) + ", "
-            + "notAllowedAfter: " + toUtcString(notAllowedAfter) + ", ";
+    private static Date getThisUpdateWithinAgeLimit(Instant now) {
+        return Date.from(now.minus(THIS_UPDATE_AGE.minusSeconds(1)));
     }
 
 }

@@ -89,6 +89,10 @@ public final class AuthTokenValidators {
             .build();
     }
 
+    public static AuthTokenValidatorBuilder getDefaultAuthTokenValidatorBuilder() throws CertificateException, IOException {
+        return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, getCACertificates());
+    }
+
     private static AuthTokenValidatorBuilder getAuthTokenValidatorBuilder(String uri, X509Certificate[] certificates) {
         return new AuthTokenValidatorBuilder()
             .withSiteOrigin(URI.create(uri))
