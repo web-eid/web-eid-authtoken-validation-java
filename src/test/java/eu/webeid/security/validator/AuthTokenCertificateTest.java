@@ -46,6 +46,7 @@ import org.mockito.MockedStatic;
 import java.security.cert.CertificateException;
 
 import static eu.webeid.security.testutil.DateMocker.mockDate;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mockStatic;
 
@@ -228,13 +229,14 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
             .hasMessage("User certificate is not yet valid");
     }
 
+    // In this case both CA and user certificate are not yet valid, we expect the user certificate to be checked first.
     @Test
-    void whenTrustedCACertificateIsNotYetValid_thenValidationFails() {
+    void whenTrustedCACertificateIsNotYetValid_thenUserCertValidationFails() {
         mockDate("2018-08-17", mockedClock);
         assertThatThrownBy(() -> validator
             .validate(validAuthToken, VALID_CHALLENGE_NONCE))
             .isInstanceOf(CertificateNotYetValidException.class)
-            .hasMessage("Trusted CA certificate is not yet valid");
+            .hasMessage("User certificate is not yet valid");
     }
 
     @Test
@@ -246,13 +248,26 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
             .hasMessage("User certificate has expired");
     }
 
+    // In this case both CA and user certificate have expired, we expect the user certificate to be checked first.
     @Test
-    void whenTrustedCACertificateIsNoLongerValid_thenValidationFails() {
+    void whenTrustedCACertificateIsNoLongerValid_thenUserCertValidationFails() {
         mockDate("2033-10-19", mockedClock);
         assertThatThrownBy(() -> validator
             .validate(validAuthToken, VALID_CHALLENGE_NONCE))
             .isInstanceOf(CertificateExpiredException.class)
-            .hasMessage("Trusted CA certificate has expired");
+            .hasMessage("User certificate has expired");
+    }
+
+    // The certificate validation process must only check the expiration of the CA certificate that is directly part of
+    // the user's certificate chain. Expired but unrelated CA certificates must not cause exceptions.
+    @Test
+    void whenUnrelatedCACertificateIsExpired_thenValidationSucceeds() throws Exception {
+        mockDate("2024-07-01", mockedClock);
+        final AuthTokenValidator validatorWithExpiredUnrelatedTrustedCA = AuthTokenValidators.getAuthTokenValidatorWithJuly2024ExpiredUnrelatedTrustedCA();
+
+        assertThatCode(() -> validatorWithExpiredUnrelatedTrustedCA
+            .validate(validAuthToken, VALID_CHALLENGE_NONCE))
+            .doesNotThrowAnyException();
     }
 
     @Test

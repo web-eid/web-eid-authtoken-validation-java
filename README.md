@@ -108,8 +108,7 @@ import eu.webeid.security.certificate.CertificateLoader;
 
 ...
     private X509Certificate[] trustedIntermediateCACertificates() {
-         return CertificateLoader.loadCertificatesFromResources(
-             "cacerts/ESTEID2018.cer");
+         return CertificateLoader.loadCertificatesFromResources("cacerts/ESTEID2018.cer");
     }
 ...
 ```
@@ -128,7 +127,7 @@ import eu.webeid.security.validator.AuthTokenValidatorBuilder;
     public AuthTokenValidator tokenValidator() throws JceException {
         return new AuthTokenValidatorBuilder()
                 .withSiteOrigin("https://example.org")
-                .withTrustedCertificateAuthorities(trustedCertificateAuthorities())
+                .withTrustedCertificateAuthorities(trustedIntermediateCACertificates())
                 .build();
     }
 ...

@@ -82,6 +82,11 @@ public final class AuthTokenValidators {
             CertificateLoader.loadCertificatesFromResources("ESTEID2018.cer"));
     }
 
+    public static AuthTokenValidator getAuthTokenValidatorWithJuly2024ExpiredUnrelatedTrustedCA() throws CertificateException, JceException, IOException {
+        return getAuthTokenValidator(TOKEN_ORIGIN_URL,
+            CertificateLoader.loadCertificatesFromResources("TEST_of_ESTEID2018.cer", "TEST_of_SK_OCSP_RESPONDER_2020.cer"));
+    }
+
     public static AuthTokenValidator getAuthTokenValidatorWithDisallowedESTEIDPolicy() throws CertificateException, JceException, IOException {
         return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, getCACertificates())
             .withDisallowedCertificatePolicies(EST_IDEMIA_POLICY)

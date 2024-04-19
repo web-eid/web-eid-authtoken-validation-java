@@ -30,7 +30,6 @@ import eu.webeid.security.certificate.CertificateValidator;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.AuthTokenParseException;
 import eu.webeid.security.exceptions.JceException;
-import eu.webeid.security.validator.certvalidators.SubjectCertificateExpiryValidator;
 import eu.webeid.security.validator.certvalidators.SubjectCertificateNotRevokedValidator;
 import eu.webeid.security.validator.certvalidators.SubjectCertificatePolicyValidator;
 import eu.webeid.security.validator.certvalidators.SubjectCertificatePurposeValidator;
@@ -83,7 +82,6 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         trustedCACertificateCertStore = CertificateValidator.buildCertStoreFromCertificates(configuration.getTrustedCACertificates());
 
         simpleSubjectCertificateValidators = SubjectCertificateValidatorBatch.createFrom(
-            new SubjectCertificateExpiryValidator(trustedCACertificateAnchors)::validateCertificateExpiry,
             SubjectCertificatePurposeValidator::validateCertificatePurpose,
             new SubjectCertificatePolicyValidator(configuration.getDisallowedSubjectCertificatePolicies())::validateCertificatePolicies
         );

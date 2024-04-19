@@ -24,10 +24,12 @@ package eu.webeid.security.validator.certvalidators;
 
 import eu.webeid.security.certificate.CertificateValidator;
 import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.exceptions.CertificateExpiredException;
+import eu.webeid.security.exceptions.CertificateNotTrustedException;
+import eu.webeid.security.exceptions.CertificateNotYetValidException;
+import eu.webeid.security.util.DateAndTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import eu.webeid.security.exceptions.CertificateNotTrustedException;
-import eu.webeid.security.util.DateAndTime;
 
 import java.security.cert.CertStore;
 import java.security.cert.TrustAnchor;
@@ -49,10 +51,14 @@ public final class SubjectCertificateTrustedValidator {
     }
 
     /**
-     * Validates that the user certificate from the authentication token is signed by a trusted certificate authority.
+     * Checks that the user certificate from the authentication token is valid and signed by
+     * a trusted certificate authority. Also checks the validity of the user certificate's
+     * trusted CA certificate.
      *
      * @param subjectCertificate user certificate to be validated
-     * @throws CertificateNotTrustedException when user certificate is not signed by a trusted CA.
+     * @throws CertificateNotTrustedException when user certificate is not signed by a trusted CA
+     * @throws CertificateNotYetValidException when a CA certificate in the chain or the user certificate is not yet valid
+     * @throws CertificateExpiredException when a CA certificate in the chain or the user certificate is expired
      */
     public void validateCertificateTrusted(X509Certificate subjectCertificate) throws AuthTokenException {
         // Use the clock instance so that the date can be mocked in tests.
@@ -63,7 +69,7 @@ public final class SubjectCertificateTrustedValidator {
             trustedCACertificateCertStore,
             now
         );
-        LOG.debug("Subject certificate is signed by a trusted CA");
+        LOG.debug("Subject certificate is valid and signed by a trusted CA");
     }
 
     public X509Certificate getSubjectCertificateIssuerCertificate() {
