@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <artifactId>authtoken-validation</artifactId>
     <groupId>org.webeid.security</groupId>
-    <version>3.0.2-SNAPSHOT</version>
+    <version>3.1.0</version>
     <packaging>jar</packaging>
     <name>authtoken-validation</name>
     <description>Web eID authentication token validation library for Java</description>
@@ -13,12 +13,12 @@
     <properties>
         <java.version>11</java.version>
         <jjwt.version>0.12.5</jjwt.version>
-        <bouncycastle.version>1.78</bouncycastle.version>
-        <jackson.version>2.17.0</jackson.version>
+        <bouncycastle.version>1.78.1</bouncycastle.version>
+        <jackson.version>2.17.1</jackson.version>
         <slf4j.version>2.0.9</slf4j.version>
         <junit-jupiter.version>5.10.2</junit-jupiter.version>
         <assertj.version>3.25.3</assertj.version>
-        <mockito.version>5.11.0</mockito.version>
+        <mockito.version>5.12.0</mockito.version>
         <maven-surefire-plugin.version>2.22.2</maven-surefire-plugin.version>
         <maven-source-plugin.version>3.3.0</maven-source-plugin.version>
         <maven-javadoc-plugin.version>3.6.2</maven-javadoc-plugin.version>
