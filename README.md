@@ -23,7 +23,7 @@ Add the following lines to Maven `pom.xml` to include the Web eID authentication
 ```xml
 <dependencies>
     <dependency>
-        <groupId>org.webeid.security</groupId>
+        <groupId>eu.webeid.security</groupId>
         <artifactId>authtoken-validation</artifactId>
         <version>3.1.0</version>
     </dependency>
@@ -137,7 +137,7 @@ import eu.webeid.security.validator.AuthTokenValidatorBuilder;
 
 A REST endpoint that issues challenge nonces is required for authentication. The endpoint must support `GET` requests.
 
-In the following example, we are using the [Spring RESTful Web Services framework](https://spring.io/guides/gs/rest-service/) to implement the endpoint, see also the full implementation [here](https://github.com/web-eid/web-eid-spring-boot-example/blob/main/src/main/java/org/webeid/example/web/rest/ChallengeController.java).
+In the following example, we are using the [Spring RESTful Web Services framework](https://spring.io/guides/gs/rest-service/) to implement the endpoint, see also the full implementation [here](https://github.com/web-eid/web-eid-spring-boot-example/blob/main/src/main/java/eu/webeid/example/web/rest/ChallengeController.java).
 
 ```java
 import org.springframework.web.bind.annotation.GetMapping;
@@ -200,7 +200,7 @@ try {
 - [Challenge nonce generation](#challenge-nonce-generation)
   - [Basic usage](#basic-usage-1)
   - [Extended configuration](#extended-configuration-1)
-- [Upgrading from version 1 to version 2](#upgrading-from-version-1-to-version-2)
+- [Differences between version 1 and version 2](#differences-between-version-1-and-version-2)
 
 # Introduction
 
@@ -261,7 +261,7 @@ The website back end must lookup the challenge nonce from its local store using 
 
 As described in section *[5. Configure the authentication token validator](#5-configure-the-authentication-token-validator)*, the mandatory authentication token validator configuration parameters are the website origin and trusted certificate authorities.
 
-**Origin** must be the URL serving the web application. Origin URL must be in the form of `"https://" <hostname> [ ":" <port> ]`  as defined in [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Location/origin) and not contain path or query components. Note that the `origin` URL must not end with a slash `/`.
+**Origin** must be the URL serving the web application. Origin URL must be in the form of `"https://" <hostname> [ ":" <port> ]`  as defined in [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Location/origin) and not contain path or query components. **Note that the `origin` URL must not end with a slash `/`**.
 
 The **trusted certificate authority certificates** are used to validate that the user certificate from the authentication token and the OCSP responder certificate is signed by a trusted certificate authority. Intermediate CA certificates must be used instead of the root CA certificates so that revoked CA certificates can be removed. Trusted certificate authority certificates configuration is described in more detail in section *[4. Add trusted certificate authority certificates](#4-add-trusted-certificate-authority-certificates)*.
 
@@ -283,12 +283,12 @@ import static eu.webeid.security.util.Strings.toTitleCase;
 
 ...
     
-CertificateData.getSubjectCN(userCertificate); // "JÕEORG\\,JAAK-KRISTJAN\\,38001085718"
-CertificateData.getSubjectIdCode(userCertificate); // "PNOEE-38001085718"
-CertificateData.getSubjectCountryCode(userCertificate); // "EE"
+CertificateData.getSubjectCN(userCertificate).orElseThrow(); // "JÕEORG\\,JAAK-KRISTJAN\\,38001085718"
+CertificateData.getSubjectIdCode(userCertificate).orElseThrow(); // "PNOEE-38001085718"
+CertificateData.getSubjectCountryCode(userCertificate).orElseThrow(); // "EE"
 
-toTitleCase(CertUtil.getSubjectGivenName(userCertificate)); // "Jaak-Kristjan"
-toTitleCase(CertUtil.getSubjectSurname(userCertificate)); // "Jõeorg"
+toTitleCase(CertUtil.getSubjectGivenName(userCertificate)).orElseThrow(); // "Jaak-Kristjan"
+toTitleCase(CertUtil.getSubjectSurname(userCertificate)).orElseThrow(); // "Jõeorg"
 ```
 
 ## Extended configuration  
@@ -297,7 +297,7 @@ The following additional configuration options are available in `AuthTokenValida
 
 - `withoutUserCertificateRevocationCheckWithOcsp()` – turns off user certificate revocation check with OCSP. OCSP check is enabled by default and the OCSP responder access location URL is extracted from the user certificate AIA extension unless a designated OCSP service is activated.
 - `withDesignatedOcspServiceConfiguration(DesignatedOcspServiceConfiguration serviceConfiguration)` – activates the provided designated OCSP responder service configuration for user certificate revocation check with OCSP. The designated service is only used for checking the status of the certificates whose issuers are supported by the service, for other certificates the default AIA extension service access location will be used. See configuration examples in `testutil.OcspServiceMaker.getDesignatedOcspServiceConfiguration()`.
-- `withOcspClient(OcspClient ocspClient)` - uses the provided OCSP client instance during user certificate revocation check with OCSP. The provided client instance must be thread-safe. This gives the possibility to either configure the request timeouts, proxies etc of the `OkHttpClient` instance used by `OkHttpOcspClient` or provide an implementation that uses an altogether different HTTP client, for example the built-in `HttpClient` provided by Java 9+. See examples in `OcspClientOverrideTest`.
+- `withOcspClient(OcspClient ocspClient)` - uses the provided OCSP client instance during user certificate revocation check with OCSP. The provided client instance must be thread-safe. This gives the possibility to configure the request timeouts, proxies etc of the `HttpClient` instance or provide an implementation that uses an altogether different HTTP client. See examples in `OcspClientOverrideTest`.
 - `withOcspRequestTimeout(Duration ocspRequestTimeout)` – sets both the connection and response timeout of user certificate revocation check OCSP requests. Default is 5 seconds.
 - `withDisallowedCertificatePolicies(ASN1ObjectIdentifier... policies)` – adds the given policies to the list of disallowed user certificate policies. In order for the user certificate to be considered valid, it must not contain any policies present in this list. Contains the Estonian Mobile-ID policies by default as it must not be possible to authenticate with a Mobile-ID certificate when an eID smart card is expected.
 - `withNonceDisabledOcspUrls(URI... urls)` – adds the given URLs to the list of OCSP responder access location URLs for which the nonce protocol extension will be disabled. Some OCSP responders don't support the nonce extension.
@@ -326,7 +326,7 @@ Note that there may be limitations to using AIA URLs as the services behind thes
 
 ## Possible validation errors  
 
-The `validate()` method of `AuthTokenValidator` returns the validated user certificate object if validation is successful or throws an exception if validation fails. All exceptions that can occur during validation derive from `AuthTokenException`, the list of available exceptions is available [here](src/main/java/org/webeid/security/exceptions/). Each exception file contains a documentation comment that describes under which conditions the exception is thrown.
+The `validate()` method of `AuthTokenValidator` returns the validated user certificate object if validation is successful or throws an exception if validation fails. All exceptions that can occur during validation derive from `AuthTokenException`, the list of available exceptions is available [here](src/main/java/eu/webeid/security/exceptions/). Each exception file contains a documentation comment that describes under which conditions the exception is thrown.
 
 ## Stateful and stateless authentication
 
@@ -375,26 +375,8 @@ NonceGenerator generator = new NonceGeneratorBuilder()
         .build();
 ```
 
-# Upgrading from version 1 to version 2
+# Differences between version 1 and version 2
 
-Version 2 is a major backwards-incompatible release.
-
-In the `authtoken-validation` library version 1, the generated challenge nonces were stored in a JSR107 compatible cache. The goal of using a cache was to support stateful and stateless authentication with a universal API that uses the same underlying mechanism. However, in case the website had a CSRF vulnerability, this made the solution vulnerable to [forged login attacks](https://en.wikipedia.org/wiki/Cross-site_request_forgery#Forging_login_requests) (the attacker could trick the victim to submit the authentication token with the attacker's challenge nonce to the website using a CSRF attack, so that the victim was authenticated to the website as the attacker). To mitigate this attack, in version 2 the requirement is that the library adopter must guarantee that the authentication token is received from the same browser to which the corresponding challenge nonce was issued. The recommended solution is to use a session-backed challenge nonce store, as in the code examples above. The library no longer uses the JSR107 cache API and provides a `ChallengeNonceStore` interface instead.
-
-A less major backwards-incompatible change was the Maven group ID and package namespace change from `org.webeid` to `eu.webeid` to better reflect the domain of the official project website and focus on European Union eID cards.
+In version 1, the generated challenge nonces were stored in a JSR107 compatible cache. The goal of using a cache was to support stateful and stateless authentication with a universal API that uses the same underlying mechanism. However, in case the website had a CSRF vulnerability, this made the solution vulnerable to [forged login attacks](https://en.wikipedia.org/wiki/Cross-site_request_forgery#Forging_login_requests) (the attacker could trick the victim to submit the authentication token with the attacker's challenge nonce to the website using a CSRF attack, so that the victim was authenticated to the website as the attacker). To mitigate this attack, in version 2 the requirement is that the library adopter must guarantee that the authentication token is received from the same browser to which the corresponding challenge nonce was issued. The recommended solution is to use a session-backed challenge nonce store, as in the code examples above. The library no longer uses the JSR107 cache API and provides a `ChallengeNonceStore` interface instead.
 
 In the internal implementation, the Web eID authentication token format changed in version 2. In version 1, the authentication token was in the OpenID X509 ID Token (JWT) format in order to be compatible with the standard OpenID Connect ID Token specification. During independent security review it was pointed out that any similarities of the Web eID authentication token to the JWT format are actually undesirable, as they would imply that the claims presented in the Web eID authentication token can be trusted and processed, while in fact they must be ignored, as they can be manipulated at the client side. The presence of the claims in the authentication token introduces a risk of vulnerabilities in case the authentication implementer decides to rely on any of them for making security critical decisions or decides to apply the same standard validation workflow that is applied to standard JWTs. Since there does not exist a standardized format for an authentication proof that corresponds to the requirements of the Web eID authentication protocol, a special purpose JSON-based format for the Web eID authentication token was adopted in version 2. The format is described in detail in the section *[Authentication token format](#authentication-token-format)*, and the full analysis of the format change is available in [this article](https://web-eid.github.io/web-eid-system-architecture-doc/web-eid-auth-token-v2-format-spec.pdf).
-
-To upgrade from version 1 to version 2,
-
-- replace the library group ID prefix `org.webeid` with `eu.webeid` in the Maven or Gradle project file and upgrade the library version to `2.0.0`,
-- replace all code import statements that use `org.webeid` to use `eu.webeid` instead,
-- add a session-backed challenge nonce store that implements the `ChallengeNonceStore` interface, as in the code example in the section *[2. Configure the challenge nonce store](#2-configure-the-challenge-nonce-store)* above,
-- replace `NonceGenerator` with `ChallengeNonceGenerator` and `NonceGeneratorBuilder` with `ChallengeNonceGeneratorBuilder`,
-- replace `withNonceCache(cache)` with `withChallengeNonceStore(store)` in the `ChallengeNonceGenerator` invocation,
-- remove `withNonceCache(cache)` from the `AuthTokenValidatorBuilder` invocation,
-- to upgrade authentication token validation, as in the code example in the section *[Authentication token validation > Basic usage](#basic-usage)* above,
-  - use `challengeNonceStore.getAndRemove().getBase64EncodedNonce()` to retrieve the challenge nonce from the store,
-  - use `tokenValidator.parse(tokenString)` to parse the authentication token string into a `WebEidAuthToken` object,
-  - pass the token object and challenge nonce string into the `tokenValidator.validate()` method,
-- replace `CertUtil` with `CertificateData`.
