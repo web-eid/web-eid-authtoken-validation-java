@@ -24,6 +24,7 @@ package eu.webeid.security.validator.certvalidators;
 
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
+import eu.webeid.security.util.DateAndTime;
 import eu.webeid.security.validator.ocsp.DigestCalculatorImpl;
 import eu.webeid.security.validator.ocsp.OcspClient;
 import eu.webeid.security.validator.ocsp.OcspRequestBuilder;
@@ -163,8 +164,9 @@ public final class SubjectCertificateNotRevokedValidator {
         //   4. The signer is currently authorized to provide a response for the
         //      certificate in question.
 
-        final Date producedAt = basicResponse.getProducedAt();
-        ocspService.validateResponderCertificate(responderCert, producedAt);
+        // Use the clock instance so that the date can be mocked in tests.
+        final Date now = DateAndTime.DefaultClock.getInstance().now();
+        ocspService.validateResponderCertificate(responderCert, now);
 
         //   5. The time at which the status being indicated is known to be
         //      correct (thisUpdate) is sufficiently recent.

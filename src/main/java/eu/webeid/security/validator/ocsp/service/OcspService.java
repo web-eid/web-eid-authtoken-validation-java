@@ -34,6 +34,6 @@ public interface OcspService {
 
     URI getAccessLocation();
 
-    void validateResponderCertificate(X509CertificateHolder cert, Date date) throws AuthTokenException;
+    void validateResponderCertificate(X509CertificateHolder cert, Date now) throws AuthTokenException;
 
 }

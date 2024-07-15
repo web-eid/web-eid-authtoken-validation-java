@@ -287,8 +287,8 @@ CertificateData.getSubjectCN(userCertificate).orElseThrow(); // "JÕEORG\\,JAAK-
 CertificateData.getSubjectIdCode(userCertificate).orElseThrow(); // "PNOEE-38001085718"
 CertificateData.getSubjectCountryCode(userCertificate).orElseThrow(); // "EE"
 
-toTitleCase(CertUtil.getSubjectGivenName(userCertificate)).orElseThrow(); // "Jaak-Kristjan"
-toTitleCase(CertUtil.getSubjectSurname(userCertificate)).orElseThrow(); // "Jõeorg"
+toTitleCase(CertificateData.getSubjectGivenName(userCertificate).orElseThrow()); // "Jaak-Kristjan"
+toTitleCase(CertificateData.getSubjectSurname(userCertificate).orElseThrow()); // "Jõeorg"
 ```
 
 ## Extended configuration  

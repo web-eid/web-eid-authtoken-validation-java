@@ -59,7 +59,7 @@ public class DesignatedOcspService implements OcspService {
     }
 
     @Override
-    public void validateResponderCertificate(X509CertificateHolder cert, Date producedAt) throws AuthTokenException {
+    public void validateResponderCertificate(X509CertificateHolder cert, Date now) throws AuthTokenException {
         try {
             final X509Certificate responderCertificate = certificateConverter.getCertificate(cert);
             // Certificate pinning is implemented simply by comparing the certificates or their public keys,
@@ -68,7 +68,7 @@ public class DesignatedOcspService implements OcspService {
                 throw new OCSPCertificateException("Responder certificate from the OCSP response is not equal to " +
                     "the configured designated OCSP responder certificate");
             }
-            certificateIsValidOnDate(responderCertificate, producedAt, "Designated OCSP responder");
+            certificateIsValidOnDate(responderCertificate, now, "Designated OCSP responder");
         } catch (CertificateException e) {
             throw new OCSPCertificateException("X509CertificateHolder conversion to X509Certificate failed", e);
         }
