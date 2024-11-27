@@ -1,0 +1,8 @@
+web-eid-auth-token:
+  validation:
+    use-digidoc4j-prod-configuration: true
+    local-origin: "https://web-eid.eu"
+    truststore-password: "changeit"
+spring:
+  thymeleaf:
+    cache: true

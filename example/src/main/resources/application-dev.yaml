@@ -1,0 +1,4 @@
+web-eid-auth-token:
+  validation:
+    use-digidoc4j-prod-configuration: false
+    local-origin: "https://7911-90-191-75-155.ngrok-free.app"
