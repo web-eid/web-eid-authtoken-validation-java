@@ -60,7 +60,6 @@ import java.util.Objects;
 public final class SubjectCertificateNotRevokedValidator {
 
     private static final Logger LOG = LoggerFactory.getLogger(SubjectCertificateNotRevokedValidator.class);
-    private static final DigestCalculator DIGEST_CALCULATOR = DigestCalculatorImpl.sha1();
 
     private final SubjectCertificateTrustedValidator trustValidator;
     private final OcspClient ocspClient;
@@ -197,7 +196,8 @@ public final class SubjectCertificateNotRevokedValidator {
 
     private static CertificateID getCertificateId(X509Certificate subjectCertificate, X509Certificate issuerCertificate) throws CertificateEncodingException, IOException, OCSPException {
         final BigInteger serial = subjectCertificate.getSerialNumber();
-        return new CertificateID(DIGEST_CALCULATOR,
+        final DigestCalculator digestCalculator = DigestCalculatorImpl.sha1();
+        return new CertificateID(digestCalculator,
             new X509CertificateHolder(issuerCertificate.getEncoded()), serial);
     }
 
