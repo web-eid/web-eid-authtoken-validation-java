@@ -5,24 +5,28 @@
     <modelVersion>4.0.0</modelVersion>
     <artifactId>authtoken-validation</artifactId>
     <groupId>eu.webeid.security</groupId>
-    <version>3.1.0</version>
+    <version>3.1.1</version>
     <packaging>jar</packaging>
     <name>authtoken-validation</name>
     <description>Web eID authentication token validation library for Java</description>
 
+    <prerequisites>
+        <maven>3.6.3</maven>
+    </prerequisites>
+
     <properties>
         <java.version>11</java.version>
-        <jjwt.version>0.12.5</jjwt.version>
-        <bouncycastle.version>1.78.1</bouncycastle.version>
-        <jackson.version>2.17.1</jackson.version>
-        <slf4j.version>2.0.9</slf4j.version>
-        <junit-jupiter.version>5.10.2</junit-jupiter.version>
-        <assertj.version>3.25.3</assertj.version>
-        <mockito.version>5.12.0</mockito.version>
-        <maven-surefire-plugin.version>2.22.2</maven-surefire-plugin.version>
-        <maven-source-plugin.version>3.3.0</maven-source-plugin.version>
-        <maven-javadoc-plugin.version>3.6.2</maven-javadoc-plugin.version>
-        <jacoco.version>0.8.8</jacoco.version>
+        <jjwt.version>0.12.6</jjwt.version>
+        <bouncycastle.version>1.80</bouncycastle.version>
+        <jackson.version>2.18.3</jackson.version>
+        <slf4j.version>2.0.17</slf4j.version>
+        <junit-jupiter.version>5.12.0</junit-jupiter.version>
+        <assertj.version>3.27.3</assertj.version>
+        <mockito.version>5.16.0</mockito.version>
+        <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
+        <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
+        <maven-javadoc-plugin.version>3.11.2</maven-javadoc-plugin.version>
+        <jacoco.version>0.8.12</jacoco.version>
         <sonar.coverage.jacoco.xmlReportPaths>
             ${project.basedir}/../jacoco-coverage-report/target/site/jacoco-aggregate/jacoco.xml
         </sonar.coverage.jacoco.xmlReportPaths>
@@ -119,7 +123,7 @@
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>${maven-javadoc-plugin.version}</version>
                 <configuration>
-                  <doclint>all,-missing</doclint>
+                    <doclint>all,-missing</doclint>
                 </configuration>
                 <executions>
                     <execution>

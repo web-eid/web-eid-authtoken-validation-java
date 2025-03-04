@@ -25,7 +25,7 @@ Add the following lines to Maven `pom.xml` to include the Web eID authentication
     <dependency>
         <groupId>eu.webeid.security</groupId>
         <artifactId>authtoken-validation</artifactId>
-        <version>3.1.0</version>
+        <version>3.1.1</version>
     </dependency>
 </dependencies>
 
