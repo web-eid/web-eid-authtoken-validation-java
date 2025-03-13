@@ -27,13 +27,16 @@ import eu.webeid.security.certificate.CertificateData;
 import eu.webeid.security.exceptions.AuthTokenSignatureValidationException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
 import eu.webeid.security.testutil.AuthTokenValidators;
+import eu.webeid.security.util.DateAndTime;
 import org.junit.jupiter.api.Test;
 
 import java.security.cert.X509Certificate;
 
+import static eu.webeid.security.testutil.DateMocker.mockDate;
 import static eu.webeid.security.util.Strings.toTitleCase;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mockStatic;
 
 class AuthTokenSignatureTest extends AbstractTestWithValidator {
 
@@ -77,11 +80,15 @@ class AuthTokenSignatureTest extends AbstractTestWithValidator {
 
     @Test
     void whenTokenWithWrongCert_thenValidationFails() throws Exception {
-        final AuthTokenValidator authTokenValidator = AuthTokenValidators.getAuthTokenValidator();
-        final WebEidAuthToken authTokenWithWrongCert = authTokenValidator.parse(AUTH_TOKEN_WRONG_CERT);
-        assertThatThrownBy(() -> authTokenValidator
-            .validate(authTokenWithWrongCert, VALID_CHALLENGE_NONCE))
-            .isInstanceOf(AuthTokenSignatureValidationException.class);
+        // Ensure that the certificate does not expire.
+        try (final var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
+            mockDate("2024-08-01", mockedClock);
+            final AuthTokenValidator authTokenValidator = AuthTokenValidators.getAuthTokenValidator();
+            final WebEidAuthToken authTokenWithWrongCert = authTokenValidator.parse(AUTH_TOKEN_WRONG_CERT);
+            assertThatThrownBy(() -> authTokenValidator
+                .validate(authTokenWithWrongCert, VALID_CHALLENGE_NONCE))
+                .isInstanceOf(AuthTokenSignatureValidationException.class);
+        }
     }
 
 }
