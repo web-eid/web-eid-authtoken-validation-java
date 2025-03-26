@@ -36,8 +36,8 @@ import java.util.List;
 public final class SubjectCertificatePurposeValidator {
 
     private static final Logger LOG = LoggerFactory.getLogger(SubjectCertificatePurposeValidator.class);
+    private static final int KEY_USAGE_DIGITAL_SIGNATURE = 0;
     private static final String EXTENDED_KEY_USAGE_CLIENT_AUTHENTICATION = "1.3.6.1.5.5.7.3.2";
-
     /**
      * Validates that the purpose of the user certificate from the authentication token contains client authentication.
      *
@@ -46,9 +46,18 @@ public final class SubjectCertificatePurposeValidator {
      */
     public static void validateCertificatePurpose(X509Certificate subjectCertificate) throws AuthTokenException {
         try {
+            final boolean[] keyUsage = subjectCertificate.getKeyUsage();
+            if (keyUsage == null) {
+                throw new UserCertificateMissingPurposeException();
+            }
+            if (!keyUsage[KEY_USAGE_DIGITAL_SIGNATURE]) {
+                throw new UserCertificateWrongPurposeException();
+            }
             final List<String> usages = subjectCertificate.getExtendedKeyUsage();
             if (usages == null || usages.isEmpty()) {
-                throw new UserCertificateMissingPurposeException();
+                // Digital Signature extension present, but Extended Key Usage extension not present,
+                // assume it is an authentication certificate (e.g. Luxembourg eID).
+                return;
             }
             if (!usages.contains(EXTENDED_KEY_USAGE_CLIENT_AUTHENTICATION)) {
                 throw new UserCertificateWrongPurposeException();
