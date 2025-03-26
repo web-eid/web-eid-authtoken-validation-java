@@ -94,6 +94,20 @@ public final class AuthTokenValidators {
             .build();
     }
 
+    public static AuthTokenValidator getAuthTokenValidatorForBelgianIdCard() throws CertificateException, IOException, JceException {
+      return getAuthTokenValidator(
+                "https://47f0-46-131-86-189.ngrok-free.app",
+                CertificateLoader.loadCertificatesFromResources("eID TEST EC Citizen CA.cer")
+            );
+    }
+
+    public static AuthTokenValidator getAuthTokenValidatorForFinnishIdCard() throws CertificateException, IOException, JceException {
+      return getAuthTokenValidator(
+                "https://47f0-46-131-86-189.ngrok-free.app",
+                CertificateLoader.loadCertificatesFromResources("DVV TEST Certificates - G5E.crt", "VRK TEST CA for Test Purposes - G4.crt")
+            );
+    }
+
     public static AuthTokenValidatorBuilder getDefaultAuthTokenValidatorBuilder() throws CertificateException, IOException {
         return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, getCACertificates());
     }
