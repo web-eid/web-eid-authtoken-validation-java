@@ -77,7 +77,7 @@ public class AuthTokenValidatorBuilder {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Trusted intermediate certificate authorities set to {}",
                 configuration.getTrustedCACertificates().stream()
-                    .map(X509Certificate::getSubjectDN)
+                    .map(X509Certificate::getSubjectX500Principal)
                     .collect(Collectors.toList()));
         }
         return this;

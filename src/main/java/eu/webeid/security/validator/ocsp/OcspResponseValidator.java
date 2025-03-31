@@ -58,7 +58,7 @@ public final class OcspResponseValidator {
         Objects.requireNonNull(certificate, "certificate");
         try {
             if (certificate.getExtendedKeyUsage() == null || !certificate.getExtendedKeyUsage().contains(OID_OCSP_SIGNING)) {
-                throw new OCSPCertificateException("Certificate " + certificate.getSubjectDN() +
+                throw new OCSPCertificateException("Certificate " + certificate.getSubjectX500Principal() +
                     " does not contain the key usage extension for OCSP response signing");
             }
         } catch (CertificateParsingException e) {
