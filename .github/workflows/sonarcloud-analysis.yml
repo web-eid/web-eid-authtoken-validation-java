@@ -1,16 +1,23 @@
 name: SonarCloud code analysis
 
-on: [push, pull_request]
+on:
+  workflow_run:
+    workflows: [ Maven build ]
+    types: [ completed ]
 
 jobs:
   analyze:
     name: Analyze
-    if: github.repository == 'web-eid/web-eid-authtoken-validation-java'
+    if: >
+      github.repository == 'web-eid/web-eid-authtoken-validation-java' &&
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
         with:
+          repository: ${{ github.event.workflow_run.head_repository.full_name }}
+          ref: ${{ github.event.workflow_run.head_branch }}
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
       - name: Set up JDK 17
         uses: actions/setup-java@v3
