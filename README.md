@@ -201,6 +201,7 @@ try {
   - [Basic usage](#basic-usage-1)
   - [Extended configuration](#extended-configuration-1)
 - [Differences between version 1 and version 2](#differences-between-version-1-and-version-2)
+- [Example using Spring Boot](#example-using-spring-boot)
 
 # Introduction
 
@@ -380,3 +381,6 @@ NonceGenerator generator = new NonceGeneratorBuilder()
 In version 1, the generated challenge nonces were stored in a JSR107 compatible cache. The goal of using a cache was to support stateful and stateless authentication with a universal API that uses the same underlying mechanism. However, in case the website had a CSRF vulnerability, this made the solution vulnerable to [forged login attacks](https://en.wikipedia.org/wiki/Cross-site_request_forgery#Forging_login_requests) (the attacker could trick the victim to submit the authentication token with the attacker's challenge nonce to the website using a CSRF attack, so that the victim was authenticated to the website as the attacker). To mitigate this attack, in version 2 the requirement is that the library adopter must guarantee that the authentication token is received from the same browser to which the corresponding challenge nonce was issued. The recommended solution is to use a session-backed challenge nonce store, as in the code examples above. The library no longer uses the JSR107 cache API and provides a `ChallengeNonceStore` interface instead.
 
 In the internal implementation, the Web eID authentication token format changed in version 2. In version 1, the authentication token was in the OpenID X509 ID Token (JWT) format in order to be compatible with the standard OpenID Connect ID Token specification. During independent security review it was pointed out that any similarities of the Web eID authentication token to the JWT format are actually undesirable, as they would imply that the claims presented in the Web eID authentication token can be trusted and processed, while in fact they must be ignored, as they can be manipulated at the client side. The presence of the claims in the authentication token introduces a risk of vulnerabilities in case the authentication implementer decides to rely on any of them for making security critical decisions or decides to apply the same standard validation workflow that is applied to standard JWTs. Since there does not exist a standardized format for an authentication proof that corresponds to the requirements of the Web eID authentication protocol, a special purpose JSON-based format for the Web eID authentication token was adopted in version 2. The format is described in detail in the section *[Authentication token format](#authentication-token-format)*, and the full analysis of the format change is available in [this article](https://web-eid.github.io/web-eid-system-architecture-doc/web-eid-auth-token-v2-format-spec.pdf).
+
+# Example using Spring Boot
+See the [example documentation](example/README.md).
