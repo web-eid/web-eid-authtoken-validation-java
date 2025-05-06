@@ -1,6 +1,18 @@
-name: Maven build
+name: Maven build example
 
-on: [ push, pull_request ]
+on:
+  push:
+    paths:
+      - 'example/**'
+      - '.github/workflows/*example*'
+  pull_request:
+    paths:
+      - 'example/**'
+      - '.github/workflows/*example*'
+
+defaults:
+  run:
+    working-directory: ./example
 
 jobs:
   build:
@@ -26,3 +38,4 @@ jobs:
 
       - name: Test and package
         run: mvn --batch-mode package
+
