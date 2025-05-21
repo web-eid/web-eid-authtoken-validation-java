@@ -14,7 +14,8 @@ A Java web application that uses Maven or Gradle to manage packages is needed fo
 
 In the following example we are using the [Spring Framework](https://spring.io/), but the examples can be easily ported to other Java web application frameworks.
 
-See the full example [here](https://github.com/web-eid/web-eid-spring-boot-example).
+## Full example project using the validation library in spring-boot
+[example/README.md](example/README.md)
 
 ## 1. Add the library to your project
 
@@ -98,7 +99,7 @@ import eu.webeid.security.challenge.ChallengeNonceStore;
 
 ## 4. Add trusted certificate authority certificates
 
-You must explicitly specify which **intermediate** certificate authorities (CAs) are trusted to issue the eID authentication and OCSP responder certificates. CA certificates can be loaded from either the truststore file, resources or any stream source. We use the [`CertificateLoader`](https://github.com/web-eid/web-eid-authtoken-validation-java/blob/main/src/main/java/eu/webeid/security/certificate/CertificateLoader.java) helper class to load CA certificates from resources here, but consider using [the truststore file](https://github.com/web-eid/web-eid-spring-boot-example/blob/main/src/main/java/eu/webeid/example/config/ValidationConfiguration.java#L104-L123) instead.
+You must explicitly specify which **intermediate** certificate authorities (CAs) are trusted to issue the eID authentication and OCSP responder certificates. CA certificates can be loaded from either the truststore file, resources or any stream source. We use the [`CertificateLoader`](https://github.com/web-eid/web-eid-authtoken-validation-java/blob/main/src/main/java/eu/webeid/security/certificate/CertificateLoader.java) helper class to load CA certificates from resources here, but consider using [the truststore file](./blob/example/main/src/main/java/eu/webeid/example/config/ValidationConfiguration.java#L104-L123) instead.
 
 First, copy the trusted certificates, for example `ESTEID2018.cer`, to `resources/cacerts/`, then load the certificates as follows:
 
@@ -137,7 +138,7 @@ import eu.webeid.security.validator.AuthTokenValidatorBuilder;
 
 A REST endpoint that issues challenge nonces is required for authentication. The endpoint must support `GET` requests.
 
-In the following example, we are using the [Spring RESTful Web Services framework](https://spring.io/guides/gs/rest-service/) to implement the endpoint, see also the full implementation [here](https://github.com/web-eid/web-eid-spring-boot-example/blob/main/src/main/java/eu/webeid/example/web/rest/ChallengeController.java).
+In the following example, we are using the [Spring RESTful Web Services framework](https://spring.io/guides/gs/rest-service/) to implement the endpoint, see also the full implementation [here](example/blob/main/src/main/java/eu/webeid/example/web/rest/ChallengeController.java).
 
 ```java
 import org.springframework.web.bind.annotation.GetMapping;
@@ -171,11 +172,11 @@ Authentication consists of calling the `validate()` method of the authentication
 
 When using [Spring Security](https://spring.io/guides/topicals/spring-security-architecture) with standard cookie-based authentication,
 
-- implement a custom authentication provider that uses the authentication token validator for authentication as shown [here](https://github.com/web-eid/web-eid-spring-boot-example/blob/main/src/main/java/eu/webeid/example/security/AuthTokenDTOAuthenticationProvider.java),
-- implement an AJAX authentication processing filter that extracts the authentication token and passes it to the authentication manager as shown [here](https://github.com/web-eid/web-eid-spring-boot-example/blob/main/src/main/java/eu/webeid/example/security/WebEidAjaxLoginProcessingFilter.java),
-- configure the authentication provider and authentication processing filter in the application configuration as shown [here](https://github.com/web-eid/web-eid-spring-boot-example/blob/main/src/main/java/eu/webeid/example/config/ApplicationConfiguration.java).
+- implement a custom authentication provider that uses the authentication token validator for authentication as shown [here](example/blob/main/src/main/java/eu/webeid/example/security/AuthTokenDTOAuthenticationProvider.java),
+- implement an AJAX authentication processing filter that extracts the authentication token and passes it to the authentication manager as shown [here](example/blob/main/src/main/java/eu/webeid/example/security/WebEidAjaxLoginProcessingFilter.java),
+- configure the authentication provider and authentication processing filter in the application configuration as shown [here](example/blob/main/src/main/java/eu/webeid/example/config/ApplicationConfiguration.java).
 
-The gist of the validation is [in the `authenticate()` method](https://github.com/web-eid/web-eid-spring-boot-example/blob/main/src/main/java/eu/webeid/example/security/AuthTokenDTOAuthenticationProvider.java#L74-L76) of the authentication provider:
+The gist of the validation is [in the `authenticate()` method](example/blob/main/src/main/java/eu/webeid/example/security/AuthTokenDTOAuthenticationProvider.java#L74-L76) of the authentication provider:
 
 ```java
 try {

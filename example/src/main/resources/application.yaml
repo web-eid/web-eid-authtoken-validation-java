@@ -1,0 +1,19 @@
+spring:
+  main:
+    allow-circular-references: true
+
+# Make session cookie secure behind a reverse proxy, see
+# - https://docs.spring.io/spring-boot/docs/2.2.5.RELEASE/reference/htmlsingle/#howto-use-behind-a-proxy-server
+# - https://docs.spring.io/spring-boot/docs/2.2.5.RELEASE/reference/htmlsingle/#howto-enable-https
+# Note that `server.servlet.session.cookie.secure` is implicitly true when HTTPS is detected.
+server:
+  forward-headers-strategy: native
+  tomcat:
+    remote-ip-header: x-forwarded-for
+    protocol-header: x-forwarded-proto
+
+logging:
+  level:
+    eu.webeid.security: DEBUG
+    eu.webeid.example: DEBUG
+    org.springframework.security.web.csrf.CsrfFilter: DEBUG
