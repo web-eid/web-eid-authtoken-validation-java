@@ -57,6 +57,7 @@ public final class SubjectCertificatePurposeValidator {
             if (usages == null || usages.isEmpty()) {
                 // Digital Signature extension present, but Extended Key Usage extension not present,
                 // assume it is an authentication certificate (e.g. Luxembourg eID).
+                LOG.debug("User certificate has Digital Signature key usage and no Extended Key Usage extension, this means that it can be used for client authentication.");
                 return;
             }
             if (!usages.contains(EXTENDED_KEY_USAGE_CLIENT_AUTHENTICATION)) {
