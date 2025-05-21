@@ -138,7 +138,7 @@ import eu.webeid.security.validator.AuthTokenValidatorBuilder;
 
 A REST endpoint that issues challenge nonces is required for authentication. The endpoint must support `GET` requests.
 
-In the following example, we are using the [Spring RESTful Web Services framework](https://spring.io/guides/gs/rest-service/) to implement the endpoint, see also the full implementation [here](https://github.com/web-eid/web-eid-spring-boot-example/blob/main/src/main/java/eu/webeid/example/web/rest/ChallengeController.java).
+In the following example, we are using the [Spring RESTful Web Services framework](https://spring.io/guides/gs/rest-service/) to implement the endpoint, see also the full implementation [here](example/blob/main/src/main/java/eu/webeid/example/web/rest/ChallengeController.java).
 
 ```java
 import org.springframework.web.bind.annotation.GetMapping;
@@ -174,7 +174,7 @@ When using [Spring Security](https://spring.io/guides/topicals/spring-security-a
 
 - implement a custom authentication provider that uses the authentication token validator for authentication as shown [here](example/blob/main/src/main/java/eu/webeid/example/security/AuthTokenDTOAuthenticationProvider.java),
 - implement an AJAX authentication processing filter that extracts the authentication token and passes it to the authentication manager as shown [here](example/blob/main/src/main/java/eu/webeid/example/security/WebEidAjaxLoginProcessingFilter.java),
-- configure the authentication provider and authentication processing filter in the application configuration as shown [here](https://github.com/web-eid/web-eid-spring-boot-example/blob/main/src/main/java/eu/webeid/example/config/ApplicationConfiguration.java).
+- configure the authentication provider and authentication processing filter in the application configuration as shown [here](example/blob/main/src/main/java/eu/webeid/example/config/ApplicationConfiguration.java).
 
 The gist of the validation is [in the `authenticate()` method](example/blob/main/src/main/java/eu/webeid/example/security/AuthTokenDTOAuthenticationProvider.java#L74-L76) of the authentication provider:
 
