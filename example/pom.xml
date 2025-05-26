@@ -44,6 +44,15 @@
 			<artifactId>digidoc4j</artifactId>
 			<version>${digidoc4j.version}</version>
 		</dependency>
+<!--
+        To use your locally built version of the authtoken-validation library instead of the published release:
+        1. in parent dir change the version of authtoken-validation in pom.xml to next SNAPSHOT:
+           for example 3.1.1 -> 3.1.2-SNAPSHOT
+        2. Execute mvn clean install
+        3. Verify that latest build date is recent, in ~/.m2/repository/eu/webeid/security/authtoken-validation/3.1.2-SNAPSHOT/
+        4. Change the properties webeid.version to 3.1.2-SNAPSHOT
+        5. After each change in authtoken-validation, you need to run mvn clean install
+-->
 		<dependency>
 			<groupId>eu.webeid.security</groupId>
 			<artifactId>authtoken-validation</artifactId>
