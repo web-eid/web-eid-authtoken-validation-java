@@ -23,13 +23,16 @@
 package eu.webeid.example.config;
 
 import org.apache.tomcat.util.http.Rfc6265CookieProcessor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.web.embedded.tomcat.TomcatContextCustomizer;
+import org.springframework.boot.web.server.WebServerFactoryCustomizer;
+import org.springframework.boot.web.servlet.server.ConfigurableServletWebServerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
-public class SameSiteCookieConfiguration implements WebMvcConfigurer {
+public class CookieConfiguration implements WebMvcConfigurer {
 
     @Bean
     public TomcatContextCustomizer configureSameSiteCookies() {
@@ -38,5 +41,17 @@ public class SameSiteCookieConfiguration implements WebMvcConfigurer {
             cookieProcessor.setSameSiteCookies("strict");
             context.setCookieProcessor(cookieProcessor);
         };
+    }
+
+    @Bean
+    @ConditionalOnExpression("'${web-eid-auth-token.validation.local-origin}'.startsWith('http:')")
+    public WebServerFactoryCustomizer<ConfigurableServletWebServerFactory> httpSessionCookieCustomizer() {
+        return factory -> factory.addInitializers(servletContext -> servletContext.getSessionCookieConfig().setName("JSESSIONID"));
+    }
+
+    @Bean
+    @ConditionalOnExpression("'${web-eid-auth-token.validation.local-origin}'.startsWith('https:')")
+    public WebServerFactoryCustomizer<ConfigurableServletWebServerFactory> httpsSessionCookieCustomizer() {
+        return factory -> factory.addInitializers(servletContext -> servletContext.getSessionCookieConfig().setName("__Host-JSESSIONID"));
     }
 }
