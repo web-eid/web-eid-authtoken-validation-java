@@ -16,6 +16,8 @@ public class YAMLConfig {
     @Value("local-origin")
     private String localOrigin;
 
+    private String corsAllowedOrigin;
+
     @Value("site-cert-hash")
     private String siteCertHash;
 
@@ -31,6 +33,11 @@ public class YAMLConfig {
 
     public void setLocalOrigin(String localOrigin) {
         this.localOrigin = localOrigin;
+        this.corsAllowedOrigin = localOrigin;
+    }
+
+    public String getCorsAllowedOrigin() {
+        return corsAllowedOrigin;
     }
 
     public String getSiteCertHash() {

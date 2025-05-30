@@ -6,8 +6,10 @@
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"/>
 
-    <meta id="csrftoken" name="csrftoken" th:content="${_csrf.token}"/>
-    <meta id="csrfheadername" name="csrfheadername" th:content="${_csrf.headerName}"/>
+    <th:block th:unless="${@csrfConfigurationProperties.isUseSpaConfiguration()}">
+        <meta id="csrftoken" name="csrftoken" th:content="${_csrf.token}"/>
+        <meta id="csrfheadername" name="csrfheadername" th:content="${_csrf.headerName}"/>
+    </th:block>
 
     <title>Welcome!</title>
     <link
@@ -53,6 +55,7 @@
 <script type="module">
     "use strict";
     import * as webeid from "/js/web-eid.js";
+    import {csrfHeader} from "/js/csrf.js";
     import {hideErrorMessage, showErrorMessage, checkHttpError} from "/js/errors.js";
 
     const signButton = document.querySelector("#webeid-sign-button");
@@ -61,15 +64,13 @@
     const fileNameText = document.querySelector("#file-name");
     const exampleDocument = document.querySelector("#example-document");
 
-    const csrfToken = document.querySelector('#csrftoken').content;
-    const csrfHeaderName = document.querySelector('#csrfheadername').content;
-
     document.querySelector("#webeid-logout-button").addEventListener("click", async () => {
         await fetch("/logout", {
             method: "POST",
+            credentials: "include",
             headers: {
                 "Content-Type": "application/json",
-                [csrfHeaderName]: csrfToken
+                ...csrfHeader()
             }
         });
         window.location.href = "/";
@@ -93,9 +94,10 @@
 
             const prepareSigningResponse = await fetch("/sign/prepare", {
                 method: "POST",
+                credentials: "include",
                 headers: {
                     "Content-Type": "application/json",
-                    [csrfHeaderName]: csrfToken
+                    ...csrfHeader()
                 },
                 body: JSON.stringify({certificate, supportedSignatureAlgorithms}),
             });
@@ -112,9 +114,10 @@
 
             const finalizeSigningResponse = await fetch("/sign/sign", {
                 method: "POST",
+                credentials: "include",
                 headers: {
                     "Content-Type": "application/json",
-                    [csrfHeaderName]: csrfToken
+                    ...csrfHeader()
                 },
                 body: JSON.stringify({signature, signatureAlgorithm}),
             });
