@@ -68,7 +68,7 @@ public class YAMLConfig {
             try {
                 if (InetAddress.getByName(new URI(localOrigin).getHost()).isLoopbackAddress()) {
                     this.localOrigin = localOrigin.replaceFirst("^http:", "https:");
-                    LOG.warn("Configuration contains http protocol {}, which is not supported. Replacing it with secure {}", localOrigin, this.localOrigin);
+                    LOG.warn("Configuration local-origin contains http protocol {}, which is not supported. Replacing it with secure {}", localOrigin, this.localOrigin);
                     return;
                 }
             } catch (URISyntaxException e) {
