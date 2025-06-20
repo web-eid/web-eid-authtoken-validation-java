@@ -23,13 +23,15 @@
 package eu.webeid.security.challenge;
 
 import eu.webeid.security.exceptions.AuthTokenException;
-import org.junit.jupiter.api.Test;
 import eu.webeid.security.exceptions.ChallengeNonceExpiredException;
 import eu.webeid.security.exceptions.ChallengeNonceNotFoundException;
+import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ChallengeNonceGeneratorTest {
 
