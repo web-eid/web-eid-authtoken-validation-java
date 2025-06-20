@@ -46,6 +46,14 @@ class AuthTokenSignatureTest extends AbstractTestWithValidator {
         "\"signature\":\"arx164xRiwhIQDINe0J+ZxJWZFOQTx0PBtOaWaxAe7gofEIHRIbV1w0sOCYBJnvmvMem9hU4nc2+iJx2x8poYck4Z6eI3GwtiksIec3XQ9ZIk1n/XchXnmPn3GYV+HzJ\"," +
         "\"format\":\"web-eid:1.0\"}";
 
+    static final String NFC_AUTH_TOKEN_WRONG_CERT = "{\"algorithm\":\"ES384\"," +
+        "\"unverifiedCertificate\":\"MIIEBDCCA2WgAwIBAgIQH9NeN14jo0ReaircrN2YvDAKBggqhkjOPQQDBDBgMQswCQYDVQQGEwJFRTEbMBkGA1UECgwSU0sgSUQgU29sdXRpb25zIEFTMRcwFQYDVQRhDA5OVFJFRS0xMDc0NzAxMzEbMBkGA1UEAwwSVEVTVCBvZiBFU1RFSUQyMDE4MB4XDTIwMDMxMjEyMjgxMloXDTI1MDMxMjIxNTk1OVowfzELMAkGA1UEBhMCRUUxKjAoBgNVBAMMIUrDlUVPUkcsSkFBSy1LUklTVEpBTiwzODAwMTA4NTcxODEQMA4GA1UEBAwHSsOVRU9SRzEWMBQGA1UEKgwNSkFBSy1LUklTVEpBTjEaMBgGA1UEBRMRUE5PRUUtMzgwMDEwODU3MTgwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAARVeP+9l3b1mm3fMHPeCFLbD7esXI8lDc+soWCBoMnZGo3d2Rg/mzKCIWJtw+JhcN7RwFFH9cwZ8Gni4C3QFYBIIJ2GdjX2KQfEkDvRsnKw6ZZmJQ+HC4ZFew3r8gauhfejggHDMIIBvzAJBgNVHRMEAjAAMA4GA1UdDwEB/wQEAwIDiDBHBgNVHSAEQDA+MDIGCysGAQQBg5EhAQIBMCMwIQYIKwYBBQUHAgEWFWh0dHBzOi8vd3d3LnNrLmVlL0NQUzAIBgYEAI96AQIwHwYDVR0RBBgwFoEUMzgwMDEwODU3MThAZWVzdGkuZWUwHQYDVR0OBBYEFOfk7lPOq6rb9IbFZF1q97kJ4s2iMGEGCCsGAQUFBwEDBFUwUzBRBgYEAI5GAQUwRzBFFj9odHRwczovL3NrLmVlL2VuL3JlcG9zaXRvcnkvY29uZGl0aW9ucy1mb3ItdXNlLW9mLWNlcnRpZmljYXRlcy8TAkVOMCAGA1UdJQEB/wQWMBQGCCsGAQUFBwMCBggrBgEFBQcDBDAfBgNVHSMEGDAWgBTAhJkpxE6fOwI09pnhClYACCk+ezBzBggrBgEFBQcBAQRnMGUwLAYIKwYBBQUHMAGGIGh0dHA6Ly9haWEuZGVtby5zay5lZS9lc3RlaWQyMDE4MDUGCCsGAQUFBzAChilodHRwOi8vYy5zay5lZS9UZXN0X29mX0VTVEVJRDIwMTguZGVyLmNydDAKBggqhkjOPQQDBAOBjAAwgYgCQgEQRbzFOSHIcmIEKczhN8xuteYgN2zEXZSJdP0q1iH1RR2AzZ8Ddz6SKRn/bZSzjcd4b7h3AyOEQr2hcidYkxT7sAJCAMPtOUryqp2WbTEUoOpbWrKqp8GjaAiVpBGDn/Xdu5M2Z6dvwZHnFGgRrZXtyUbcAgRW7MQJ0s/9GCVro3iqUzNN\"," +
+        "\"unverifiedSigningCertificate\":\"MIIEBDCCA2WgAwIBAgIQH9NeN14jo0ReaircrN2YvDAKBggqhkjOPQQDBDBgMQswCQYDVQQGEwJFRTEbMBkGA1UECgwSU0sgSUQgU29sdXRpb25zIEFTMRcwFQYDVQRhDA5OVFJFRS0xMDc0NzAxMzEbMBkGA1UEAwwSVEVTVCBvZiBFU1RFSUQyMDE4MB4XDTIwMDMxMjEyMjgxMloXDTI1MDMxMjIxNTk1OVowfzELMAkGA1UEBhMCRUUxKjAoBgNVBAMMIUrDlUVPUkcsSkFBSy1LUklTVEpBTiwzODAwMTA4NTcxODEQMA4GA1UEBAwHSsOVRU9SRzEWMBQGA1UEKgwNSkFBSy1LUklTVEpBTjEaMBgGA1UEBRMRUE5PRUUtMzgwMDEwODU3MTgwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAARVeP+9l3b1mm3fMHPeCFLbD7esXI8lDc+soWCBoMnZGo3d2Rg/mzKCIWJtw+JhcN7RwFFH9cwZ8Gni4C3QFYBIIJ2GdjX2KQfEkDvRsnKw6ZZmJQ+HC4ZFew3r8gauhfejggHDMIIBvzAJBgNVHRMEAjAAMA4GA1UdDwEB/wQEAwIDiDBHBgNVHSAEQDA+MDIGCysGAQQBg5EhAQIBMCMwIQYIKwYBBQUHAgEWFWh0dHBzOi8vd3d3LnNrLmVlL0NQUzAIBgYEAI96AQIwHwYDVR0RBBgwFoEUMzgwMDEwODU3MThAZWVzdGkuZWUwHQYDVR0OBBYEFOfk7lPOq6rb9IbFZF1q97kJ4s2iMGEGCCsGAQUFBwEDBFUwUzBRBgYEAI5GAQUwRzBFFj9odHRwczovL3NrLmVlL2VuL3JlcG9zaXRvcnkvY29uZGl0aW9ucy1mb3ItdXNlLW9mLWNlcnRpZmljYXRlcy8TAkVOMCAGA1UdJQEB/wQWMBQGCCsGAQUFBwMCBggrBgEFBQcDBDAfBgNVHSMEGDAWgBTAhJkpxE6fOwI09pnhClYACCk+ezBzBggrBgEFBQcBAQRnMGUwLAYIKwYBBQUHMAGGIGh0dHA6Ly9haWEuZGVtby5zay5lZS9lc3RlaWQyMDE4MDUGCCsGAQUFBzAChilodHRwOi8vYy5zay5lZS9UZXN0X29mX0VTVEVJRDIwMTguZGVyLmNydDAKBggqhkjOPQQDBAOBjAAwgYgCQgEQRbzFOSHIcmIEKczhN8xuteYgN2zEXZSJdP0q1iH1RR2AzZ8Ddz6SKRn/bZSzjcd4b7h3AyOEQr2hcidYkxT7sAJCAMPtOUryqp2WbTEUoOpbWrKqp8GjaAiVpBGDn/Xdu5M2Z6dvwZHnFGgRrZXtyUbcAgRW7MQJ0s/9GCVro3iqUzNN\"," +
+        "\"supportedSignatureAlgorithms\":[{\"cryptoAlgorithm\":\"RSA\",\"hashFunction\":\"SHA-256\",\"paddingScheme\":\"PKCS1.5\"}]," +
+        "\"appVersion\":\"https://web-eid.eu/web-eid-mobile-app/releases/v1.0.0\"," +
+        "\"signature\":\"arx164xRiwhIQDINe0J+ZxJWZFOQTx0PBtOaWaxAe7gofEIHRIbV1w0sOCYBJnvmvMem9hU4nc2+iJx2x8poYck4Z6eI3GwtiksIec3XQ9ZIk1n/XchXnmPn3GYV+HzJ\"," +
+        "\"format\":\"web-eid:1.1\"}";
+
     @Test
     void whenValidTokenAndNonce_thenValidationSucceeds() throws Exception {
         final X509Certificate result = validator.validate(validAuthToken, VALID_CHALLENGE_NONCE);
@@ -87,6 +95,45 @@ class AuthTokenSignatureTest extends AbstractTestWithValidator {
             final WebEidAuthToken authTokenWithWrongCert = authTokenValidator.parse(AUTH_TOKEN_WRONG_CERT);
             assertThatThrownBy(() -> authTokenValidator
                 .validate(authTokenWithWrongCert, VALID_CHALLENGE_NONCE))
+                .isInstanceOf(AuthTokenSignatureValidationException.class);
+        }
+    }
+
+    @Test
+    void whenValidNfcTokenAndNonce_thenValidationSucceeds() throws Exception {
+        final X509Certificate result = validator.validate(validNfcAuthToken, VALID_CHALLENGE_NONCE);
+
+        assertThat(CertificateData.getSubjectCN(result).orElseThrow())
+            .isEqualTo("JÕEORG\\,JAAK-KRISTJAN\\,38001085718");
+        assertThat(CertificateData.getSubjectIdCode(result).orElseThrow())
+            .isEqualTo("PNOEE-38001085718");
+    }
+
+    @Test
+    void whenNfcTokenWithWrongChallengeNonce_thenValidationFails() {
+        final String invalidChallengeNonce = "12345678123456781234567812345678912356789124";
+        assertThatThrownBy(() -> validator
+            .validate(validNfcAuthToken, invalidChallengeNonce))
+            .isInstanceOf(AuthTokenSignatureValidationException.class);
+    }
+
+    @Test
+    void whenNfcTokenWithWrongOrigin_thenValidationFails() throws Exception {
+        final AuthTokenValidator validatorWithWrongOrigin =
+            AuthTokenValidators.getAuthTokenValidator("https://wrong-origin.com");
+
+        assertThatThrownBy(() -> validatorWithWrongOrigin
+            .validate(validNfcAuthToken, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(AuthTokenSignatureValidationException.class);
+    }
+
+    @Test
+    void whenNfcTokenWithWrongCert_thenValidationFails() throws Exception {
+        try (final var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
+            mockDate("2024-08-01", mockedClock);
+            final AuthTokenValidator validator = AuthTokenValidators.getAuthTokenValidator();
+            final WebEidAuthToken token = validator.parse(NFC_AUTH_TOKEN_WRONG_CERT);
+            assertThatThrownBy(() -> validator.validate(token, VALID_CHALLENGE_NONCE))
                 .isInstanceOf(AuthTokenSignatureValidationException.class);
         }
     }

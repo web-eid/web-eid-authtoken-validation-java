@@ -59,4 +59,65 @@ class AuthTokenAlgorithmTest extends AbstractTestWithValidator {
             .hasMessage("Unsupported signature algorithm");
     }
 
+    @Test
+    void whenNfcTokenMissingSupportedAlgorithms_thenValidationFails() throws Exception {
+        final WebEidAuthToken token = removeJsonField();
+
+        assertThatThrownBy(() -> validator.validate(token, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(AuthTokenParseException.class)
+            .hasMessageContaining("'supportedSignatureAlgorithms' field is missing");
+    }
+
+    @Test
+    void whenNfcTokenHasInvalidCryptoAlgorithm_thenValidationFails() throws Exception {
+        final WebEidAuthToken token = replaceTokenField(
+            VALID_NFC_AUTH_TOKEN,
+            "\"cryptoAlgorithm\":\"RSA\"",
+            "\"cryptoAlgorithm\":\"INVALID\""
+        );
+
+        assertThatThrownBy(() -> validator.validate(token, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(AuthTokenParseException.class)
+            .hasMessage("Unsupported signature algorithm");
+    }
+
+    @Test
+    void whenNfcTokenHasInvalidHashFunction_thenValidationFails() throws Exception {
+        final WebEidAuthToken token = replaceTokenField(
+            VALID_NFC_AUTH_TOKEN,
+            "\"hashFunction\":\"SHA-256\"",
+            "\"hashFunction\":\"NOT_A_HASH\""
+        );
+
+        assertThatThrownBy(() -> validator.validate(token, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(AuthTokenParseException.class)
+            .hasMessage("Unsupported signature algorithm");
+    }
+
+    @Test
+    void whenNfcTokenHasInvalidPaddingScheme_thenValidationFails() throws Exception {
+        final WebEidAuthToken token = replaceTokenField(
+            VALID_NFC_AUTH_TOKEN,
+            "\"paddingScheme\":\"PKCS1.5\"",
+            "\"paddingScheme\":\"BAD_PADDING\""
+        );
+
+        assertThatThrownBy(() -> validator.validate(token, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(AuthTokenParseException.class)
+            .hasMessage("Unsupported signature algorithm");
+    }
+
+    @Test
+    void whenNfcTokenHasEmptySupportedAlgorithms_thenValidationFails() throws Exception {
+        final WebEidAuthToken token = replaceTokenField(
+            VALID_NFC_AUTH_TOKEN,
+            "\"supportedSignatureAlgorithms\":[{\"cryptoAlgorithm\":\"RSA\",\"hashFunction\":\"SHA-256\",\"paddingScheme\":\"PKCS1.5\"}]",
+            "\"supportedSignatureAlgorithms\":[]"
+        );
+
+        assertThatThrownBy(() -> validator.validate(token, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(AuthTokenParseException.class)
+            .hasMessage("'supportedSignatureAlgorithms' field is missing");
+    }
+
 }

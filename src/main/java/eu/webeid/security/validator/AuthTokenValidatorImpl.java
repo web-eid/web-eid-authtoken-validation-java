@@ -68,6 +68,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
     private OcspClient ocspClient;
     private OcspServiceProvider ocspServiceProvider;
     private final AuthTokenSignatureValidator authTokenSignatureValidator;
+    private final NfcAuthTokenValidator nfcAuthTokenValidator;
 
     /**
      * @param configuration configuration parameters for the token validator
@@ -84,6 +85,11 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         simpleSubjectCertificateValidators = SubjectCertificateValidatorBatch.createFrom(
             SubjectCertificatePurposeValidator::validateCertificatePurpose,
             new SubjectCertificatePolicyValidator(configuration.getDisallowedSubjectCertificatePolicies())::validateCertificatePolicies
+        );
+
+        this.nfcAuthTokenValidator = new NfcAuthTokenValidator(
+            simpleSubjectCertificateValidators,
+            getCertTrustValidators()
         );
 
         if (configuration.isUserCertificateRevocationCheckWithOcspEnabled()) {
@@ -154,6 +160,10 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
             throw new AuthTokenParseException("'unverifiedCertificate' field is missing, null or empty");
         }
         final X509Certificate subjectCertificate = CertificateLoader.decodeCertificateFromBase64(token.getUnverifiedCertificate());
+
+        if (token.getFormat().startsWith(CURRENT_NFC_TOKEN_FORMAT_VERSION)) {
+            nfcAuthTokenValidator.validate(token, subjectCertificate);
+        }
 
         simpleSubjectCertificateValidators.executeFor(subjectCertificate);
         getCertTrustValidators().executeFor(subjectCertificate);

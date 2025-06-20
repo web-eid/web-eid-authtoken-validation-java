@@ -35,6 +35,7 @@ import java.security.cert.X509Certificate;
 public interface AuthTokenValidator {
 
     String CURRENT_TOKEN_FORMAT_VERSION = "web-eid:1";
+    String CURRENT_NFC_TOKEN_FORMAT_VERSION = "web-eid:1.1";
 
     /**
      * Parses the Web eID authentication token signed by the subject.
