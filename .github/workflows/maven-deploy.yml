@@ -14,14 +14,14 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: zulu
-          java-version: 11
+          java-version: 21
 
       - name: Cache Maven packages
         uses: actions/cache@v4
         with:
           path: ~/.m2
-          key: ${{ runner.os }}-m2-v8-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2-v8
+          key: ${{ runner.os }}-m2-v21-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2-v21
 
       - name: Deploy to GitLab Package Repository # GitHub Packages
         env:

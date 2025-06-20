@@ -22,18 +22,24 @@
 
 package eu.webeid.security.validator.ocsp;
 
-import org.bouncycastle.cert.X509CertificateHolder;
-import org.junit.jupiter.api.Test;
 import eu.webeid.security.exceptions.OCSPCertificateException;
 import eu.webeid.security.validator.ocsp.service.OcspService;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.junit.jupiter.api.Test;
 
 import java.net.URI;
 import java.util.Date;
 
-import static org.assertj.core.api.Assertions.*;
-import static eu.webeid.security.testutil.Certificates.*;
+import static eu.webeid.security.testutil.Certificates.getJaakKristjanEsteid2018Cert;
+import static eu.webeid.security.testutil.Certificates.getMariliisEsteid2015Cert;
+import static eu.webeid.security.testutil.Certificates.getTestEsteid2015CA;
+import static eu.webeid.security.testutil.Certificates.getTestEsteid2018CA;
+import static eu.webeid.security.testutil.Certificates.getTestSkOcspResponder2020;
 import static eu.webeid.security.testutil.OcspServiceMaker.getAiaOcspServiceProvider;
 import static eu.webeid.security.testutil.OcspServiceMaker.getDesignatedOcspServiceProvider;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 class OcspServiceProviderTest {
 

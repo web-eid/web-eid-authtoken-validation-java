@@ -26,16 +26,17 @@ import org.apache.tomcat.util.http.Rfc6265CookieProcessor;
 import org.springframework.boot.web.embedded.tomcat.TomcatContextCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
-public class SameSiteCookieConfiguration implements WebMvcConfigurer {
+public class SameSiteCookieConfiguration {
 
     @Bean
     public TomcatContextCustomizer configureSameSiteCookies() {
         return context -> {
             final Rfc6265CookieProcessor cookieProcessor = new Rfc6265CookieProcessor();
-            cookieProcessor.setSameSiteCookies("strict");
+            // Set to "strict" if Web eID for Mobile flow is not used - this would restrict sending back the
+            // authentication response in the Web eID for Mobile flow.
+            cookieProcessor.setSameSiteCookies("lax");
             context.setCookieProcessor(cookieProcessor);
         };
     }

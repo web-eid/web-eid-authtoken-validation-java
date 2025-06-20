@@ -20,20 +20,31 @@
  * SOFTWARE.
  */
 
-package eu.webeid.example.security.dto;
+package eu.webeid.security.authtoken;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import eu.webeid.security.authtoken.WebEidAuthToken;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-public class AuthTokenDTO {
-    @JsonProperty("auth-token")
-    private WebEidAuthToken token;
+import java.util.List;
 
-    public WebEidAuthToken getToken() {
-        return token;
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class UnverifiedSigningCertificate {
+
+    private String certificate;
+    private List<SupportedSignatureAlgorithm> supportedSignatureAlgorithms;
+
+    public String getCertificate() {
+        return certificate;
     }
 
-    public void setToken(WebEidAuthToken token) {
-        this.token = token;
+    public void setCertificate(String certificate) {
+        this.certificate = certificate;
+    }
+
+    public List<SupportedSignatureAlgorithm> getSupportedSignatureAlgorithms() {
+        return supportedSignatureAlgorithms;
+    }
+
+    public void setSupportedSignatureAlgorithms(List<SupportedSignatureAlgorithm> supportedSignatureAlgorithms) {
+        this.supportedSignatureAlgorithms = supportedSignatureAlgorithms;
     }
 }
