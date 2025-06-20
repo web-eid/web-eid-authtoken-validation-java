@@ -22,12 +22,12 @@
 
 package eu.webeid.security.validator.certvalidators;
 
-import eu.webeid.security.exceptions.UserCertificateWrongPurposeException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.UserCertificateMissingPurposeException;
 import eu.webeid.security.exceptions.UserCertificateParseException;
+import eu.webeid.security.exceptions.UserCertificateWrongPurposeException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
