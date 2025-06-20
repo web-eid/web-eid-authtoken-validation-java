@@ -24,6 +24,8 @@ package eu.webeid.security.authtoken;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+import java.util.List;
+
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class WebEidAuthToken {
 
@@ -31,6 +33,9 @@ public class WebEidAuthToken {
     private String signature;
     private String algorithm;
     private String format;
+
+    private String unverifiedSigningCertificate;
+    private List<SupportedSignatureAlgorithm> supportedSignatureAlgorithms;
 
     public String getUnverifiedCertificate() {
         return unverifiedCertificate;
@@ -64,4 +69,19 @@ public class WebEidAuthToken {
         this.format = format;
     }
 
+    public String getUnverifiedSigningCertificate() {
+        return unverifiedSigningCertificate;
+    }
+
+    public void setUnverifiedSigningCertificate(String unverifiedSigningCertificate) {
+        this.unverifiedSigningCertificate = unverifiedSigningCertificate;
+    }
+
+    public List<SupportedSignatureAlgorithm> getSupportedSignatureAlgorithms() {
+        return supportedSignatureAlgorithms;
+    }
+
+    public void setSupportedSignatureAlgorithms(List<SupportedSignatureAlgorithm> supportedSignatureAlgorithms) {
+        this.supportedSignatureAlgorithms = supportedSignatureAlgorithms;
+    }
 }
