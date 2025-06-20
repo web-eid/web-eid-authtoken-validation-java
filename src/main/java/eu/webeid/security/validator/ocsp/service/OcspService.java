@@ -22,8 +22,8 @@
 
 package eu.webeid.security.validator.ocsp.service;
 
-import org.bouncycastle.cert.X509CertificateHolder;
 import eu.webeid.security.exceptions.AuthTokenException;
+import org.bouncycastle.cert.X509CertificateHolder;
 
 import java.net.URI;
 import java.util.Date;
