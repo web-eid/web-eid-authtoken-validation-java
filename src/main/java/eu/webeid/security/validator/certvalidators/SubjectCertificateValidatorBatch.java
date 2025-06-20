@@ -23,11 +23,17 @@
 package eu.webeid.security.validator.certvalidators;
 
 import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.validator.AuthTokenValidationConfiguration;
+import eu.webeid.security.validator.ocsp.OcspClient;
+import eu.webeid.security.validator.ocsp.OcspServiceProvider;
 
+import java.security.cert.CertStore;
+import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 public final class SubjectCertificateValidatorBatch {
 
@@ -54,5 +60,35 @@ public final class SubjectCertificateValidatorBatch {
 
     private SubjectCertificateValidatorBatch(List<SubjectCertificateValidator> validatorList) {
         this.validatorList = validatorList;
+    }
+
+    /**
+     * Creates the certificate trust validators batch.
+     * As SubjectCertificateTrustedValidator has mutable state that SubjectCertificateNotRevokedValidator depends on,
+     * they cannot be reused/cached in an instance variable in a multi-threaded environment. Hence, they are
+     * re-created for each validation run for thread safety.
+     *
+     * @return certificate trust validator batch
+     */
+    public static SubjectCertificateValidatorBatch forTrustValidation(
+        AuthTokenValidationConfiguration configuration,
+        Set<TrustAnchor> trustedCACertificateAnchors,
+        CertStore trustedCACertificateCertStore,
+        OcspClient ocspClient,
+        OcspServiceProvider ocspServiceProvider) {
+
+        final SubjectCertificateTrustedValidator certTrustedValidator =
+            new SubjectCertificateTrustedValidator(trustedCACertificateAnchors, trustedCACertificateCertStore);
+
+        return SubjectCertificateValidatorBatch.createFrom(
+            certTrustedValidator::validateCertificateTrusted
+        ).addOptional(configuration.isUserCertificateRevocationCheckWithOcspEnabled(),
+            new SubjectCertificateNotRevokedValidator(
+                certTrustedValidator,
+                ocspClient, ocspServiceProvider,
+                configuration.getAllowedOcspResponseTimeSkew(),
+                configuration.getMaxOcspResponseThisUpdateAge()
+            )::validateCertificateNotRevoked
+        );
     }
 }

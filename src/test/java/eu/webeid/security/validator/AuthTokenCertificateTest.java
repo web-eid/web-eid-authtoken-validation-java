@@ -70,7 +70,6 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
 
     private MockedStatic<DateAndTime.DefaultClock> mockedClock;
 
-
     @Override
     @BeforeEach
     protected void setup() {
