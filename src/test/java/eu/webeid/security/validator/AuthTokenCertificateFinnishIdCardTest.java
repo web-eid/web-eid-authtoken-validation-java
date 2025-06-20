@@ -22,21 +22,22 @@
 
 package eu.webeid.security.validator;
 
-import static eu.webeid.security.testutil.DateMocker.mockDate;
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.Mockito.mockStatic;
-
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
 import eu.webeid.security.testutil.AuthTokenValidators;
 import eu.webeid.security.util.DateAndTime;
-import java.io.IOException;
-import java.security.cert.CertificateException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
+
+import java.io.IOException;
+import java.security.cert.CertificateException;
+
+import static eu.webeid.security.testutil.DateMocker.mockDate;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.Mockito.mockStatic;
 
 class AuthTokenCertificateFinnishIdCardTest extends AbstractTestWithValidator {
 

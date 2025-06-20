@@ -22,8 +22,8 @@
 
 package eu.webeid.security.challenge;
 
-import eu.webeid.security.exceptions.ChallengeNonceExpiredException;
 import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.exceptions.ChallengeNonceExpiredException;
 import eu.webeid.security.exceptions.ChallengeNonceNotFoundException;
 
 import static eu.webeid.security.util.DateAndTime.utcNow;

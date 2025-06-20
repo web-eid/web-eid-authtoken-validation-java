@@ -80,4 +80,65 @@ class AuthTokenAlgorithmTest extends AbstractTestWithValidator {
             .hasMessage("Unsupported signature algorithm");
     }
 
+    @Test
+    void whenV11TokenMissingSupportedAlgorithms_thenValidationFails() throws Exception {
+        final WebEidAuthToken token = removeJsonField();
+
+        assertThatThrownBy(() -> validator.validate(token, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(AuthTokenParseException.class)
+            .hasMessageContaining("'supportedSignatureAlgorithms' field is missing");
+    }
+
+    @Test
+    void whenV11TokenHasInvalidCryptoAlgorithm_thenValidationFails() throws Exception {
+        final WebEidAuthToken token = replaceTokenField(
+            VALID_V11_AUTH_TOKEN,
+            "\"cryptoAlgorithm\":\"RSA\"",
+            "\"cryptoAlgorithm\":\"INVALID\""
+        );
+
+        assertThatThrownBy(() -> validator.validate(token, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(AuthTokenParseException.class)
+            .hasMessage("Unsupported signature algorithm");
+    }
+
+    @Test
+    void whenV11TokenHasInvalidHashFunction_thenValidationFails() throws Exception {
+        final WebEidAuthToken token = replaceTokenField(
+            VALID_V11_AUTH_TOKEN,
+            "\"hashFunction\":\"SHA-256\"",
+            "\"hashFunction\":\"NOT_A_HASH\""
+        );
+
+        assertThatThrownBy(() -> validator.validate(token, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(AuthTokenParseException.class)
+            .hasMessage("Unsupported signature algorithm");
+    }
+
+    @Test
+    void whenV11TokenHasInvalidPaddingScheme_thenValidationFails() throws Exception {
+        final WebEidAuthToken token = replaceTokenField(
+            VALID_V11_AUTH_TOKEN,
+            "\"paddingScheme\":\"PKCS1.5\"",
+            "\"paddingScheme\":\"BAD_PADDING\""
+        );
+
+        assertThatThrownBy(() -> validator.validate(token, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(AuthTokenParseException.class)
+            .hasMessage("Unsupported signature algorithm");
+    }
+
+    @Test
+    void whenV11TokenHasEmptySupportedAlgorithms_thenValidationFails() throws Exception {
+        final WebEidAuthToken token = replaceTokenField(
+            VALID_V11_AUTH_TOKEN,
+            "\"supportedSignatureAlgorithms\":[{\"cryptoAlgorithm\":\"RSA\",\"hashFunction\":\"SHA-256\",\"paddingScheme\":\"PKCS1.5\"}]",
+            "\"supportedSignatureAlgorithms\":[]"
+        );
+
+        assertThatThrownBy(() -> validator.validate(token, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(AuthTokenParseException.class)
+            .hasMessage("'supportedSignatureAlgorithms' field is missing");
+    }
+
 }

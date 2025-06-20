@@ -22,7 +22,8 @@
 
 package eu.webeid.example.security;
 
-import eu.webeid.example.security.dto.AuthTokenDTO;
+import eu.webeid.example.config.WebEidMobileProperties;
+import eu.webeid.security.authtoken.SupportedSignatureAlgorithm;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.challenge.ChallengeNonceStore;
 import eu.webeid.security.exceptions.AuthTokenException;
@@ -37,6 +38,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
@@ -47,18 +49,20 @@ import java.util.List;
  * Parses JWT from token string inside AuthTokenDTO and attempts authentication.
  */
 @Component
-public class AuthTokenDTOAuthenticationProvider implements AuthenticationProvider {
+public class WebEidAuthenticationProvider implements AuthenticationProvider {
     public static final String ROLE_USER = "ROLE_USER";
     private static final GrantedAuthority USER_ROLE = new SimpleGrantedAuthority(ROLE_USER);
 
-    private static final Logger LOG = LoggerFactory.getLogger(AuthTokenDTOAuthenticationProvider.class);
+    private static final Logger LOG = LoggerFactory.getLogger(WebEidAuthenticationProvider.class);
 
     private final AuthTokenValidator tokenValidator;
     private final ChallengeNonceStore challengeNonceStore;
+    private final boolean requireSigningCert;
 
-    public AuthTokenDTOAuthenticationProvider(AuthTokenValidator tokenValidator, ChallengeNonceStore challengeNonceStore) {
+    public WebEidAuthenticationProvider(AuthTokenValidator tokenValidator, ChallengeNonceStore challengeNonceStore, WebEidMobileProperties webEidMobileProperties) {
         this.tokenValidator = tokenValidator;
         this.challengeNonceStore = challengeNonceStore;
+        this.requireSigningCert = webEidMobileProperties.requestSigningCert();
     }
 
     @Override
@@ -66,14 +70,17 @@ public class AuthTokenDTOAuthenticationProvider implements AuthenticationProvide
         LOG.info("authenticate(): {}", auth);
 
         final PreAuthenticatedAuthenticationToken authentication = (PreAuthenticatedAuthenticationToken) auth;
-        final WebEidAuthToken authToken = ((AuthTokenDTO) authentication.getCredentials()).getToken();
+        final WebEidAuthToken authToken = (WebEidAuthToken) authentication.getCredentials();
 
         final List<GrantedAuthority> authorities = Collections.singletonList(USER_ROLE);
 
         try {
             final String nonce = challengeNonceStore.getAndRemove().getBase64EncodedNonce();
             final X509Certificate userCertificate = tokenValidator.validate(authToken, nonce);
-            return WebEidAuthentication.fromCertificate(userCertificate, authorities);
+            final var signingCertificate = requireSigningCert && !CollectionUtils.isEmpty(authToken.getUnverifiedSigningCertificates())
+                ? authToken.getUnverifiedSigningCertificates().getFirst() // NOTE: Handling multiple signing certificates is out of scope of this example.
+                : null;
+            return WebEidAuthentication.fromCertificate(userCertificate, signingCertificate, authorities);
         } catch (AuthTokenException e) {
             throw new AuthenticationServiceException("Web eID token validation failed", e);
         } catch (CertificateEncodingException e) {
