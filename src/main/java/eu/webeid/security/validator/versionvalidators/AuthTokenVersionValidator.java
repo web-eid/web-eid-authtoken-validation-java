@@ -20,7 +20,7 @@
  * SOFTWARE.
  */
 
-package eu.webeid.security.validator;
+package eu.webeid.security.validator.versionvalidators;
 
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.certificate.CertificateData;
@@ -29,19 +29,14 @@ import eu.webeid.security.util.Strings;
 
 import java.security.cert.X509Certificate;
 
-/**
- * Parses and validates the provided Web eID authentication token.
- */
-public interface AuthTokenValidator {
-
+public interface AuthTokenVersionValidator {
     /**
-     * Parses the Web eID authentication token signed by the subject.
+     * Returns whether this validator supports validation of the given token format.
      *
-     * @param authToken the Web eID authentication token string, in Web eID JSON format
-     * @return the Web eID authentication token
-     * @throws AuthTokenException when parsing fails
+     * @param format the format string from the Web eID authentication token (e.g. "web-eid:1.0", "web-eid:1.1")
+     * @return true if this validator can handle the given format, false otherwise
      */
-    WebEidAuthToken parse(String authToken) throws AuthTokenException;
+    boolean supports(String format);
 
     /**
      * Validates the Web eID authentication token signed by the subject and returns
@@ -56,5 +51,4 @@ public interface AuthTokenValidator {
      * @throws AuthTokenException when validation fails
      */
     X509Certificate validate(WebEidAuthToken authToken, String currentChallengeNonce) throws AuthTokenException;
-
 }
