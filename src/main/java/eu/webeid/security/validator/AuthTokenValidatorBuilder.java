@@ -214,7 +214,7 @@ public class AuthTokenValidatorBuilder {
         if (configuration.isUserCertificateRevocationCheckWithOcspEnabled() && ocspClient == null) {
             ocspClient = OcspClientImpl.build(configuration.getOcspRequestTimeout());
         }
-        return new AuthTokenValidatorImpl(configuration, ocspClient);
+        return new AuthTokenValidatorManager(configuration, ocspClient);
     }
 
 }
