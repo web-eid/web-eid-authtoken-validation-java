@@ -20,28 +20,16 @@
  * SOFTWARE.
  */
 
-package eu.webeid.example.web.rest;
+package eu.webeid.example.config;
 
-import eu.webeid.example.service.dto.ChallengeDTO;
-import eu.webeid.security.challenge.ChallengeNonceGenerator;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
-@RestController
-@RequestMapping("auth")
-public class ChallengeController {
-
-    private final ChallengeNonceGenerator challengeNonceGenerator;
-
-    public ChallengeController(ChallengeNonceGenerator challengeNonceGenerator) {
-        this.challengeNonceGenerator = challengeNonceGenerator;
-    }
-
-    @GetMapping("challenge")
-    public ChallengeDTO challenge() {
-        final ChallengeDTO challenge = new ChallengeDTO();
-        challenge.setNonce(challengeNonceGenerator.generateAndStoreNonce().getBase64EncodedNonce());
-        return challenge;
-    }
+@Validated
+@ConfigurationProperties(prefix = "web-eid-mobile")
+public record WebEidMobileProperties(
+    @NotBlank @Pattern(regexp = "^.*(?:[^/]|://)$", message = "Base URI must not have a trailing slash") String baseRequestUri,
+    boolean requestSigningCert) {
 }

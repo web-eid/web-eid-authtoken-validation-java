@@ -20,30 +20,31 @@
  * SOFTWARE.
  */
 
-package eu.webeid.example;
+package eu.webeid.example.config;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import eu.webeid.example.web.rest.ChallengeController;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.validation.annotation.Validated;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static eu.webeid.security.challenge.ChallengeNonceGenerator.NONCE_LENGTH;
+import java.time.Duration;
 
-@SpringBootTest
-class AuthenticationRestControllerTest {
+@Validated
+@ConfigurationProperties(prefix = "web-eid-auth-token")
+public record WebEidAuthTokenProperties(WebEidAuthTokenValidation validation) {
 
-    @Autowired
-    ChallengeController authRestController;
-
-    @Test
-    void testChallengeNonceLength() {
-        assertThat(authRestController.challenge().getNonce().length())
-                .isEqualTo(nonceGeneratorNonceBase64Length());
+    public record WebEidAuthTokenValidation(
+        @NotBlank
+        @Pattern(
+            regexp = "^https://[A-Za-z0-9.-]+(:\\d{1,5})?$",
+            message = "Origin URL must be in the form of 'https://' <hostname> [ ':' <port> ] and not end with a trailing slash"
+        )
+        String localOrigin,
+        String siteCertHash,
+        String trustStorePassword,
+        @DefaultValue("5s") Duration ocspRequestTimeout,
+        @NotNull Boolean useDigiDoc4jProdConfiguration) {
     }
-
-    private int nonceGeneratorNonceBase64Length() {
-        return (NONCE_LENGTH * 8 + 6 - 1) / 6 + 1;
-    }
-
 }

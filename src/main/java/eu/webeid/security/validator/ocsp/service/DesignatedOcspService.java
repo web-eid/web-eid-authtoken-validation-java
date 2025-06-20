@@ -22,10 +22,10 @@
 
 package eu.webeid.security.validator.ocsp.service;
 
+import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.exceptions.OCSPCertificateException;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
-import eu.webeid.security.exceptions.OCSPCertificateException;
-import eu.webeid.security.exceptions.AuthTokenException;
 
 import java.net.URI;
 import java.security.cert.CertificateEncodingException;

@@ -29,7 +29,7 @@ import java.security.cert.X509Certificate;
 /**
  * Validators perform the actual user certificate validation actions.
  * <p>
- * They are used by AuthTokenValidatorImpl and are not part of the public API.
+ * They are used by AuthTokenVersionValidatorFactory and are not part of the public API.
  */
 @FunctionalInterface
 public interface SubjectCertificateValidator {

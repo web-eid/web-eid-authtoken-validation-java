@@ -22,10 +22,10 @@
 
 package eu.webeid.security.validator.ocsp.service;
 
+import eu.webeid.security.exceptions.OCSPCertificateException;
 import eu.webeid.security.validator.ocsp.OcspResponseValidator;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
-import eu.webeid.security.exceptions.OCSPCertificateException;
 
 import java.net.URI;
 import java.security.cert.CertificateEncodingException;
