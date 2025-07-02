@@ -22,15 +22,22 @@
 
 package eu.webeid.example;
 
+import eu.webeid.example.service.dto.DigestDTO;
 import eu.webeid.example.testutil.Dates;
 import eu.webeid.example.testutil.HttpHelper;
 import eu.webeid.example.testutil.ObjectMother;
+import eu.webeid.security.authtoken.WebEidAuthToken;
+import eu.webeid.security.challenge.ChallengeNonce;
+import eu.webeid.security.util.DateAndTime;
 import mockit.Mock;
 import mockit.MockUp;
 import org.digidoc4j.impl.asic.AsicSignatureFinalizer;
 import org.digidoc4j.impl.asic.xades.XadesSignature;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
@@ -41,35 +48,38 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.DefaultMockMvcBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
-import eu.webeid.example.service.dto.DigestDTO;
-import eu.webeid.security.challenge.ChallengeNonce;
-import eu.webeid.security.util.DateAndTime;
-import eu.webeid.security.validator.certvalidators.SubjectCertificateNotRevokedValidator;
 
-import java.security.cert.X509Certificate;
+import java.util.stream.Stream;
 
+import static eu.webeid.example.testutil.ObjectMother.VALID_AUTH_TOKEN;
+import static eu.webeid.example.testutil.ObjectMother.VALID_WEB_EID_1_1AUTH_TOKEN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @SpringBootTest
 @WebAppConfiguration
-public class WebApplicationTest {
+class WebApplicationTest {
 
+    private static DefaultMockMvcBuilder mvcBuilder;
     @Autowired
     private WebApplicationContext context;
-
     @Autowired
     private jakarta.servlet.Filter[] springSecurityFilterChain;
 
-    private static DefaultMockMvcBuilder mvcBuilder;
+    static Stream<Arguments> provideAuthToken() {
+        return Stream.of(
+            Arguments.of(VALID_AUTH_TOKEN),
+            Arguments.of(VALID_WEB_EID_1_1AUTH_TOKEN)
+        );
+    }
 
     @BeforeEach
-    public void setup() {
+    void setup() {
         mvcBuilder = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain);
     }
 
     @Test
-    public void testRoot() throws Exception {
+    void testRoot() throws Exception {
         // @formatter:off
         MockHttpServletResponse response = mvcBuilder
             .build()
@@ -81,17 +91,9 @@ public class WebApplicationTest {
         System.out.println(response.getContentAsString());
     }
 
-    @Test
-    public void testHappyFlow_LoginPrepareSignDownload() throws Exception {
-
-        // Arrange
-        new MockUp<SubjectCertificateNotRevokedValidator>() {
-            @Mock
-            public void validateCertificateNotRevoked(X509Certificate subjectCertificate) {
-                // Do not call real OCSP service in tests.
-            }
-        };
-
+    @ParameterizedTest
+    @MethodSource("provideAuthToken")
+    void testHappyFlow_LoginPrepareSignDownload(WebEidAuthToken authToken) throws Exception {
         new MockUp<AsicSignatureFinalizer>() {
             @Mock
             public void validateOcspResponse(XadesSignature xadesSignature) {
@@ -107,7 +109,7 @@ public class WebApplicationTest {
         // Act and assert
         mvcBuilder.build().perform(get("/auth/challenge"));
 
-        MvcResult result = HttpHelper.login(mvcBuilder, session, ObjectMother.mockAuthToken());
+        MvcResult result = HttpHelper.login(mvcBuilder, session, authToken);
         session = (MockHttpSession) result.getRequest().getSession();
         MockHttpServletResponse response = result.getResponse();
         assertEquals("{\"sub\":\"JAAK-KRISTJAN JÕEORG\",\"auth\":\"[ROLE_USER]\"}", response.getContentAsString());
