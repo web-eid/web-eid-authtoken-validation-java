@@ -56,7 +56,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Objects;
 
-import static eu.webeid.example.security.AuthTokenDTOAuthenticationProvider.ROLE_USER;
+import static eu.webeid.example.security.WebEidAuthenticationProvider.ROLE_USER;
 
 @Service
 @Secured(ROLE_USER)

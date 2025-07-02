@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import java.security.Principal;
 import java.util.Objects;
 
-import static eu.webeid.example.security.AuthTokenDTOAuthenticationProvider.ROLE_USER;
+import static eu.webeid.example.security.WebEidAuthenticationProvider.ROLE_USER;
 
 @Controller
 @Secured(ROLE_USER)
