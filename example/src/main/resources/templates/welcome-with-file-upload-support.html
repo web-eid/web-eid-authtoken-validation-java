@@ -17,17 +17,19 @@
         <div class="container">
             <div class="row justify-content-md-center">
                 <div class="col-xs-12 col-md-8" style="padding-top: 3rem;">
+                    <p class="text-end p-4">
+                        <button id="webeid-logout-button" class="btn btn-primary">Logout</button>
+                    </p>
                     <div style="text-align: center;">
                         <h2 class="adding-signature">Sign a document</h2>
                         <p th:text="'Welcome, ' + ${principalName} + '!'" class="welcome-line"></p>
                     </div>
                     <div id="file-name"></div>
                     <p class="text-center p-4">
-                        <button id="webeid-sign-button" class="btn btn-info" style="display: none;">Sign container</button>
+                        <button id="webeid-sign-button" class="btn btn-primary" style="display: none;">Sign container</button>
                         <button id="webeid-download-button" class="btn btn-success" style="display: none;">Download container</button>
                     </p>
                 </div>
-                <button id="webeid-logout-button" class="btn btn-info">Logout</button>
             </div>
         </div>
         <div id="error-message" class="alert alert-danger" style="display: none;" role="alert">
