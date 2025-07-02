@@ -43,7 +43,7 @@ import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 
-import static eu.webeid.example.security.AuthTokenDTOAuthenticationProvider.ROLE_USER;
+import static eu.webeid.example.security.WebEidAuthenticationProvider.ROLE_USER;
 
 @RestController
 @RequestMapping("sign")
