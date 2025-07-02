@@ -22,6 +22,9 @@
 
 package eu.webeid.example.testutil;
 
+import eu.webeid.example.service.dto.CertificateDTO;
+import eu.webeid.example.service.dto.SignatureDTO;
+import eu.webeid.security.authtoken.WebEidAuthToken;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpSession;
@@ -29,9 +32,6 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.DefaultMockMvcBuilder;
-import eu.webeid.example.security.dto.AuthTokenDTO;
-import eu.webeid.example.service.dto.CertificateDTO;
-import eu.webeid.example.service.dto.SignatureDTO;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -39,7 +39,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 public class HttpHelper {
 
-    public static MvcResult login(DefaultMockMvcBuilder mvcBuilder, MockHttpSession session, AuthTokenDTO authTokenDTO) throws Exception {
+    public static MvcResult login(DefaultMockMvcBuilder mvcBuilder, MockHttpSession session, WebEidAuthToken webEidAuthToken) throws Exception {
         // @formatter:off
         return mvcBuilder
                 .build()
@@ -47,7 +47,7 @@ public class HttpHelper {
                         .session(session)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(ObjectMother.toJson(authTokenDTO)))
+                        .content(ObjectMother.toJson(webEidAuthToken)))
                 .andReturn();
         // @formatter:on
     }
