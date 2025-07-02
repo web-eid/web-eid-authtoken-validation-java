@@ -22,8 +22,12 @@
 
 package eu.webeid.example.config;
 
-import eu.webeid.example.security.AuthTokenDTOAuthenticationProvider;
 import eu.webeid.example.security.WebEidAjaxLoginProcessingFilter;
+import eu.webeid.example.security.WebEidAuthenticationProvider;
+import eu.webeid.example.security.WebEidChallengeNonceFilter;
+import eu.webeid.example.security.WebEidMobileAuthInitFilter;
+import eu.webeid.example.security.ui.WebEidLoginPageGeneratingFilter;
+import eu.webeid.security.challenge.ChallengeNonceGenerator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -34,29 +38,36 @@ import org.springframework.security.config.annotation.web.configurers.HeadersCon
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
-import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.thymeleaf.ITemplateEngine;
+import org.thymeleaf.web.servlet.JakartaServletWebApplication;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(securedEnabled = true)
-public class ApplicationConfiguration implements WebMvcConfigurer {
+public class ApplicationConfiguration {
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, AuthTokenDTOAuthenticationProvider authTokenDTOAuthenticationProvider, AuthenticationConfiguration authConfig) throws Exception {
+    public SecurityFilterChain filterChain(
+        HttpSecurity http,
+        WebEidAuthenticationProvider webEidAuthenticationProvider,
+        AuthenticationConfiguration authConfig,
+        ChallengeNonceGenerator challengeNonceGenerator,
+        ITemplateEngine templateEngine,
+        JakartaServletWebApplication webApp
+    ) throws Exception {
         return http
-                .authenticationProvider(authTokenDTOAuthenticationProvider)
-                .addFilterBefore(new WebEidAjaxLoginProcessingFilter("/auth/login", authConfig.getAuthenticationManager()),
-                        UsernamePasswordAuthenticationFilter.class)
-                .logout(logout -> logout.logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler()))
-                .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin))
-                .build();
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/css/**", "/files/**", "/img/**", "/js/**", "/scripts/**").permitAll()
+                .requestMatchers("/").permitAll()
+                .anyRequest().authenticated()
+            )
+            .authenticationProvider(webEidAuthenticationProvider)
+            .addFilterBefore(new WebEidMobileAuthInitFilter("/auth/mobile/init", "/auth/mobile/login", challengeNonceGenerator), UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(new WebEidChallengeNonceFilter("/auth/challenge", challengeNonceGenerator), UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(new WebEidLoginPageGeneratingFilter("/auth/mobile/login", "/auth/login", templateEngine, webApp), UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(new WebEidAjaxLoginProcessingFilter("/auth/login", authConfig.getAuthenticationManager()), UsernamePasswordAuthenticationFilter.class)
+            .logout(l -> l.logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler()))
+            .headers(h -> h.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin))
+            .build();
     }
-
-    @Override
-    public void addViewControllers(ViewControllerRegistry registry) {
-        registry.addViewController("/").setViewName("index");
-        registry.addViewController("/welcome").setViewName("welcome");
-    }
-
 }

@@ -22,7 +22,6 @@
 
 package eu.webeid.example.security;
 
-import eu.webeid.example.security.dto.AuthTokenDTO;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.challenge.ChallengeNonceStore;
 import eu.webeid.security.exceptions.AuthTokenException;
@@ -47,16 +46,16 @@ import java.util.List;
  * Parses JWT from token string inside AuthTokenDTO and attempts authentication.
  */
 @Component
-public class AuthTokenDTOAuthenticationProvider implements AuthenticationProvider {
+public class WebEidAuthenticationProvider implements AuthenticationProvider {
     public static final String ROLE_USER = "ROLE_USER";
     private static final GrantedAuthority USER_ROLE = new SimpleGrantedAuthority(ROLE_USER);
 
-    private static final Logger LOG = LoggerFactory.getLogger(AuthTokenDTOAuthenticationProvider.class);
+    private static final Logger LOG = LoggerFactory.getLogger(WebEidAuthenticationProvider.class);
 
     private final AuthTokenValidator tokenValidator;
     private final ChallengeNonceStore challengeNonceStore;
 
-    public AuthTokenDTOAuthenticationProvider(AuthTokenValidator tokenValidator, ChallengeNonceStore challengeNonceStore) {
+    public WebEidAuthenticationProvider(AuthTokenValidator tokenValidator, ChallengeNonceStore challengeNonceStore) {
         this.tokenValidator = tokenValidator;
         this.challengeNonceStore = challengeNonceStore;
     }
@@ -66,7 +65,7 @@ public class AuthTokenDTOAuthenticationProvider implements AuthenticationProvide
         LOG.info("authenticate(): {}", auth);
 
         final PreAuthenticatedAuthenticationToken authentication = (PreAuthenticatedAuthenticationToken) auth;
-        final WebEidAuthToken authToken = ((AuthTokenDTO) authentication.getCredentials()).getToken();
+        final WebEidAuthToken authToken = (WebEidAuthToken) authentication.getCredentials();
 
         final List<GrantedAuthority> authorities = Collections.singletonList(USER_ROLE);
 
