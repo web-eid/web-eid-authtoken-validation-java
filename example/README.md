@@ -100,7 +100,8 @@ This repository contains the code of a minimal Spring Boot web application that 
 -   Spring Security,
 -   the Web eID authentication token validation library [_web-eid-authtoken-validation-java_](https://github.com/web-eid/web-eid-authtoken-validation-java),
 -   the Web eID JavaScript library [_web-eid.js_](https://github.com/web-eid/web-eid.js),
--   the digital signing library [_DigiDoc4j_](https://github.com/open-eid/digidoc4j).
+-   the digital signing library [_DigiDoc4j_](https://github.com/open-eid/digidoc4j),
+-   the Android application [_MOPP-Android_](https://github.com/open-eid/MOPP-Android/).
 
 The project uses Maven for managing the dependencies and building the application. Maven project configuration file `pom.xml` is in the root of the project.
 
@@ -113,11 +114,13 @@ The source code folder `src` contains the application source code and resources 
 The `src/main/java/eu/webeid/example` directory contains the Spring Boot application Java class and the following subdirectories:
 
 -   `config`: Spring and HTTP security configuration, Web eID authentication token validation library configuration, trusted CA certificates loading etc,
--   `security`: Web eID authentication token validation library integration with Spring Security via an `AuthenticationProvider` and `AuthenticationProcessingFilter`,
+-   `security`: Web eID authentication token validation library integration with Spring Security
+    -   `AuthenticationProvider` and `AuthenticationProcessingFilter` for handling Web eID authentication tokens,
+    -   `WebEidChallengeNonceFilter` for issuing the challenge nonce required by the authentication flow,
+    -   `WebEidMobileAuthInitFilter` for issuing the challenge nonce and generating the deep link with the authentication request, used to initiate the mobile authentication flow,
+    -   `WebEidAjaxLoginProcessingFilter` and `WebEidLoginPageGeneratingFilter` for handling login requests.
 -   `service`: Web eID signing service implementation that uses DigiDoc4j, and DigiDoc4j runtime configuration,
--   `web`: Spring Web MVC controller for the welcome page and Spring Web REST controllers that provide endpoints
-    -   for getting the challenge nonce used by the authentication token validation library,
-    -   for digital signing.
+-   `web`: Spring Web MVC controller for the welcome page and Spring Web REST controller that provides a digital signing endpoint.
 
 The `src/resources` directory contains the resources used by the application:
 
