@@ -40,7 +40,16 @@ public class ChallengeController {
 
     @GetMapping("challenge")
     public ChallengeDTO challenge() {
-        final ChallengeDTO challenge = new ChallengeDTO();
+        return generateChallenge();
+    }
+
+    @GetMapping("mobile/challenge")
+    public ChallengeDTO mobileChallenge() {
+        return generateChallenge();
+    }
+
+    private ChallengeDTO generateChallenge() {
+        ChallengeDTO challenge = new ChallengeDTO();
         challenge.setNonce(challengeNonceGenerator.generateAndStoreNonce().getBase64EncodedNonce());
         return challenge;
     }

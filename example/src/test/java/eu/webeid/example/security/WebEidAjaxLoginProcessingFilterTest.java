@@ -22,6 +22,7 @@
 
 package eu.webeid.example.security;
 
+import eu.webeid.example.testutil.ObjectMother;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 
 import java.io.BufferedReader;
 import java.io.StringReader;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.mock;
@@ -57,5 +59,24 @@ class WebEidAjaxLoginProcessingFilterTest {
         assertDoesNotThrow(() ->
                 new WebEidAjaxLoginProcessingFilter("/auth/login", authenticationManager)
                         .attemptAuthentication(request, response));
+    }
+
+    @Test
+    void testAttemptAuthentication_NfcToken() throws Exception {
+        final HttpServletRequest request = mock(HttpServletRequest.class);
+        final HttpServletResponse response = mock(HttpServletResponse.class);
+        when(request.getMethod()).thenReturn(HttpMethod.POST.name());
+        when(request.getHeader("Content-type")).thenReturn("application/json");
+
+        var jsonBody = ObjectMother.toJson(Map.of("auth-token", ObjectMother.mockNfcAuthToken().getToken()));
+
+        when(request.getReader()).thenReturn(new BufferedReader(new StringReader(jsonBody)));
+
+        final AuthenticationManager authenticationManager = mock(AuthenticationManager.class);
+
+        assertDoesNotThrow(() ->
+            new WebEidAjaxLoginProcessingFilter("/auth/login", authenticationManager)
+                .attemptAuthentication(request, response)
+        );
     }
 }

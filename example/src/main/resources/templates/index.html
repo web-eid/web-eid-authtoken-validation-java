@@ -265,7 +265,11 @@
         authButton.disabled = true;
 
         try {
-            const challengeResponse = await fetch("/auth/challenge", {
+            const challengeUrl = isMobileDevice()
+                ? "/auth/mobile/challenge"
+                : "/auth/challenge";
+
+            const challengeResponse = await fetch(challengeUrl, {
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json"
@@ -273,6 +277,22 @@
             });
             await checkHttpError(challengeResponse);
             const {nonce} = await challengeResponse.json();
+
+            if (isMobileDevice()) {
+                const loginUri = encodeURIComponent(window.location.origin + "/");
+                const payload = {
+                    challenge: nonce,
+                    login_uri: loginUri
+                };
+                const encoded = btoa(JSON.stringify(payload));
+
+                // TODO: Replace with actual URL once DigiDoc app supports app links
+                const eidAppUri = `TODO-MOBILE-EID-APP-LAUNCH-URL#${encoded}`;
+
+                alert("Opening eID app for authentication...\n\nIf nothing happens, the app may not yet support mobile login.");
+                window.location.href = eidAppUri;
+                return;
+            }
 
             const authToken = await webeid.authenticate(nonce, {lang});
 
@@ -298,6 +318,10 @@
             authButton.disabled = false;
         }
     });
+
+    function isMobileDevice() {
+        return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    }
 
     document.addEventListener('DOMContentLoaded', function () {
         setTimeout(function () {
