@@ -48,7 +48,7 @@ Implement the session-backed challenge nonce store as follows:
 import org.springframework.beans.factory.ObjectFactory;
 import eu.webeid.security.challenge.ChallengeNonce;
 import eu.webeid.security.challenge.ChallengeNonceStore;
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpSession;
 
 public class SessionBackedChallengeNonceStore implements ChallengeNonceStore {
 
@@ -134,34 +134,101 @@ import eu.webeid.security.validator.AuthTokenValidatorBuilder;
 ...
 ```
 
-## 6. Add a REST endpoint for issuing challenge nonces
+## 6. Add a filter for issuing challenge nonces
 
-A REST endpoint that issues challenge nonces is required for authentication. The endpoint must support `GET` requests.
+Request Filters that issue challenge nonces for regular Web eID and  Web eID for Mobile authentication flows are required for authentication.
+The filters must support POST requests.
 
-In the following example, we are using the [Spring RESTful Web Services framework](https://spring.io/guides/gs/rest-service/) to implement the endpoint, see also the full implementation [here](example/blob/main/src/main/java/eu/webeid/example/web/rest/ChallengeController.java).
+The `WebEidChallengeNonceFilter` handles `/auth/challenge` requests and issues a new nonce for regular Web eID authentication flow.
+See the full implementation [here](example/src/main/java/eu/webeid/example/security/WebEidChallengeNonceFilter.java).
 
 ```java
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import eu.webeid.security.challenge.ChallengeNonceGenerator;
-...
+public final class WebEidChallengeNonceFilter extends OncePerRequestFilter {
+    private static final ObjectWriter OBJECT_WRITER = new ObjectMapper().writer();
+    private final RequestMatcher requestMatcher;
+    private final ChallengeNonceGenerator nonceGenerator;
 
-@RestController
-@RequestMapping("auth")
-public class ChallengeController {
-
-    @Autowired // for brevity, prefer constructor dependency injection
-    private ChallengeNonceGenerator nonceGenerator;
-
-    @GetMapping("challenge")
-    public ChallengeDTO challenge() {
-        // a simple DTO with a single 'nonce' field
-        final ChallengeDTO challenge = new ChallengeDTO();
-        challenge.setNonce(nonceGenerator.generateAndStoreNonce().getBase64EncodedNonce());
-        return challenge;
+    public WebEidChallengeNonceFilter(String path, ChallengeNonceGenerator nonceGenerator) {
+        this.requestMatcher = PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, path);
+        this.nonceGenerator = nonceGenerator;
     }
+
+    @Override
+    protected void doFilterInternal(
+        @NonNull HttpServletRequest request,
+        @NonNull HttpServletResponse response,
+        @NonNull FilterChain chain
+    ) throws ServletException, IOException {
+        if (!requestMatcher.matches(request)) {
+            chain.doFilter(request, response);
+            return;
+        }
+
+        var dto = new ChallengeDTO(nonceGenerator.generateAndStoreNonce().getBase64EncodedNonce());
+
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        OBJECT_WRITER.writeValue(response.getWriter(), dto);
+    }
+
+    public record ChallengeDTO(String nonce) {}
 }
+```
+
+Similarly, the `WebEidMobileAuthInitFilter` handles `/auth/mobile/init` requests for Web eID for Mobile authentication flow by generating a challenge nonce and returning a deep link URI. This deep link contains both the challenge nonce and a login URI for the mobile authentication flow.
+See the full implementation [here](example/src/main/java/eu/webeid/example/security/WebEidMobileAuthInitFilter.java).
+
+```java
+public final class WebEidMobileAuthInitFilter extends OncePerRequestFilter {
+    private static final ObjectWriter OBJECT_WRITER = new ObjectMapper().writer();
+    private final RequestMatcher requestMatcher;
+    private final ChallengeNonceGenerator nonceGenerator;
+    private final String loginPath;
+
+    public WebEidMobileAuthInitFilter(String path, String loginPath, ChallengeNonceGenerator nonceGenerator) {
+        this.requestMatcher = PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, path);
+        this.nonceGenerator = nonceGenerator;
+        this.loginPath = loginPath;
+    }
+
+    @Override
+    protected void doFilterInternal(
+        @NonNull HttpServletRequest request,
+        @NonNull HttpServletResponse response,
+        @NonNull FilterChain chain
+    ) throws IOException, ServletException {
+        if (!requestMatcher.matches(request)) {
+            chain.doFilter(request, response);
+            return;
+        }
+
+        var challenge = nonceGenerator.generateAndStoreNonce();
+
+        String loginUri = ServletUriComponentsBuilder.fromCurrentContextPath()
+            .path(loginPath).build().toUriString();
+
+        String payloadJson = OBJECT_WRITER.writeValueAsString(
+            new AuthPayload(challenge.getBase64EncodedNonce(), loginUri)
+        );
+        String encoded = Base64.getEncoder().encodeToString(payloadJson.getBytes(StandardCharsets.UTF_8));
+        String eidAuthUri = "web-eid-mobile://auth#" + encoded;
+
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        OBJECT_WRITER.writeValue(response.getWriter(), new AuthUri(eidAuthUri));
+    }
+
+    record AuthPayload(String challenge, @JsonProperty("login_uri") String loginUri) {}
+    record AuthUri(@JsonProperty("auth_uri") String authUri) {}
+}
+```
+
+Both filters are registered in the Spring Security filter chain in ApplicationConfiguration
+See the full implementation [here](example/src/main/java/eu/webeid/example/config/ApplicationConfiguration.java):
+```java
+http
+  .addFilterBefore(new WebEidMobileAuthInitFilter("/auth/mobile/init", "/auth/mobile/login", challengeNonceGenerator),
+      UsernamePasswordAuthenticationFilter.class)
+  .addFilterBefore(new WebEidChallengeNonceFilter("/auth/challenge", challengeNonceGenerator),
+      UsernamePasswordAuthenticationFilter.class);
 ```
 
 Also, see general guidelines for implementing secure authentication services [here](https://github.com/SK-EID/smart-id-documentation/wiki/Secure-Implementation-Guide).
@@ -172,11 +239,11 @@ Authentication consists of calling the `validate()` method of the authentication
 
 When using [Spring Security](https://spring.io/guides/topicals/spring-security-architecture) with standard cookie-based authentication,
 
-- implement a custom authentication provider that uses the authentication token validator for authentication as shown [here](example/blob/main/src/main/java/eu/webeid/example/security/AuthTokenDTOAuthenticationProvider.java),
+- implement a custom authentication provider that uses the authentication token validator for authentication as shown [here](example/blob/main/src/main/java/eu/webeid/example/security/WebEidAuthenticationProvider.java),
 - implement an AJAX authentication processing filter that extracts the authentication token and passes it to the authentication manager as shown [here](example/blob/main/src/main/java/eu/webeid/example/security/WebEidAjaxLoginProcessingFilter.java),
 - configure the authentication provider and authentication processing filter in the application configuration as shown [here](example/blob/main/src/main/java/eu/webeid/example/config/ApplicationConfiguration.java).
 
-The gist of the validation is [in the `authenticate()` method](example/blob/main/src/main/java/eu/webeid/example/security/AuthTokenDTOAuthenticationProvider.java#L74-L76) of the authentication provider:
+The gist of the validation is [in the `authenticate()` method](example/blob/main/src/main/java/eu/webeid/example/security/WebEidAuthenticationProvider.java#L74-L76) of the authentication provider:
 
 ```java
 try {
