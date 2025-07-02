@@ -22,6 +22,9 @@
 
 package eu.webeid.example;
 
+import eu.webeid.example.service.SigningService;
+import eu.webeid.example.service.dto.FileDTO;
+import eu.webeid.example.service.dto.SignatureDTO;
 import eu.webeid.example.testutil.Dates;
 import eu.webeid.example.testutil.HttpHelper;
 import eu.webeid.example.testutil.ObjectMother;
@@ -99,6 +102,14 @@ public class WebApplicationTest {
             }
         };
 
+        new MockUp<SigningService>() {
+            @Mock
+            public FileDTO signContainer(SignatureDTO signatureDTO) {
+                // Return a dummy FileDTO in tests
+                return new FileDTO("example-for-signing.asice");
+            }
+        };
+
         MockHttpSession session = new MockHttpSession();
         session.setAttribute("challenge-nonce", new ChallengeNonce(ObjectMother.VALID_CHALLENGE_NONCE, DateAndTime.utcNow().plusMinutes(1)));
 
@@ -132,4 +143,37 @@ public class WebApplicationTest {
         assertEquals(HttpStatus.OK.value(), response.getStatus());
         assertEquals("attachment; filename=example-for-signing.asice", response.getHeader("Content-Disposition"));
     }
+
+    @Test
+    public void testHappyFlow_NfcLoginAuthToken() throws Exception {
+        new MockUp<SubjectCertificateNotRevokedValidator>() {
+            @Mock
+            public void validateCertificateNotRevoked(X509Certificate subjectCertificate) {
+                // Do not call real OCSP service in tests.
+            }
+        };
+
+        new MockUp<AsicSignatureFinalizer>() {
+            @Mock
+            public void validateOcspResponse(XadesSignature xadesSignature) {
+                // Do not call real OCSP service in tests.
+            }
+        };
+
+        new MockUp<SigningService>() {
+            @Mock
+            public FileDTO signContainer(SignatureDTO signatureDTO) {
+                // Return a dummy FileDTO in tests
+                return new FileDTO("example-for-signing.asice");
+            }
+        };
+
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("challenge-nonce", new ChallengeNonce(ObjectMother.VALID_CHALLENGE_NONCE, DateAndTime.utcNow().plusMinutes(1)));
+
+        MvcResult result = HttpHelper.login(mvcBuilder, session, ObjectMother.mockNfcAuthToken());
+        MockHttpServletResponse response = result.getResponse();
+        assertEquals("{\"sub\":\"JAAK-KRISTJAN JÕEORG\",\"auth\":\"[ROLE_USER]\"}", response.getContentAsString());
+    }
+
 }
