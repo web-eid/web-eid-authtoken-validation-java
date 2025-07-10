@@ -342,11 +342,11 @@ class SubjectCertificateNotRevokedValidatorTest {
         return getSubjectCertificateNotRevokedValidator(getMockClient(response), getAiaOcspServiceProvider());
     }
 
-    private SubjectCertificateNotRevokedValidator getSubjectCertificateNotRevokedValidator(OcspServiceProvider ocspServiceProvider) throws JceException {
+    private SubjectCertificateNotRevokedValidator getSubjectCertificateNotRevokedValidator(OcspServiceProvider ocspServiceProvider) {
         return getSubjectCertificateNotRevokedValidator(ocspClient, ocspServiceProvider);
     }
 
-    private SubjectCertificateNotRevokedValidator getSubjectCertificateNotRevokedValidator(OcspClient client, OcspServiceProvider ocspServiceProvider) throws JceException {
+    private SubjectCertificateNotRevokedValidator getSubjectCertificateNotRevokedValidator(OcspClient client, OcspServiceProvider ocspServiceProvider) {
         return new SubjectCertificateNotRevokedValidator(trustedValidator, client, ocspServiceProvider, CONFIGURATION.getAllowedOcspResponseTimeSkew(), CONFIGURATION.getMaxOcspResponseThisUpdateAge());
     }
 
@@ -357,6 +357,7 @@ class SubjectCertificateNotRevokedValidatorTest {
     }
 
     private HttpResponse<byte[]> getMockedResponse(byte[] bodyContent) throws URISyntaxException {
+        @SuppressWarnings("unchecked")
         final HttpResponse<byte[]> mockResponse = mock(HttpResponse.class);
 
         final HttpHeaders headers = HttpHeaders.of(
