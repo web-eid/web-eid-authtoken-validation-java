@@ -87,15 +87,41 @@
                     Attach a smart card reader to the computer and insert the eID card into the reader.
                 </li>
                 <li>Click <i>Authenticate</i> below.</li>
+                <li>
+                    Select the Web eID application language from the dropdown menu.
+                    If you have previously configured a language preference within the Web eID application dialog, that setting will take precedence over the language selection made here.
+                    Please note that this language setting does not affect the website interface.
+                </li>
             </ol>
 
             <div id="error-message" class="alert alert-danger" style="display: none;" role="alert">
                 <div class="message"></div>
                 <pre class="details"></pre>
             </div>
-            <p class="text-center p-4">
+
+            <div class="d-flex justify-content-center align-items-center p-4">
                 <button id="webeid-auth-button" class="btn btn-info">Authenticate</button>
-            </p>
+                <div class="language-dropdown ml-1">
+                    <button id="language-button" class="language-btn" type="button">
+                        <span id="selected-lang">EN</span>
+                        <span class="dropdown-arrow">▼</span>
+                    </button>
+                    <div id="language-menu" class="language-menu">
+                        <div class="language-grid">
+                            <button class="language-option" data-lang="et" data-display="ET">Eesti</button>
+                            <button class="language-option" data-lang="en" data-display="EN">English</button>
+                            <button class="language-option" data-lang="ru" data-display="RU">Русский</button>
+                            <button class="language-option" data-lang="fi" data-display="FI">Suomi</button>
+                            <button class="language-option" data-lang="hr" data-display="HR">Hrvatska</button>
+                            <button class="language-option" data-lang="de" data-display="DE">Deutsch</button>
+                            <button class="language-option" data-lang="fr" data-display="FR">Française</button>
+                            <button class="language-option" data-lang="nl" data-display="NL">Nederlands</button>
+                            <button class="language-option" data-lang="cs" data-display="CS">Čeština</button>
+                            <button class="language-option" data-lang="sk" data-display="SK">Slovenština</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <p>The privacy policy of the test service is available <a href="/files/Web eID privacy policy.pdf">here</a>.
             </p>
@@ -250,6 +276,7 @@
     "use strict";
     import * as webeid from "/js/web-eid.js";
     import {hideErrorMessage, showErrorMessage, checkHttpError} from "/js/errors.js";
+    import {setupLanguageSelection} from "/js/index.js";
 
     hideErrorMessage();
 
@@ -258,7 +285,8 @@
     const csrfToken = document.querySelector('#csrftoken').content;
     const csrfHeaderName = document.querySelector('#csrfheadername').content;
 
-    const lang = new URLSearchParams(window.location.search).get("lang") || "en";
+    let lang = new URLSearchParams(window.location.search).get("lang") || "en";
+    setupLanguageSelection(lang, changedLang => lang = changedLang);
 
     authButton.addEventListener("click", async () => {
         hideErrorMessage();
@@ -289,7 +317,7 @@
 
             console.log("Authentication successful! Result:", authTokenResult);
 
-            window.location.href = "/welcome";
+            window.location.href = "/welcome?lang=" + lang;
 
         } catch (error) {
             showErrorMessage(error);
