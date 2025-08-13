@@ -17,7 +17,9 @@ class YAMLConfigTest {
         "http://127.0.0.1",
         "http://127.0.0.1:8080",
         "http://[::1]",
-        "http://[::1]:8080"
+        "http://[::1]:8080",
+        "http://[0000:0000:0000:0000:0000:0000:0000:0001]",
+        "http://[0000:0000:0000:0000:0000:0000:0000:0001]:8080"
     })
     @ParameterizedTest
     void givenLocalOriginHttpLoopbackAddress_whenParsingLocalOrigin_thenItIsReplacedWithHttps(String origin) {
@@ -33,6 +35,8 @@ class YAMLConfigTest {
         "https://127.0.0.1:8080",
         "https://[::1]",
         "https://[::1]:8080",
+        "https://[0000:0000:0000:0000:0000:0000:0000:0001]",
+        "https://[0000:0000:0000:0000:0000:0000:0000:0001]:8080"
     })
     @ParameterizedTest
     void givenLocalOriginHttpsLoopbackAddress_whenParsingLocalOrigin_thenOriginalIsKept(String origin) {
