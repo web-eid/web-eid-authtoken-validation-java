@@ -77,6 +77,25 @@ public class ValidationConfiguration {
                 .build();
     }
 
+    @Bean
+    public AuthTokenValidator validator(YAMLConfig yamlConfig) {
+        try {
+            return new AuthTokenValidatorBuilder()
+                .withSiteOrigin(URI.create(yamlConfig.getLocalOrigin()))
+                .withTrustedCertificateAuthorities(loadTrustedCACertificatesFromCerFiles())
+                .withTrustedCertificateAuthorities(loadTrustedCACertificatesFromTrustStore(yamlConfig))
+                .withOcspRequestTimeout(yamlConfig.getOcspRequestTimeout())
+                .build();
+        } catch (JceException e) {
+            throw new RuntimeException("Error building the Web eID auth token validator.", e);
+        }
+    }
+
+    @Bean
+    public YAMLConfig yamlConfig() {
+        return new YAMLConfig();
+    }
+
     private X509Certificate[] loadTrustedCACertificatesFromCerFiles() {
         List<X509Certificate> caCertificates = new ArrayList<>();
 
@@ -121,23 +140,6 @@ public class ValidationConfiguration {
         return caCertificates.toArray(new X509Certificate[0]);
     }
 
-    @Bean
-    public AuthTokenValidator validator(YAMLConfig yamlConfig) {
-        try {
-            return new AuthTokenValidatorBuilder()
-                    .withSiteOrigin(URI.create(yamlConfig.getLocalOrigin()))
-                    .withTrustedCertificateAuthorities(loadTrustedCACertificatesFromCerFiles())
-                    .withTrustedCertificateAuthorities(loadTrustedCACertificatesFromTrustStore(yamlConfig))
-                    .withOcspRequestTimeout(yamlConfig.getOcspRequestTimeout())
-                    .build();
-        } catch (JceException e) {
-            throw new RuntimeException("Error building the Web eID auth token validator.", e);
-        }
-    }
 
-    @Bean
-    public YAMLConfig yamlConfig() {
-        return new YAMLConfig();
-    }
 
 }
