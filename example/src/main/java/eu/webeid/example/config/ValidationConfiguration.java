@@ -77,8 +77,7 @@ public class ValidationConfiguration {
                 .build();
     }
 
-    @Bean
-    public X509Certificate[] loadTrustedCACertificatesFromCerFiles() {
+    private X509Certificate[] loadTrustedCACertificatesFromCerFiles() {
         List<X509Certificate> caCertificates = new ArrayList<>();
 
         try {
@@ -99,8 +98,7 @@ public class ValidationConfiguration {
         return caCertificates.toArray(new X509Certificate[0]);
     }
 
-    @Bean
-    public X509Certificate[] loadTrustedCACertificatesFromTrustStore() {
+    private X509Certificate[] loadTrustedCACertificatesFromTrustStore(YAMLConfig yamlConfig) {
         List<X509Certificate> caCertificates = new ArrayList<>();
 
         try (InputStream is = ValidationConfiguration.class.getResourceAsStream(CERTS_RESOURCE_PATH + activeProfile + "/" + TRUSTED_CERTIFICATES_JKS)) {
@@ -109,7 +107,7 @@ public class ValidationConfiguration {
                 return new X509Certificate[0];
             }
             KeyStore keystore = KeyStore.getInstance(KeyStore.getDefaultType());
-            keystore.load(is, yamlConfig().getTrustStorePassword().toCharArray());
+            keystore.load(is, yamlConfig.getTrustStorePassword().toCharArray());
             Enumeration<String> aliases = keystore.aliases();
             while (aliases.hasMoreElements()) {
                 String alias = aliases.nextElement();
@@ -124,12 +122,13 @@ public class ValidationConfiguration {
     }
 
     @Bean
-    public AuthTokenValidator validator() {
+    public AuthTokenValidator validator(YAMLConfig yamlConfig) {
         try {
             return new AuthTokenValidatorBuilder()
-                    .withSiteOrigin(URI.create(yamlConfig().getLocalOrigin()))
+                    .withSiteOrigin(URI.create(yamlConfig.getLocalOrigin()))
                     .withTrustedCertificateAuthorities(loadTrustedCACertificatesFromCerFiles())
-                    .withTrustedCertificateAuthorities(loadTrustedCACertificatesFromTrustStore())
+                    .withTrustedCertificateAuthorities(loadTrustedCACertificatesFromTrustStore(yamlConfig))
+                    .withOcspRequestTimeout(yamlConfig.getOcspRequestTimeout())
                     .build();
         } catch (JceException e) {
             throw new RuntimeException("Error building the Web eID auth token validator.", e);

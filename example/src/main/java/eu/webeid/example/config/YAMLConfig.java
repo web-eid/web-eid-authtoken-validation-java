@@ -22,6 +22,7 @@
 
 package eu.webeid.example.config;
 
+import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -40,6 +41,8 @@ public class YAMLConfig {
 
     @Value("truststore-password")
     private String trustStorePassword;
+
+    private Duration ocspRequestTimeout = Duration.ofSeconds(5L);
 
     @Value("#{new Boolean('${web-eid-auth-token.validation.use-digidoc4j-prod-configuration}'.trim())}")
     private Boolean useDigiDoc4jProdConfiguration;
@@ -74,5 +77,13 @@ public class YAMLConfig {
 
     public void setUseDigiDoc4jProdConfiguration(boolean useDigiDoc4jProdConfiguration) {
         this.useDigiDoc4jProdConfiguration = useDigiDoc4jProdConfiguration;
+    }
+
+    public Duration getOcspRequestTimeout() {
+        return ocspRequestTimeout;
+    }
+
+    public void setOcspRequestTimeout(Duration ocspRequestTimeout) {
+        this.ocspRequestTimeout = ocspRequestTimeout;
     }
 }
