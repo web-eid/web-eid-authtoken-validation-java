@@ -108,16 +108,6 @@
                     </button>
                     <div id="language-menu" class="language-menu">
                         <div class="language-grid">
-                            <button class="language-option" data-lang="et" data-display="ET">Eesti</button>
-                            <button class="language-option" data-lang="en" data-display="EN">English</button>
-                            <button class="language-option" data-lang="ru" data-display="RU">Русский</button>
-                            <button class="language-option" data-lang="fi" data-display="FI">Suomi</button>
-                            <button class="language-option" data-lang="hr" data-display="HR">Hrvatska</button>
-                            <button class="language-option" data-lang="de" data-display="DE">Deutsch</button>
-                            <button class="language-option" data-lang="fr" data-display="FR">Française</button>
-                            <button class="language-option" data-lang="nl" data-display="NL">Nederlands</button>
-                            <button class="language-option" data-lang="cs" data-display="CS">Čeština</button>
-                            <button class="language-option" data-lang="sk" data-display="SK">Slovenština</button>
                         </div>
                     </div>
                 </div>
@@ -276,7 +266,7 @@
     "use strict";
     import * as webeid from "/js/web-eid.js";
     import {hideErrorMessage, showErrorMessage, checkHttpError} from "/js/errors.js";
-    import {setupLanguageSelection} from "/js/index.js";
+    import {setupLanguageSelection, getValidatedLangFromUrl} from "/js/index.js";
 
     hideErrorMessage();
 
@@ -285,7 +275,7 @@
     const csrfToken = document.querySelector('#csrftoken').content;
     const csrfHeaderName = document.querySelector('#csrfheadername').content;
 
-    let lang = new URLSearchParams(window.location.search).get("lang") || "en";
+    let lang = getValidatedLangFromUrl();
     setupLanguageSelection(lang, changedLang => lang = changedLang);
 
     authButton.addEventListener("click", async () => {
@@ -317,8 +307,11 @@
 
             console.log("Authentication successful! Result:", authTokenResult);
 
-            window.location.href = "/welcome?lang=" + lang;
-
+            const welcomePageUrl = new URL("/welcome", window.location.origin);
+            if (lang) {
+                welcomePageUrl.searchParams.set("lang", lang);
+            }
+            window.location.href = welcomePageUrl.toString();
         } catch (error) {
             showErrorMessage(error);
             throw error;
