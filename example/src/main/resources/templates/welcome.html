@@ -52,6 +52,7 @@
     "use strict";
     import * as webeid from "/js/web-eid.js";
     import {hideErrorMessage, showErrorMessage, checkHttpError} from "/js/errors.js";
+    import {getValidatedLangFromUrl} from "/js/index.js";
 
     const signButton = document.querySelector("#webeid-sign-button");
     const downloadButton = document.querySelector("#webeid-download-button");
@@ -70,7 +71,12 @@
                 [csrfHeaderName]: csrfToken
             }
         });
-        window.location.href = "/";
+        const lang = getValidatedLangFromUrl();
+        const indexPageUrl = new URL("/", window.location.origin);
+        if (lang) {
+            indexPageUrl.searchParams.set("lang", lang);
+        }
+        window.location.href = indexPageUrl.toString();
     });
 
     downloadButton.addEventListener("click", async () => {
