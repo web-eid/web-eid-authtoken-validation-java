@@ -29,12 +29,12 @@ const SUPPORTED_LANGUAGES = [
   { lang: "en", display: "EN", name: "English" },
   { lang: "ru", display: "RU", name: "Русский" },
   { lang: "fi", display: "FI", name: "Suomi" },
-  { lang: "hr", display: "HR", name: "Hrvatska" },
+  { lang: "hr", display: "HR", name: "Hrvatski" },
   { lang: "de", display: "DE", name: "Deutsch" },
-  { lang: "fr", display: "FR", name: "Française" },
+  { lang: "fr", display: "FR", name: "Français" },
   { lang: "nl", display: "NL", name: "Nederlands" },
   { lang: "cs", display: "CS", name: "Čeština" },
-  { lang: "sk", display: "SK", name: "Slovenština" },
+  { lang: "sk", display: "SK", name: "Slovenčina" },
   NO_LANGUAGE_SELECTED
 ];
 
