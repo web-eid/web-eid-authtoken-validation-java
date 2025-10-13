@@ -82,7 +82,7 @@ public class HttpHelper {
         // @formatter:off
         return mvcBuilder
                 .build()
-                .perform(post("/sign/sign")
+                .perform(post("/sign/signature")
                         .session(session)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)

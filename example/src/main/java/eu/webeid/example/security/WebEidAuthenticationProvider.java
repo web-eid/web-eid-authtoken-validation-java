@@ -22,6 +22,8 @@
 
 package eu.webeid.example.security;
 
+import eu.webeid.example.config.WebEidMobileProperties;
+import eu.webeid.security.authtoken.SupportedSignatureAlgorithm;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.challenge.ChallengeNonceStore;
 import eu.webeid.security.exceptions.AuthTokenException;
@@ -54,10 +56,12 @@ public class WebEidAuthenticationProvider implements AuthenticationProvider {
 
     private final AuthTokenValidator tokenValidator;
     private final ChallengeNonceStore challengeNonceStore;
+    private final boolean requireSigningCert;
 
-    public WebEidAuthenticationProvider(AuthTokenValidator tokenValidator, ChallengeNonceStore challengeNonceStore) {
+    public WebEidAuthenticationProvider(AuthTokenValidator tokenValidator, ChallengeNonceStore challengeNonceStore, WebEidMobileProperties webEidMobileProperties) {
         this.tokenValidator = tokenValidator;
         this.challengeNonceStore = challengeNonceStore;
+        this.requireSigningCert = webEidMobileProperties.requestSigningCert();
     }
 
     @Override
@@ -72,7 +76,14 @@ public class WebEidAuthenticationProvider implements AuthenticationProvider {
         try {
             final String nonce = challengeNonceStore.getAndRemove().getBase64EncodedNonce();
             final X509Certificate userCertificate = tokenValidator.validate(authToken, nonce);
-            return WebEidAuthentication.fromCertificate(userCertificate, authorities);
+            final String signingCertificate = requireSigningCert
+                ? authToken.getUnverifiedSigningCertificate()
+                : null;
+            final List<SupportedSignatureAlgorithm> supportedSignatureAlgorithms = requireSigningCert
+                ? authToken.getSupportedSignatureAlgorithms()
+                : null;
+
+            return WebEidAuthentication.fromCertificate(userCertificate, signingCertificate, supportedSignatureAlgorithms, authorities);
         } catch (AuthTokenException e) {
             throw new AuthenticationServiceException("Web eID token validation failed", e);
         } catch (CertificateEncodingException e) {

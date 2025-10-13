@@ -22,7 +22,9 @@
 
 package eu.webeid.example.security;
 
+import eu.webeid.security.authtoken.SupportedSignatureAlgorithm;
 import eu.webeid.security.certificate.CertificateData;
+import org.springframework.lang.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
@@ -36,21 +38,21 @@ import java.util.Optional;
 public class WebEidAuthentication extends PreAuthenticatedAuthenticationToken implements Authentication {
 
     private final String idCode;
+    private final transient String signingCertificate;
+    private final transient List<SupportedSignatureAlgorithm> supportedSignatureAlgorithms;
 
-    public static Authentication fromCertificate(X509Certificate userCertificate, List<GrantedAuthority> authorities) throws CertificateEncodingException {
-        final String principalName = getPrincipalNameFromCertificate(userCertificate);
-        final String idCode = CertificateData.getSubjectIdCode(userCertificate)
-                .orElseThrow(() -> new CertificateEncodingException("Certificate does not contain subject ID code"));
-        return new WebEidAuthentication(principalName, idCode, authorities);
-    }
-
-    public String getIdCode() {
-        return idCode;
-    }
-
-    private WebEidAuthentication(String principalName, String idCode, List<GrantedAuthority> authorities) {
+    private WebEidAuthentication(String principalName, String idCode, String signingCertificate, List<SupportedSignatureAlgorithm> supportedSignatureAlgorithms, List<GrantedAuthority> authorities) {
         super(principalName, idCode, authorities);
         this.idCode = idCode;
+        this.signingCertificate = signingCertificate;
+        this.supportedSignatureAlgorithms = supportedSignatureAlgorithms;
+    }
+
+    public static Authentication fromCertificate(X509Certificate userCertificate, @Nullable String signingCertificate, @Nullable List<SupportedSignatureAlgorithm> supportedSignatureAlgorithms, List<GrantedAuthority> authorities) throws CertificateEncodingException {
+        final String principalName = getPrincipalNameFromCertificate(userCertificate);
+        final String idCode = CertificateData.getSubjectIdCode(userCertificate)
+            .orElseThrow(() -> new CertificateEncodingException("Certificate does not contain subject ID code"));
+        return new WebEidAuthentication(principalName, idCode, signingCertificate, supportedSignatureAlgorithms, authorities);
     }
 
     private static String getPrincipalNameFromCertificate(X509Certificate userCertificate) throws CertificateEncodingException {
@@ -62,8 +64,20 @@ public class WebEidAuthentication extends PreAuthenticatedAuthenticationToken im
         } else {
             // Organization certificates do not have given name and surname fields.
             return CertificateData.getSubjectCN(userCertificate)
-                    .orElseThrow(() -> new CertificateEncodingException("Certificate does not contain subject CN"));
+                .orElseThrow(() -> new CertificateEncodingException("Certificate does not contain subject CN"));
         }
+    }
+
+    public String getIdCode() {
+        return idCode;
+    }
+
+    public String getSigningCertificate() {
+        return signingCertificate;
+    }
+
+    public List<SupportedSignatureAlgorithm> getSupportedSignatureAlgorithms() {
+        return supportedSignatureAlgorithms;
     }
 
     @Override

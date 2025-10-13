@@ -1,4 +1,7 @@
 web-eid-auth-token:
   validation:
-    use-digidoc4j-prod-configuration: false
+    use-digi-doc4j-prod-configuration: false
     local-origin: "https://test.web-eid.eu"
+web-eid-mobile:
+  base-request-uri: "web-eid-mobile://"
+  request-signing-cert: false

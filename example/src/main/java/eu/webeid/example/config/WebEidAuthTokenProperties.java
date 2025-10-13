@@ -20,39 +20,31 @@
  * SOFTWARE.
  */
 
-"use strict";
+package eu.webeid.example.config;
 
-const alertUi = {
-    alert: document.querySelector("#error-message"),
-    alertMessage: document.querySelector("#error-message .message"),
-    alertDetails: document.querySelector("#error-message .details")
-};
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.validation.annotation.Validated;
 
-export function hideErrorMessage() {
-    alertUi.alert.style.display = "none";
-}
+import java.time.Duration;
 
-export function showErrorMessage(error, message = "Authentication failed") {
-    const details =
-        `[Code]\n${error.code ?? "UNKNOWN_ERROR"}` +
-        `\n\n[Message]\n${error.message}` +
-        (error.response ? `\n\n[response]\n${JSON.stringify(error.response, null, " ")}` : "");
+@Validated
+@ConfigurationProperties(prefix = "web-eid-auth-token")
+public record WebEidAuthTokenProperties(WebEidAuthTokenValidation validation) {
 
-    alertUi.alertMessage.innerText = message;
-    alertUi.alertDetails.innerText = details;
-    alertUi.alert.style.display = "block";
-}
-
-export async function checkHttpError(response) {
-    if (!response.ok) {
-        let body;
-        try {
-            body = await response.text();
-        } catch (error) {
-            body = "<<unable to retrieve response body>>";
-        }
-        const error = new Error("Server error: " + body);
-        error.code = response.status;
-        throw error;
+    public record WebEidAuthTokenValidation(
+        @NotBlank
+        @Pattern(
+            regexp = "^https://[A-Za-z0-9.-]+(:\\d{1,5})?$",
+            message = "Origin URL must be in the form of 'https://' <hostname> [ ':' <port> ] and not end with a trailing slash"
+        )
+        String localOrigin,
+        String siteCertHash,
+        String trustStorePassword,
+        @DefaultValue("5s") Duration ocspRequestTimeout,
+        @NotNull Boolean useDigiDoc4jProdConfiguration) {
     }
 }

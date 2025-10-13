@@ -23,6 +23,8 @@
 package eu.webeid.example.web.rest;
 
 import eu.webeid.example.security.WebEidAuthentication;
+import eu.webeid.example.service.MobileSigningService;
+import eu.webeid.example.service.MobileSigningService.MobileInitRequest;
 import eu.webeid.example.service.SigningService;
 import eu.webeid.example.service.dto.CertificateDTO;
 import eu.webeid.example.service.dto.DigestDTO;
@@ -38,6 +40,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.ModelAndView;
 
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
@@ -51,9 +54,11 @@ import static eu.webeid.example.security.WebEidAuthenticationProvider.ROLE_USER;
 public class SigningController {
 
     private final SigningService signingService;
+    private final MobileSigningService mobileSigningService;
 
-    public SigningController(SigningService signingService) {
+    public SigningController(SigningService signingService, MobileSigningService mobileSigningService) {
         this.signingService = signingService;
+        this.mobileSigningService = mobileSigningService;
     }
 
     @PostMapping("prepare")
@@ -61,9 +66,34 @@ public class SigningController {
         return signingService.prepareContainer(data, authentication);
     }
 
-    @PostMapping("sign")
-    public FileDTO sign(@RequestBody SignatureDTO data) {
+    @PostMapping("signature")
+    public FileDTO signature(@RequestBody SignatureDTO data) {
         return signingService.signContainer(data);
+    }
+
+    @PostMapping("mobile/init")
+    public ResponseEntity<MobileInitRequest> mobileInit(WebEidAuthentication authentication) throws CertificateException, IOException, NoSuchAlgorithmException {
+        return ResponseEntity.ok(mobileSigningService.initCertificateOrSigningRequest(authentication));
+    }
+
+    @GetMapping("mobile/certificate")
+    public ModelAndView mobileCertificateResponse() {
+        return new ModelAndView("webeid-callback");
+    }
+
+    @PostMapping("mobile/certificate")
+    public ResponseEntity<MobileInitRequest> mobileCertificate(@RequestBody CertificateDTO certificateDTO, WebEidAuthentication authentication) throws CertificateException, IOException, NoSuchAlgorithmException {
+        return ResponseEntity.ok(mobileSigningService.initSigningRequest(authentication, certificateDTO));
+    }
+
+    @GetMapping("mobile/signature")
+    public ModelAndView mobileSignatureResponse() {
+        return new ModelAndView("webeid-callback");
+    }
+
+    @PostMapping("mobile/signature")
+    public ResponseEntity<FileDTO> mobileSignature(@RequestBody SignatureDTO signatureDTO) {
+        return ResponseEntity.ok(signingService.signContainer(signatureDTO));
     }
 
     @GetMapping(value = "download", produces = "application/vnd.etsi.asic-e+zip")
