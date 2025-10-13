@@ -1,67 +1,42 @@
 <!doctype html>
 <html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>Signing you in…</title>
-</head>
-<body>
-<div id="error-message" class="alert alert-danger" style="display: none;" role="alert">
-    <div class="message"></div>
-    <pre class="details"></pre>
-</div>
+    <head>
+        <meta charset="utf-8" />
+        <title>Signing you in…</title>
+        <link rel="stylesheet" href="/css/bootstrap.min.css" />
+        <link rel="stylesheet" href="/css/main.css" />
+    </head>
+    <body>
+        <div id="error-message" class="alert alert-danger" style="display: none" role="alert">
+            <div class="message"></div>
+            <pre class="details"></pre>
+        </div>
 
-<script type="module" th:inline="javascript">
-    import { showErrorMessage } from "/js/errors.js";
+        <script type="module" th:inline="javascript">
+            import { showErrorMessage, checkHttpError } from "/js/errors.js";
+            import { parsePayload } from "/js/payload.js";
 
-    // Using an async IIFE for mobile WebView compatibility:
-    // top-level await is not supported in some mobile browsers/WebViews.
-    (async function () {
-        const frag = location.hash ? location.hash.substring(1) : "";
-        if (!frag) {
-            showErrorMessage({ code: "UNKNOWN_ERROR", message: "Missing authentication payload" });
-            return;
-        }
+            // Using an async IIFE for mobile WebView compatibility:
+            // top-level await is not supported in some mobile browsers/WebViews.
+            (async function () {
+                const payload = parsePayload("Authentication");
+                const authToken = payload["auth_token"];
+                const response = await fetch(/*[[${loginProcessingPath}]]*/, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRF-TOKEN": /*[[${csrfToken}]]*/
+                    },
+                    body: JSON.stringify(authToken),
+                    credentials: "include"
+                });
+                await checkHttpError(response);
 
-        let payload;
-        try {
-            payload = JSON.parse(atob(frag));
-        } catch (e) {
-            console.error("Failed to parse payload", e);
-            showErrorMessage({ code: "UNKNOWN_ERROR", message: "Failed to parse authentication payload" });
-            return;
-        }
-
-        if (payload.error) {
-            showErrorMessage({
-                code: payload.code ?? "UNKNOWN_ERROR",
-                message: payload.message ?? "Authentication failed"
+                window.location.replace("/welcome");
+            })().catch((error) => {
+                console.error(error);
+                showErrorMessage(error);
             });
-            return;
-        }
-
-        const authToken = payload["auth-token"];
-
-        try {
-            const response = await fetch(/*[[${loginProcessingPath}]]*/, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRF-TOKEN": /*[[${csrfToken}]]*/
-                },
-                body: JSON.stringify(authToken),
-                credentials: "include"
-            });
-
-            if (!response.ok) {
-                throw new Error("HTTP " + response.status);
-            }
-
-            window.location.replace("/welcome");
-        } catch (error) {
-            console.error(error);
-            showErrorMessage(error);
-        }
-    })();
-</script>
-</body>
+        </script>
+    </body>
 </html>

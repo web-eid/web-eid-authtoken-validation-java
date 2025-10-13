@@ -22,7 +22,7 @@
 
 package eu.webeid.example.service;
 
-import eu.webeid.example.config.YAMLConfig;
+import eu.webeid.example.config.WebEidAuthTokenProperties;
 import eu.webeid.example.security.WebEidAuthentication;
 import eu.webeid.example.service.dto.CertificateDTO;
 import eu.webeid.example.service.dto.DigestDTO;
@@ -67,13 +67,12 @@ public class SigningService {
     private static final String SESSION_ATTR_DATA = "data-to-sign";
     private static final Logger LOG = LoggerFactory.getLogger(SigningService.class);
     private final Configuration signingConfiguration;
-
     private final ObjectFactory<HttpSession> httpSessionFactory;
 
-    public SigningService(ObjectFactory<HttpSession> httpSessionFactory, YAMLConfig yamlConfig) {
+    public SigningService(ObjectFactory<HttpSession> httpSessionFactory, WebEidAuthTokenProperties authTokenProperties) {
         this.httpSessionFactory = httpSessionFactory;
-        signingConfiguration = Configuration.of(yamlConfig.getUseDigiDoc4jProdConfiguration() ?
-                Configuration.Mode.PROD : Configuration.Mode.TEST);
+        signingConfiguration = Configuration.of(authTokenProperties.validation().useDigiDoc4jProdConfiguration() ?
+            Configuration.Mode.PROD : Configuration.Mode.TEST);
         // Use automatic AIA OCSP URL selection from certificate for signatures.
         signingConfiguration.setPreferAiaOcsp(true);
     }

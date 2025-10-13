@@ -38,7 +38,7 @@ class WebEidAuthenticationTest {
     @Test
     void whenOrganizationCertificate_thenSucceeds() throws Exception {
         final X509Certificate certificate = CertificateLoader.decodeCertificateFromBase64(ORGANIZATION_CERT);
-        final Authentication authentication = WebEidAuthentication.fromCertificate(certificate, Collections.emptyList());
+        final Authentication authentication = WebEidAuthentication.fromCertificate(certificate, null, null, Collections.emptyList());
         assertThat(authentication.getPrincipal()).isEqualTo("Testijad.ee isikutuvastus");
     }
 
