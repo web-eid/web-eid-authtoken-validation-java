@@ -82,6 +82,7 @@ When the application has started, open the _ngrok_ HTTPS URL in your preferred w
     - [Using DigiDoc4j in production mode with the `prod` profile](#using-digidoc4j-in-production-mode-with-the-prod-profile)
   + [Stateful and stateless authentication](#stateful-and-stateless-authentication)
   + [Assuring that the signing and authentication certificate subjects match](#assuring-that-the-signing-and-authentication-certificate-subjects-match)
+  + [Requesting the signing certificate in a separate step](#requesting-the-signing-certificate-in-a-separate-step)
 * [HTTPS support](#https-support)
   + [How to verify that HTTPS is configured properly](#how-to-verify-that-https-is-configured-properly)
 * [Deployment](#deployment)
@@ -119,7 +120,9 @@ The `src/main/java/eu/webeid/example` directory contains the Spring Boot applica
     -   `WebEidChallengeNonceFilter` for issuing the challenge nonce required by the authentication flow,
     -   `WebEidMobileAuthInitFilter` for issuing the challenge nonce and generating the deep link with the authentication request, used to initiate the mobile authentication flow,
     -   `WebEidAjaxLoginProcessingFilter` and `WebEidLoginPageGeneratingFilter` for handling login requests.
--   `service`: Web eID signing service implementation that uses DigiDoc4j, and DigiDoc4j runtime configuration,
+-   `service`: Web eID signing service implementation that uses DigiDoc4j, and DigiDoc4j runtime configuration.
+    -   `SigningService`: prepares ASiC-E containers and finalizes signatures.
+    -   `MobileSigningService`: orchestrates the mobile signing flow (builds mobile signing requests/responses) and supports requesting the signing certificate in a separate step when enabled by configuration.
 -   `web`: Spring Web MVC controller for the welcome page and Spring Web REST controller that provides a digital signing endpoint.
 
 The `src/resources` directory contains the resources used by the application:
@@ -176,6 +179,16 @@ A common alternative to stateful authentication is stateless authentication with
 ### Assuring that the signing and authentication certificate subjects match
 
 It is usually required to verify that the signing certificate subject matches the authentication certificate subject by assuring that both ID codes match. This check is implemented at the beginning of the `SigningService.prepareContainer()` method.
+
+### Requesting the signing certificate in a separate step
+
+In some deployments, the signing certificate is not reused from the authentication flow. Instead, it is retrieved directly from the user’s ID-card during the signing process itself.
+
+This approach is useful when the signing process is performed without a prior authentication step. For example, in a mobile flow, the user may start signing directly without authenticating beforehand. In such cases, the signing certificate must be requested separately from the user’s ID-card before the signature can be created.
+
+When this mode is enabled in the configuration, the backend issues a separate request for the signing certificate using the `MobileSigningService`. The service communicates with the client to obtain the certificate before the signing container is prepared, ensuring that the correct certificate chain is available for the signature.
+
+This behavior is controlled by the `request-signing-cert` flag in the `application.yaml` configuration files (`application-dev.yaml`, `application-prod.yaml`). When the flag is set to **false**, the application explicitly requests the signing certificate during the signing process, demonstrating the separate signing certificate retrieval flow. When set to **true**, the signing uses the signing certificate that was already obtained during authentication, and no additional request is made.
 
 ## HTTPS support
 
