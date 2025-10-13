@@ -22,9 +22,13 @@
 
 package eu.webeid.example.security;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import eu.webeid.example.config.WebEidMobileProperties;
 import eu.webeid.security.challenge.ChallengeNonceGenerator;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -47,11 +51,13 @@ public final class WebEidMobileAuthInitFilter extends OncePerRequestFilter {
     private final RequestMatcher requestMatcher;
     private final ChallengeNonceGenerator nonceGenerator;
     private final String mobileLoginPath;
+    private final WebEidMobileProperties webEidMobileProperties;
 
-    public WebEidMobileAuthInitFilter(String path, String mobileLoginPath, ChallengeNonceGenerator nonceGenerator) {
+    public WebEidMobileAuthInitFilter(String path, String mobileLoginPath, ChallengeNonceGenerator nonceGenerator, WebEidMobileProperties webEidMobileProperties) {
         this.requestMatcher = PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, path);
         this.nonceGenerator = nonceGenerator;
         this.mobileLoginPath = mobileLoginPath;
+        this.webEidMobileProperties = webEidMobileProperties;
     }
 
     @Override
@@ -69,7 +75,8 @@ public final class WebEidMobileAuthInitFilter extends OncePerRequestFilter {
             .path(mobileLoginPath).build().toUriString();
 
         String payloadJson = OBJECT_WRITER.writeValueAsString(
-            new AuthPayload(challenge.getBase64EncodedNonce(), loginUri)
+            new AuthPayload(challenge.getBase64EncodedNonce(), loginUri,
+                webEidMobileProperties.requestSigningCert() ? Boolean.TRUE : null)
         );
         String encoded = Base64.getEncoder().encodeToString(payloadJson.getBytes(StandardCharsets.UTF_8));
         String eidAuthUri = "web-eid-mobile://auth#" + encoded;
@@ -78,9 +85,15 @@ public final class WebEidMobileAuthInitFilter extends OncePerRequestFilter {
         OBJECT_WRITER.writeValue(response.getWriter(), new AuthUri(eidAuthUri));
     }
 
-    record AuthPayload(String challenge, @JsonProperty("login_uri") String loginUri) {
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    record AuthPayload(
+        String challenge,
+        String loginUri,
+        Boolean getSigningCertificate) {
     }
 
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     record AuthUri(@JsonProperty("auth_uri") String authUri) {
     }
 }

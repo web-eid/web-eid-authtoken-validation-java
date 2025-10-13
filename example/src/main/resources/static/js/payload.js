@@ -20,18 +20,26 @@
  * SOFTWARE.
  */
 
-package eu.webeid.example.config;
+export function parsePayload(context) {
+    const fragment = window.location.hash.slice(1);
 
-import jakarta.servlet.ServletContext;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.thymeleaf.web.servlet.JakartaServletWebApplication;
-
-@Configuration
-public class ThymeleafWebAppConfiguration {
-
-    @Bean
-    public JakartaServletWebApplication jakartaServletWebApplication(ServletContext servletContext) {
-        return JakartaServletWebApplication.buildApplication(servletContext);
+    if (!fragment) {
+        throw new Error(`Missing ${context} response payload`);
     }
+
+    let payload;
+    try {
+        payload = JSON.parse(atob(fragment));
+    } catch (e) {
+        console.error(e);
+        throw new Error(`Failed to parse the ${context} response`);
+    }
+
+    if (payload.error) {
+        const error = new Error(payload.message ?? `${context} failed`);
+        error.code = payload.code;
+        throw error;
+    }
+
+    return payload;
 }

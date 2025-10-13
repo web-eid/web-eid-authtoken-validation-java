@@ -1,137 +1,164 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"/>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
 
-    <meta id="csrftoken" name="csrftoken" th:content="${_csrf.token}"/>
-    <meta id="csrfheadername" name="csrfheadername" th:content="${_csrf.headerName}"/>
+        <meta id="csrftoken" name="csrftoken" th:content="${_csrf.token}" />
+        <meta id="csrfheadername" name="csrfheadername" th:content="${_csrf.headerName}" />
 
-    <title>Welcome!</title>
-    <link
-            href="/css/bootstrap.min.css"
-            rel="stylesheet"
-    />
-    <link
-            href="/css/main.css"
-            rel="stylesheet"
-    />
-</head>
-<body class="m-4">
-<div class="container">
-    <div class="row justify-content-md-center">
-        <div class="col-xs-12 col-md-8" style="padding-top: 3rem;">
-            <p class="text-end p-4">
-                <button id="webeid-logout-button" class="btn btn-primary">Logout</button>
-            </p>
-            <div style="text-align: center;">
-                <h2 class="adding-signature">Digital signing</h2>
-                <p th:text="'Welcome, ' + ${principalName} + '!'" class="welcome-line"></p>
+        <title>Welcome!</title>
+        <link href="/css/bootstrap.min.css" rel="stylesheet" />
+        <link href="/css/main.css" rel="stylesheet" />
+    </head>
+    <body class="m-4">
+        <div class="container">
+            <div class="row justify-content-md-center">
+                <div class="col-xs-12 col-md-8" style="padding-top: 3rem">
+                    <p class="text-end p-4">
+                        <button id="webeid-logout-button" class="btn btn-primary">Logout</button>
+                    </p>
+                    <div style="text-align: center">
+                        <h2 class="adding-signature">Digital signing</h2>
+                        <p th:text="'Welcome, ' + ${principalName} + '!'" class="welcome-line"></p>
+                    </div>
+
+                    <div id="file-name"></div>
+
+                    <div id="example-document">
+                        <p class="p-4">
+                            To test digital signing, you can sign the following document by clicking
+                            <i>Sign document </i> below:
+                        </p>
+                        <iframe src="/files/example-for-signing.txt" width="100%" height="200"></iframe>
+                    </div>
+
+                    <div id="error-message" class="alert alert-danger" style="display: none" role="alert">
+                        <div class="message"></div>
+                        <pre class="details"></pre>
+                    </div>
+                    <p class="text-center p-4">
+                        <button id="webeid-sign-button" class="btn btn-primary">Sign document</button>
+                        <button id="webeid-download-button" class="btn btn-success" style="display: none">
+                            Download container
+                        </button>
+                    </p>
+                </div>
             </div>
-
-            <div id="file-name"></div>
-
-            <div id="example-document">
-                <p class="p-4">To test digital signing, you can sign the following document by clicking
-                    <i>Sign document </i> below:</p>
-                <iframe src="/files/example-for-signing.txt" width="100%" height="200"></iframe>
-            </div>
-
-            <div id="error-message" class="alert alert-danger" style="display: none;" role="alert">
-                <div class="message"></div>
-                <pre class="details"></pre>
-            </div>
-            <p class="text-center p-4">
-                <button id="webeid-sign-button" class="btn btn-primary">Sign document</button>
-                <button id="webeid-download-button" class="btn btn-success" style="display: none;">Download container
-                </button>
-            </p>
         </div>
-    </div>
-</div>
 
-<script type="module">
-    "use strict";
-    import * as webeid from "/js/web-eid.js";
-    import {hideErrorMessage, showErrorMessage, checkHttpError} from "/js/errors.js";
+        <script type="module">
+            "use strict";
+            import * as webeid from "/js/web-eid.js";
+            import { hideErrorMessage, showErrorMessage, checkHttpError } from "/js/errors.js";
 
-    const signButton = document.querySelector("#webeid-sign-button");
-    const downloadButton = document.querySelector("#webeid-download-button");
+            const signButton = document.querySelector("#webeid-sign-button");
+            const downloadButton = document.querySelector("#webeid-download-button");
 
-    const fileNameText = document.querySelector("#file-name");
-    const exampleDocument = document.querySelector("#example-document");
+            const fileNameText = document.querySelector("#file-name");
+            const exampleDocument = document.querySelector("#example-document");
 
-    const csrfToken = document.querySelector('#csrftoken').content;
-    const csrfHeaderName = document.querySelector('#csrfheadername').content;
+            const csrfToken = document.querySelector("#csrftoken").content;
+            const csrfHeaderName = document.querySelector("#csrfheadername").content;
 
-    document.querySelector("#webeid-logout-button").addEventListener("click", async () => {
-        await fetch("/logout", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                [csrfHeaderName]: csrfToken
+            document.querySelector("#webeid-logout-button").addEventListener("click", async () => {
+                await fetch("/logout", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        [csrfHeaderName]: csrfToken
+                    }
+                });
+                window.location.href = "/";
+            });
+
+            downloadButton.addEventListener("click", async () => {
+                window.location.href = "/sign/download";
+            });
+
+            const lang = new URLSearchParams(window.location.search).get("lang") || "en";
+
+            signButton.addEventListener("click", async () => {
+                hideErrorMessage();
+                signButton.disabled = true;
+
+                const isMobile = isMobileDevice();
+
+                try {
+                    if (isMobile) {
+                        const initMobileSignResponse = await fetch("/sign/mobile/init", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                [csrfHeaderName]: csrfToken
+                            }
+                        });
+
+                        await checkHttpError(initMobileSignResponse);
+                        const { request_uri } = await initMobileSignResponse.json();
+                        window.location.href = request_uri;
+                    } else {
+                        const { certificate, supportedSignatureAlgorithms } = await webeid.getSigningCertificate({
+                            lang
+                        });
+
+                        const prepareSigningResponse = await fetch("/sign/prepare", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                [csrfHeaderName]: csrfToken
+                            },
+                            body: JSON.stringify({ certificate, supportedSignatureAlgorithms })
+                        });
+                        await checkHttpError(prepareSigningResponse);
+                        const { hash, hashFunction } = await prepareSigningResponse.json();
+
+                        const { signatureAlgorithm, signature } = await webeid.sign(certificate, hash, hashFunction, {
+                            lang
+                        });
+
+                        const finalizeSigningResponse = await fetch("/sign/signature", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                [csrfHeaderName]: csrfToken
+                            },
+                            body: JSON.stringify({ signature, signatureAlgorithm })
+                        });
+                        await checkHttpError(finalizeSigningResponse);
+                        const signResult = await finalizeSigningResponse.json();
+
+                        signButton.style.display = "none";
+                        document.querySelector("#example-document").style.display = "none";
+                        downloadButton.style.display = "inline-block";
+                        document.querySelector("#file-name").textContent = "Signature added: " + signResult.name;
+                    }
+                } catch (error) {
+                    showErrorMessage(error);
+                    throw error;
+                } finally {
+                    signButton.disabled = false;
+                }
+            });
+
+            function isMobileDevice() {
+                const hasTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+                const isSmallScreen = window.innerWidth <= 768;
+                const userAgentRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+                return (hasTouch && isSmallScreen) || userAgentRegex.test(navigator.userAgent);
             }
-        });
-        window.location.href = "/";
-    });
 
-    downloadButton.addEventListener("click", async () => {
-        window.location.href = "/sign/download";
-    });
+            document.addEventListener("DOMContentLoaded", () => {
+                const urlParams = new URLSearchParams(window.location.search);
+                const signedFile = urlParams.get("signed");
 
-    const lang = new URLSearchParams(window.location.search).get("lang") || "en";
-
-    signButton.addEventListener("click", async () => {
-        hideErrorMessage();
-        signButton.disabled = true;
-
-        try {
-            const {
-                certificate,
-                supportedSignatureAlgorithms,
-            } = await webeid.getSigningCertificate({lang});
-
-            const prepareSigningResponse = await fetch("/sign/prepare", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    [csrfHeaderName]: csrfToken
-                },
-                body: JSON.stringify({certificate, supportedSignatureAlgorithms}),
+                if (signedFile) {
+                    document.querySelector("#webeid-sign-button").style.display = "none";
+                    document.querySelector("#example-document").style.display = "none";
+                    document.querySelector("#webeid-download-button").style.display = "inline-block";
+                    document.querySelector("#file-name").textContent = "Signature added: " + signedFile;
+                }
             });
-            await checkHttpError(prepareSigningResponse);
-            const {
-                hash,
-                hashFunction
-            } = await prepareSigningResponse.json();
-
-            const {
-                signatureAlgorithm,
-                signature,
-            } = await webeid.sign(certificate, hash, hashFunction, {lang});
-
-            const finalizeSigningResponse = await fetch("/sign/sign", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    [csrfHeaderName]: csrfToken
-                },
-                body: JSON.stringify({signature, signatureAlgorithm}),
-            });
-            await checkHttpError(finalizeSigningResponse);
-            const signResult = await finalizeSigningResponse.json();
-
-            signButton.setAttribute("style", "display: none;");
-            exampleDocument.setAttribute("style", "display: none;");
-            downloadButton.removeAttribute("style");
-            fileNameText.textContent = "Signature added: " + signResult.name;
-        } catch (error) {
-            showErrorMessage(error);
-            throw error;
-        } finally {
-            signButton.disabled = false;
-        }
-    });
-</script>
-</body>
+        </script>
+    </body>
 </html>
