@@ -33,11 +33,8 @@ import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.web.servlet.support.RequestContextUtils;
 import org.thymeleaf.ITemplateEngine;
-import org.thymeleaf.context.WebContext;
-import org.thymeleaf.web.IWebExchange;
-import org.thymeleaf.web.servlet.JakartaServletWebApplication;
+import org.thymeleaf.context.Context;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -47,18 +44,15 @@ public final class WebEidLoginPageGeneratingFilter extends OncePerRequestFilter 
     private final RequestMatcher requestMatcher;
     private final String loginProcessingPath;
     private final ITemplateEngine templateEngine;
-    private final JakartaServletWebApplication webApp;
 
     public WebEidLoginPageGeneratingFilter(
         String path,
         String loginProcessingPath,
-        ITemplateEngine templateEngine,
-        JakartaServletWebApplication webApp
+        ITemplateEngine templateEngine
     ) {
         this.requestMatcher = PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.GET, path);
         this.loginProcessingPath = loginProcessingPath;
         this.templateEngine = templateEngine;
-        this.webApp = webApp;
     }
 
     @Override
@@ -74,16 +68,14 @@ public final class WebEidLoginPageGeneratingFilter extends OncePerRequestFilter 
             csrf = (CsrfToken) request.getAttribute("_csrf");
         }
 
-        String html = renderTemplate(request, response, csrf);
+        String html = renderTemplate(csrf);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType(MediaType.TEXT_HTML_VALUE);
         response.getWriter().write(html);
     }
 
-    private String renderTemplate(HttpServletRequest request, HttpServletResponse response, CsrfToken csrf) {
-        IWebExchange exchange = webApp.buildExchange(request, response);
-        var locale = RequestContextUtils.getLocale(request);
-        var ctx = new WebContext(exchange, locale);
+    private String renderTemplate(CsrfToken csrf) {
+        var ctx = new Context();
         ctx.setVariable("loginProcessingPath", loginProcessingPath);
         ctx.setVariable("csrfHeaderName", csrf != null ? csrf.getHeaderName() : "X-CSRF-TOKEN");
         ctx.setVariable("csrfToken", csrf != null ? csrf.getToken() : "");

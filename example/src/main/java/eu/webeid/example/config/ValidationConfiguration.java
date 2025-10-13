@@ -79,22 +79,17 @@ public class ValidationConfiguration {
     }
 
     @Bean
-    public AuthTokenValidator validator(YAMLConfig yamlConfig) {
+    public AuthTokenValidator validator(WebEidAuthTokenProperties authTokenProperties) {
         try {
             return new AuthTokenValidatorBuilder()
-                .withSiteOrigin(URI.create(yamlConfig.getLocalOrigin()))
+                .withSiteOrigin(URI.create(authTokenProperties.validation().localOrigin()))
                 .withTrustedCertificateAuthorities(loadTrustedCACertificatesFromCerFiles())
-                .withTrustedCertificateAuthorities(loadTrustedCACertificatesFromTrustStore(yamlConfig))
-                .withOcspRequestTimeout(yamlConfig.getOcspRequestTimeout())
+                .withTrustedCertificateAuthorities(loadTrustedCACertificatesFromTrustStore(authTokenProperties))
+                .withOcspRequestTimeout(authTokenProperties.validation().ocspRequestTimeout())
                 .build();
         } catch (JceException e) {
             throw new RuntimeException("Error building the Web eID auth token validator.", e);
         }
-    }
-
-    @Bean
-    public YAMLConfig yamlConfig() {
-        return new YAMLConfig();
     }
 
     private X509Certificate[] loadTrustedCACertificatesFromCerFiles() {
@@ -117,8 +112,7 @@ public class ValidationConfiguration {
 
         return caCertificates.toArray(new X509Certificate[0]);
     }
-
-    private X509Certificate[] loadTrustedCACertificatesFromTrustStore(YAMLConfig yamlConfig) {
+    private X509Certificate[] loadTrustedCACertificatesFromTrustStore(WebEidAuthTokenProperties authTokenProperties) {
         List<X509Certificate> caCertificates = new ArrayList<>();
 
         try (InputStream is = ValidationConfiguration.class.getResourceAsStream(CERTS_RESOURCE_PATH + activeProfile + "/" + TRUSTED_CERTIFICATES_JKS)) {
@@ -126,8 +120,14 @@ public class ValidationConfiguration {
                 LOG.info("Truststore file {} not found for {} profile", TRUSTED_CERTIFICATES_JKS, activeProfile);
                 return new X509Certificate[0];
             }
+
+            String trustStorePassword = authTokenProperties.validation().trustStorePassword();
+            if (trustStorePassword == null || trustStorePassword.isBlank()) {
+                throw new IllegalStateException("Truststore password must be configured because truststore exists for profile '" + activeProfile + "'.");
+            }
+
             KeyStore keystore = KeyStore.getInstance(KeyStore.getDefaultType());
-            keystore.load(is, yamlConfig.getTrustStorePassword().toCharArray());
+            keystore.load(is, trustStorePassword.toCharArray());
             Enumeration<String> aliases = keystore.aliases();
             while (aliases.hasMoreElements()) {
                 String alias = aliases.nextElement();
@@ -140,7 +140,4 @@ public class ValidationConfiguration {
 
         return caCertificates.toArray(new X509Certificate[0]);
     }
-
-
-
 }

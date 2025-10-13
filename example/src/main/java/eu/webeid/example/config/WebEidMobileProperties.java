@@ -20,39 +20,16 @@
  * SOFTWARE.
  */
 
-"use strict";
+package eu.webeid.example.config;
 
-const alertUi = {
-    alert: document.querySelector("#error-message"),
-    alertMessage: document.querySelector("#error-message .message"),
-    alertDetails: document.querySelector("#error-message .details")
-};
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
-export function hideErrorMessage() {
-    alertUi.alert.style.display = "none";
-}
-
-export function showErrorMessage(error, message = "Authentication failed") {
-    const details =
-        `[Code]\n${error.code ?? "UNKNOWN_ERROR"}` +
-        `\n\n[Message]\n${error.message}` +
-        (error.response ? `\n\n[response]\n${JSON.stringify(error.response, null, " ")}` : "");
-
-    alertUi.alertMessage.innerText = message;
-    alertUi.alertDetails.innerText = details;
-    alertUi.alert.style.display = "block";
-}
-
-export async function checkHttpError(response) {
-    if (!response.ok) {
-        let body;
-        try {
-            body = await response.text();
-        } catch (error) {
-            body = "<<unable to retrieve response body>>";
-        }
-        const error = new Error("Server error: " + body);
-        error.code = response.status;
-        throw error;
-    }
+@Validated
+@ConfigurationProperties(prefix = "web-eid-mobile")
+public record WebEidMobileProperties(
+    @NotBlank @Pattern(regexp = "^.*(?:[^/]|://)$", message = "Base URI must not have a trailing slash") String baseRequestUri,
+    boolean requestSigningCert) {
 }

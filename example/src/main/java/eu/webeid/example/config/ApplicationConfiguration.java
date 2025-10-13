@@ -28,6 +28,7 @@ import eu.webeid.example.security.WebEidChallengeNonceFilter;
 import eu.webeid.example.security.WebEidMobileAuthInitFilter;
 import eu.webeid.example.security.ui.WebEidLoginPageGeneratingFilter;
 import eu.webeid.security.challenge.ChallengeNonceGenerator;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -39,9 +40,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
 import org.thymeleaf.ITemplateEngine;
-import org.thymeleaf.web.servlet.JakartaServletWebApplication;
 
 @Configuration
+@ConfigurationPropertiesScan
 @EnableWebSecurity
 @EnableMethodSecurity(securedEnabled = true)
 public class ApplicationConfiguration {
@@ -53,7 +54,7 @@ public class ApplicationConfiguration {
         AuthenticationConfiguration authConfig,
         ChallengeNonceGenerator challengeNonceGenerator,
         ITemplateEngine templateEngine,
-        JakartaServletWebApplication webApp
+        WebEidMobileProperties webEidMobileProperties
     ) throws Exception {
         return http
             .authorizeHttpRequests(auth -> auth
@@ -62,9 +63,9 @@ public class ApplicationConfiguration {
                 .anyRequest().authenticated()
             )
             .authenticationProvider(webEidAuthenticationProvider)
-            .addFilterBefore(new WebEidMobileAuthInitFilter("/auth/mobile/init", "/auth/mobile/login", challengeNonceGenerator), UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(new WebEidMobileAuthInitFilter("/auth/mobile/init", "/auth/mobile/login", challengeNonceGenerator, webEidMobileProperties), UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new WebEidChallengeNonceFilter("/auth/challenge", challengeNonceGenerator), UsernamePasswordAuthenticationFilter.class)
-            .addFilterBefore(new WebEidLoginPageGeneratingFilter("/auth/mobile/login", "/auth/login", templateEngine, webApp), UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(new WebEidLoginPageGeneratingFilter("/auth/mobile/login", "/auth/login", templateEngine), UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new WebEidAjaxLoginProcessingFilter("/auth/login", authConfig.getAuthenticationManager()), UsernamePasswordAuthenticationFilter.class)
             .logout(l -> l.logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler()))
             .headers(h -> h.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin))
