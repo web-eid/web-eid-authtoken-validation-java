@@ -23,9 +23,9 @@
 package eu.webeid.security.certificate;
 
 import eu.webeid.security.exceptions.CertificateExpiredException;
+import eu.webeid.security.exceptions.CertificateNotTrustedException;
 import eu.webeid.security.exceptions.CertificateNotYetValidException;
 import eu.webeid.security.exceptions.JceException;
-import eu.webeid.security.exceptions.CertificateNotTrustedException;
 
 import java.security.GeneralSecurityException;
 import java.security.InvalidAlgorithmParameterException;
@@ -57,16 +57,12 @@ public final class CertificateValidator {
         }
     }
 
-    public static void trustedCACertificatesAreValidOnDate(Set<TrustAnchor> trustedCACertificateAnchors, Date date) throws CertificateNotYetValidException, CertificateExpiredException {
-        for (TrustAnchor cert : trustedCACertificateAnchors) {
-            certificateIsValidOnDate(cert.getTrustedCert(), date, "Trusted CA");
-        }
-    }
-
     public static X509Certificate validateIsSignedByTrustedCA(X509Certificate certificate,
                                                               Set<TrustAnchor> trustedCACertificateAnchors,
                                                               CertStore trustedCACertificateCertStore,
-                                                              Date date) throws CertificateNotTrustedException, JceException {
+                                                              Date now) throws CertificateNotTrustedException, JceException, CertificateNotYetValidException, CertificateExpiredException {
+        certificateIsValidOnDate(certificate, now, "User");
+
         final X509CertSelector selector = new X509CertSelector();
         selector.setCertificate(certificate);
 
@@ -74,14 +70,19 @@ public final class CertificateValidator {
             final PKIXBuilderParameters pkixBuilderParameters = new PKIXBuilderParameters(trustedCACertificateAnchors, selector);
             // Certificate revocation check is intentionally disabled as we do the OCSP check with SubjectCertificateNotRevokedValidator ourselves.
             pkixBuilderParameters.setRevocationEnabled(false);
-            pkixBuilderParameters.setDate(date);
+            pkixBuilderParameters.setDate(now);
             pkixBuilderParameters.addCertStore(trustedCACertificateCertStore);
 
             // See the comment in buildCertStoreFromCertificates() below why we use the default JCE provider.
             final CertPathBuilder certPathBuilder = CertPathBuilder.getInstance(CertPathBuilder.getDefaultType());
             final PKIXCertPathBuilderResult result = (PKIXCertPathBuilderResult) certPathBuilder.build(pkixBuilderParameters);
 
-            return result.getTrustAnchor().getTrustedCert();
+            final X509Certificate trustedCACert = result.getTrustAnchor().getTrustedCert();
+
+            // Verify that the trusted CA cert is presently valid before returning the result.
+            certificateIsValidOnDate(trustedCACert, now, "Trusted CA");
+
+            return trustedCACert;
 
         } catch (InvalidAlgorithmParameterException | NoSuchAlgorithmException e) {
             throw new JceException(e);

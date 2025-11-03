@@ -82,11 +82,34 @@ public final class AuthTokenValidators {
             CertificateLoader.loadCertificatesFromResources("ESTEID2018.cer"));
     }
 
+    public static AuthTokenValidator getAuthTokenValidatorWithJuly2024ExpiredUnrelatedTrustedCA() throws CertificateException, JceException, IOException {
+        return getAuthTokenValidator(TOKEN_ORIGIN_URL,
+            CertificateLoader.loadCertificatesFromResources("TEST_of_ESTEID2018.cer", "TEST_of_SK_OCSP_RESPONDER_2020.cer"));
+    }
+
     public static AuthTokenValidator getAuthTokenValidatorWithDisallowedESTEIDPolicy() throws CertificateException, JceException, IOException {
         return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, getCACertificates())
             .withDisallowedCertificatePolicies(EST_IDEMIA_POLICY)
             .withoutUserCertificateRevocationCheckWithOcsp()
             .build();
+    }
+
+    public static AuthTokenValidator getAuthTokenValidatorForBelgianIdCard() throws CertificateException, IOException, JceException {
+      return getAuthTokenValidator(
+                "https://47f0-46-131-86-189.ngrok-free.app",
+                CertificateLoader.loadCertificatesFromResources("eID TEST EC Citizen CA.cer")
+            );
+    }
+
+    public static AuthTokenValidator getAuthTokenValidatorForFinnishIdCard() throws CertificateException, IOException, JceException {
+      return getAuthTokenValidator(
+                "https://47f0-46-131-86-189.ngrok-free.app",
+                CertificateLoader.loadCertificatesFromResources("DVV TEST Certificates - G5E.crt", "VRK TEST CA for Test Purposes - G4.crt")
+            );
+    }
+
+    public static AuthTokenValidatorBuilder getDefaultAuthTokenValidatorBuilder() throws CertificateException, IOException {
+        return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, getCACertificates());
     }
 
     private static AuthTokenValidatorBuilder getAuthTokenValidatorBuilder(String uri, X509Certificate[] certificates) {

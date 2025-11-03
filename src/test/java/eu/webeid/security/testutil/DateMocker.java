@@ -20,47 +20,26 @@
  * SOFTWARE.
  */
 
-package eu.webeid.security.util;
+package eu.webeid.security.testutil;
 
+import com.fasterxml.jackson.databind.util.StdDateFormat;
+import eu.webeid.security.util.DateAndTime;
 import io.jsonwebtoken.Clock;
+import org.mockito.MockedStatic;
 
-import java.time.Duration;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
+import java.text.ParseException;
 import java.util.Date;
-import java.util.Objects;
 
-public final class DateAndTime {
+public class DateMocker {
 
-    public static ZonedDateTime utcNow() {
-        return ZonedDateTime.now(ZoneOffset.UTC);
-    }
+    private static final StdDateFormat STD_DATE_FORMAT = new StdDateFormat();
 
-    public static void requirePositiveDuration(Duration duration, String fieldName) {
-        Objects.requireNonNull(duration, fieldName + " must not be null");
-        if (duration.isNegative() || duration.isZero()) {
-            throw new IllegalArgumentException(fieldName + " must be greater than zero");
+    public static void mockDate(String iso8601Date, MockedStatic<DateAndTime.DefaultClock> mockedClock) {
+        try {
+            final Date theDate = STD_DATE_FORMAT.parse(iso8601Date);
+            mockedClock.when(DateAndTime.DefaultClock::getInstance).thenReturn((Clock) () -> theDate);
+        } catch (ParseException e) {
+            throw new RuntimeException(e);
         }
     }
-
-    public static class DefaultClock implements Clock {
-
-        // Allows mocking of time-dependent behavior with Mockito.mockStatic() in tests.
-        private static final Clock instance = new DefaultClock();
-
-        public static Clock getInstance() {
-            return instance;
-        }
-
-        @Override
-        public Date now() {
-            return new Date();
-        }
-
-    }
-
-    private DateAndTime() {
-        throw new IllegalStateException("Utility class");
-    }
-
 }

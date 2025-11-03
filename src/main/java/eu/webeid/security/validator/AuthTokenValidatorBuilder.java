@@ -77,7 +77,7 @@ public class AuthTokenValidatorBuilder {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Trusted intermediate certificate authorities set to {}",
                 configuration.getTrustedCACertificates().stream()
-                    .map(X509Certificate::getSubjectDN)
+                    .map(X509Certificate::getSubjectX500Principal)
                     .collect(Collectors.toList()));
         }
         return this;
@@ -124,6 +124,38 @@ public class AuthTokenValidatorBuilder {
     public AuthTokenValidatorBuilder withOcspRequestTimeout(Duration ocspRequestTimeout) {
         configuration.setOcspRequestTimeout(ocspRequestTimeout);
         LOG.debug("OCSP request timeout set to {}", ocspRequestTimeout);
+        return this;
+    }
+
+    /**
+     * Sets the allowed time skew for OCSP response's thisUpdate and nextUpdate times.
+     * This parameter is used to allow discrepancies between the system clock and the OCSP responder's clock,
+     * which may occur due to clock drift, network delays or revocation updates that are not published in real time.
+     * <p>
+     * This is an optional configuration parameter, the default is 15 minutes.
+     * The relatively long default is specifically chosen to account for one particular OCSP responder that used
+     * CRLs for authoritative revocation info, these CRLs were updated every 15 minutes.
+     *
+     * @param allowedTimeSkew the allowed time skew
+     * @return the builder instance for method chaining.
+     */
+    public AuthTokenValidatorBuilder withAllowedOcspResponseTimeSkew(Duration allowedTimeSkew) {
+        configuration.setAllowedOcspResponseTimeSkew(allowedTimeSkew);
+        LOG.debug("Allowed OCSP response time skew set to {}", allowedTimeSkew);
+        return this;
+    }
+
+    /**
+     * Sets the maximum age of the OCSP response's thisUpdate time before it is considered too old.
+     * <p>
+     * This is an optional configuration parameter, the default is 2 minutes.
+     *
+     * @param maxThisUpdateAge the maximum age of the OCSP response's thisUpdate time
+     * @return the builder instance for method chaining.
+     */
+    public AuthTokenValidatorBuilder withMaxOcspResponseThisUpdateAge(Duration maxThisUpdateAge) {
+        configuration.setMaxOcspResponseThisUpdateAge(maxThisUpdateAge);
+        LOG.debug("Maximum OCSP response thisUpdate age set to {}", maxThisUpdateAge);
         return this;
     }
 

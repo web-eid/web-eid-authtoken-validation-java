@@ -24,7 +24,12 @@ package eu.webeid.security.validator.certvalidators;
 
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
-import eu.webeid.security.validator.ocsp.*;
+import eu.webeid.security.util.DateAndTime;
+import eu.webeid.security.validator.ocsp.DigestCalculatorImpl;
+import eu.webeid.security.validator.ocsp.OcspClient;
+import eu.webeid.security.validator.ocsp.OcspRequestBuilder;
+import eu.webeid.security.validator.ocsp.OcspResponseValidator;
+import eu.webeid.security.validator.ocsp.OcspServiceProvider;
 import eu.webeid.security.validator.ocsp.service.OcspService;
 import org.bouncycastle.asn1.ocsp.OCSPObjectIdentifiers;
 import org.bouncycastle.asn1.ocsp.OCSPResponseStatus;
@@ -41,10 +46,6 @@ import org.bouncycastle.operator.DigestCalculator;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import eu.webeid.security.validator.ocsp.Digester;
-import eu.webeid.security.validator.ocsp.OcspClient;
-import eu.webeid.security.validator.ocsp.OcspRequestBuilder;
-import eu.webeid.security.validator.ocsp.OcspServiceProvider;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -52,17 +53,19 @@ import java.security.Security;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.Date;
 import java.util.Objects;
 
 public final class SubjectCertificateNotRevokedValidator {
 
     private static final Logger LOG = LoggerFactory.getLogger(SubjectCertificateNotRevokedValidator.class);
-    private static final DigestCalculator DIGEST_CALCULATOR = Digester.sha1();
 
     private final SubjectCertificateTrustedValidator trustValidator;
     private final OcspClient ocspClient;
     private final OcspServiceProvider ocspServiceProvider;
+    private final Duration allowedOcspResponseTimeSkew;
+    private final Duration maxOcspResponseThisUpdateAge;
 
     static {
         Security.addProvider(new BouncyCastleProvider());
@@ -70,10 +73,14 @@ public final class SubjectCertificateNotRevokedValidator {
 
     public SubjectCertificateNotRevokedValidator(SubjectCertificateTrustedValidator trustValidator,
                                                  OcspClient ocspClient,
-                                                 OcspServiceProvider ocspServiceProvider) {
+                                                 OcspServiceProvider ocspServiceProvider,
+                                                 Duration allowedOcspResponseTimeSkew,
+                                                 Duration maxOcspResponseThisUpdateAge) {
         this.trustValidator = trustValidator;
         this.ocspClient = ocspClient;
         this.ocspServiceProvider = ocspServiceProvider;
+        this.allowedOcspResponseTimeSkew = allowedOcspResponseTimeSkew;
+        this.maxOcspResponseThisUpdateAge = maxOcspResponseThisUpdateAge;
     }
 
     /**
@@ -86,10 +93,6 @@ public final class SubjectCertificateNotRevokedValidator {
         try {
             OcspService ocspService = ocspServiceProvider.getService(subjectCertificate);
 
-            if (!ocspService.doesSupportNonce()) {
-                LOG.debug("Disabling OCSP nonce extension");
-            }
-
             final CertificateID certificateId = getCertificateId(subjectCertificate,
                 Objects.requireNonNull(trustValidator.getSubjectCertificateIssuerCertificate()));
 
@@ -97,6 +100,10 @@ public final class SubjectCertificateNotRevokedValidator {
                 .withCertificateId(certificateId)
                 .enableOcspNonce(ocspService.doesSupportNonce())
                 .build();
+
+            if (!ocspService.doesSupportNonce()) {
+                LOG.debug("Disabling OCSP nonce extension");
+            }
 
             LOG.debug("Sending OCSP request");
             final OCSPResp response = Objects.requireNonNull(ocspClient.request(ocspService.getAccessLocation(), request));
@@ -156,8 +163,9 @@ public final class SubjectCertificateNotRevokedValidator {
         //   4. The signer is currently authorized to provide a response for the
         //      certificate in question.
 
-        final Date producedAt = basicResponse.getProducedAt();
-        ocspService.validateResponderCertificate(responderCert, producedAt);
+        // Use the clock instance so that the date can be mocked in tests.
+        final Date now = DateAndTime.DefaultClock.getInstance().now();
+        ocspService.validateResponderCertificate(responderCert, now);
 
         //   5. The time at which the status being indicated is known to be
         //      correct (thisUpdate) is sufficiently recent.
@@ -166,7 +174,7 @@ public final class SubjectCertificateNotRevokedValidator {
         //      be available about the status of the certificate (nextUpdate) is
         //      greater than the current time.
 
-        OcspResponseValidator.validateCertificateStatusUpdateTime(certStatusResponse, producedAt);
+        OcspResponseValidator.validateCertificateStatusUpdateTime(certStatusResponse, allowedOcspResponseTimeSkew, maxOcspResponseThisUpdateAge);
 
         // Now we can accept the signed response as valid and validate the certificate status.
         OcspResponseValidator.validateSubjectCertificateStatus(certStatusResponse);
@@ -188,7 +196,8 @@ public final class SubjectCertificateNotRevokedValidator {
 
     private static CertificateID getCertificateId(X509Certificate subjectCertificate, X509Certificate issuerCertificate) throws CertificateEncodingException, IOException, OCSPException {
         final BigInteger serial = subjectCertificate.getSerialNumber();
-        return new CertificateID(DIGEST_CALCULATOR,
+        final DigestCalculator digestCalculator = DigestCalculatorImpl.sha1();
+        return new CertificateID(digestCalculator,
             new X509CertificateHolder(issuerCertificate.getEncoded()), serial);
     }
 

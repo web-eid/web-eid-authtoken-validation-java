@@ -20,26 +20,9 @@
  * SOFTWARE.
  */
 
-/*
- * Copyright 2017 The Netty Project
- * Copyright 2020 The Web eID project
- *
- * The Netty Project and The Web eID Project license this file to you under the
- * Apache License, version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at:
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
- */
-
 package eu.webeid.security.validator.ocsp;
 
-import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.nist.NISTObjectIdentifiers;
 import org.bouncycastle.asn1.oiw.OIWObjectIdentifiers;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.crypto.Digest;
@@ -52,33 +35,26 @@ import java.io.OutputStream;
 
 /**
  * BouncyCastle's OCSPReqBuilder needs a DigestCalculator but BC doesn't
- * provide any public implementations of that interface. That's why we need to
- * write our own. There's a default SHA-1 implementation and one for SHA-256.
- * Which one to use will depend on the Certificate Authority (CA).
+ * provide any public implementations of it, hence this implementation.
  */
-public final class Digester implements DigestCalculator {
+public final class DigestCalculatorImpl implements DigestCalculator {
+
+    private static final AlgorithmIdentifier SHA1 = new AlgorithmIdentifier(OIWObjectIdentifiers.idSHA1);
+    private static final AlgorithmIdentifier SHA256 = new AlgorithmIdentifier(NISTObjectIdentifiers.id_sha256);
 
     private final DigestOutputStream dos;
     private final AlgorithmIdentifier algId;
 
-    public static DigestCalculator sha1() {
-        final Digest digest = new SHA1Digest();
-        final AlgorithmIdentifier algId = new AlgorithmIdentifier(OIWObjectIdentifiers.idSHA1);
 
-        return new Digester(digest, algId);
+    public static DigestCalculator sha1() {
+        return new DigestCalculatorImpl(new SHA1Digest(), SHA1);
     }
 
     public static DigestCalculator sha256() {
-        Digest digest = new SHA256Digest();
-
-        // The OID for SHA-256: http://www.oid-info.com/get/2.16.840.1.101.3.4.2.1
-        final ASN1ObjectIdentifier oid = new ASN1ObjectIdentifier("2.16.840.1.101.3.4.2.1").intern();
-        final AlgorithmIdentifier algId = new AlgorithmIdentifier(oid);
-
-        return new Digester(digest, algId);
+        return new DigestCalculatorImpl(new SHA256Digest(), SHA256);
     }
 
-    private Digester(Digest digest, AlgorithmIdentifier algId) {
+    private DigestCalculatorImpl(Digest digest, AlgorithmIdentifier algId) {
         this.dos = new DigestOutputStream(digest);
         this.algId = algId;
     }
