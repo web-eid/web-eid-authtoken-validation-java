@@ -24,6 +24,8 @@ package eu.webeid.security.validator;
 
 import eu.webeid.security.certificate.SubjectCertificatePolicies;
 import eu.webeid.security.validator.ocsp.service.DesignatedOcspServiceConfiguration;
+import eu.webeid.security.validator.ocsp.service.FallbackOcspServiceConfiguration;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 
 import java.net.MalformedURLException;
@@ -51,6 +53,8 @@ public final class AuthTokenValidationConfiguration {
     private Duration allowedOcspResponseTimeSkew = Duration.ofMinutes(15);
     private Duration maxOcspResponseThisUpdateAge = Duration.ofMinutes(2);
     private DesignatedOcspServiceConfiguration designatedOcspServiceConfiguration;
+    private Collection<FallbackOcspServiceConfiguration> fallbackOcspServiceConfigurations = new HashSet<>();
+    private CircuitBreakerConfig circuitBreakerConfig;
     // Don't allow Estonian Mobile-ID policy by default.
     private Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies = newHashSet(
         SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V1,
@@ -71,6 +75,8 @@ public final class AuthTokenValidationConfiguration {
         this.allowedOcspResponseTimeSkew = other.allowedOcspResponseTimeSkew;
         this.maxOcspResponseThisUpdateAge = other.maxOcspResponseThisUpdateAge;
         this.designatedOcspServiceConfiguration = other.designatedOcspServiceConfiguration;
+        this.fallbackOcspServiceConfigurations = Set.copyOf(other.fallbackOcspServiceConfigurations);
+        this.circuitBreakerConfig = other.circuitBreakerConfig;
         this.disallowedSubjectCertificatePolicies = Set.copyOf(other.disallowedSubjectCertificatePolicies);
         this.nonceDisabledOcspUrls = Set.copyOf(other.nonceDisabledOcspUrls);
     }
@@ -135,6 +141,18 @@ public final class AuthTokenValidationConfiguration {
         return nonceDisabledOcspUrls;
     }
 
+    public Collection<FallbackOcspServiceConfiguration> getFallbackOcspServiceConfigurations() {
+        return fallbackOcspServiceConfigurations;
+    }
+
+    public CircuitBreakerConfig getCircuitBreakerConfig() {
+        return circuitBreakerConfig;
+    }
+
+    public void setCircuitBreakerConfig(CircuitBreakerConfig circuitBreakerConfig) {
+        this.circuitBreakerConfig = circuitBreakerConfig;
+    }
+
     /**
      * Checks that the configuration parameters are valid.
      *
@@ -150,6 +168,7 @@ public final class AuthTokenValidationConfiguration {
         requirePositiveDuration(ocspRequestTimeout, "OCSP request timeout");
         requirePositiveDuration(allowedOcspResponseTimeSkew, "Allowed OCSP response time-skew");
         requirePositiveDuration(maxOcspResponseThisUpdateAge, "Max OCSP response thisUpdate age");
+        // TODO: Add OCSP fallback/response validation
     }
 
     AuthTokenValidationConfiguration copy() {

@@ -36,4 +36,7 @@ public interface OcspService {
 
     void validateResponderCertificate(X509CertificateHolder cert, Date now) throws AuthTokenException;
 
+    default OcspService getFallbackService() {
+        return null;
+    }
 }

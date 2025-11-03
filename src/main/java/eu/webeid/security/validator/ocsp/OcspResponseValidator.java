@@ -22,14 +22,21 @@
 
 package eu.webeid.security.validator.ocsp;
 
+import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.OCSPCertificateException;
 import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.security.exceptions.UserCertificateRevokedException;
 import eu.webeid.security.util.DateAndTime;
+import eu.webeid.security.validator.ocsp.service.OcspService;
+import org.bouncycastle.asn1.ocsp.OCSPObjectIdentifiers;
+import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.ocsp.BasicOCSPResp;
+import org.bouncycastle.cert.ocsp.CertificateID;
 import org.bouncycastle.cert.ocsp.CertificateStatus;
 import org.bouncycastle.cert.ocsp.OCSPException;
+import org.bouncycastle.cert.ocsp.OCSPReq;
+import org.bouncycastle.cert.ocsp.OCSPResp;
 import org.bouncycastle.cert.ocsp.RevokedStatus;
 import org.bouncycastle.cert.ocsp.SingleResp;
 import org.bouncycastle.cert.ocsp.UnknownStatus;
@@ -42,9 +49,66 @@ import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Date;
 import java.util.Objects;
 
 public final class OcspResponseValidator {
+
+    public static void validateOcspResponse(BasicOCSPResp basicResponse, OcspService ocspService, Duration allowedOcspResponseTimeSkew, Duration maxOcspResponseThisUpdateAge, CertificateID requestCertificateId) throws AuthTokenException, OCSPException, CertificateException, OperatorCreationException {
+        // The verification algorithm follows RFC 2560, https://www.ietf.org/rfc/rfc2560.txt.
+        //
+        // 3.2.  Signed Response Acceptance Requirements
+        //   Prior to accepting a signed response for a particular certificate as
+        //   valid, OCSP clients SHALL confirm that:
+        //
+        //   1. The certificate identified in a received response corresponds to
+        //      the certificate that was identified in the corresponding request.
+
+        // As we sent the request for only a single certificate, we expect only a single response.
+        if (basicResponse.getResponses().length != 1) {
+            throw new UserCertificateOCSPCheckFailedException("OCSP response must contain one response, "
+                + "received " + basicResponse.getResponses().length + " responses instead");
+        }
+        final SingleResp certStatusResponse = basicResponse.getResponses()[0];
+        if (!requestCertificateId.equals(certStatusResponse.getCertID())) {
+            throw new UserCertificateOCSPCheckFailedException("OCSP responded with certificate ID that differs from the requested ID");
+        }
+
+        //   2. The signature on the response is valid.
+
+        // We assume that the responder includes its certificate in the certs field of the response
+        // that helps us to verify it. According to RFC 2560 this field is optional, but including it
+        // is standard practice.
+        if (basicResponse.getCerts().length < 1) {
+            throw new UserCertificateOCSPCheckFailedException("OCSP response must contain the responder certificate, "
+                + "but none was provided");
+        }
+        // The first certificate is the responder certificate, other certificates, if given, are the certificate's chain.
+        final X509CertificateHolder responderCert = basicResponse.getCerts()[0];
+        OcspResponseValidator.validateResponseSignature(basicResponse, responderCert);
+
+        //   3. The identity of the signer matches the intended recipient of the
+        //      request.
+        //
+        //   4. The signer is currently authorized to provide a response for the
+        //      certificate in question.
+
+        // Use the clock instance so that the date can be mocked in tests.
+        final Date now = DateAndTime.DefaultClock.getInstance().now();
+        ocspService.validateResponderCertificate(responderCert, now);
+
+        //   5. The time at which the status being indicated is known to be
+        //      correct (thisUpdate) is sufficiently recent.
+        //
+        //   6. When available, the time at or before which newer information will
+        //      be available about the status of the certificate (nextUpdate) is
+        //      greater than the current time.
+
+        OcspResponseValidator.validateCertificateStatusUpdateTime(certStatusResponse, allowedOcspResponseTimeSkew, maxOcspResponseThisUpdateAge);
+
+        // Now we can accept the signed response as valid and validate the certificate status.
+        OcspResponseValidator.validateSubjectCertificateStatus(certStatusResponse);
+    }
 
     /**
      * Indicates that a X.509 Certificates corresponding private key may be used by an authority to sign OCSP responses.
@@ -130,6 +194,36 @@ public final class OcspResponseValidator {
             throw new UserCertificateRevokedException("Unknown status");
         } else {
             throw new UserCertificateRevokedException("Status is neither good, revoked nor unknown");
+        }
+    }
+
+    public static void validateNonce(OCSPReq request, BasicOCSPResp response) throws UserCertificateOCSPCheckFailedException {
+        final Extension requestNonce = request.getExtension(OCSPObjectIdentifiers.id_pkix_ocsp_nonce);
+        final Extension responseNonce = response.getExtension(OCSPObjectIdentifiers.id_pkix_ocsp_nonce);
+        if (requestNonce == null || responseNonce == null) {
+            throw new UserCertificateOCSPCheckFailedException("OCSP request or response nonce extension missing, " +
+                "possible replay attack");
+        }
+        if (!requestNonce.equals(responseNonce)) {
+            throw new UserCertificateOCSPCheckFailedException("OCSP request and response nonces differ, " +
+                "possible replay attack");
+        }
+    }
+
+    public static String ocspStatusToString(int status) {
+        switch (status) {
+            case OCSPResp.MALFORMED_REQUEST:
+                return "malformed request";
+            case OCSPResp.INTERNAL_ERROR:
+                return "internal error";
+            case OCSPResp.TRY_LATER:
+                return "service unavailable";
+            case OCSPResp.SIG_REQUIRED:
+                return "request signature missing";
+            case OCSPResp.UNAUTHORIZED:
+                return "unauthorized";
+            default:
+                return "unknown";
         }
     }
 

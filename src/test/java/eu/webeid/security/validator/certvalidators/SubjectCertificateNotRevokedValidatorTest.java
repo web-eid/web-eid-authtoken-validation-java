@@ -31,6 +31,7 @@ import eu.webeid.security.util.DateAndTime;
 import eu.webeid.security.validator.ocsp.OcspClient;
 import eu.webeid.security.validator.ocsp.OcspClientImpl;
 import eu.webeid.security.validator.ocsp.OcspServiceProvider;
+import eu.webeid.security.validator.ocsp.ResilientOcspService;
 import org.bouncycastle.asn1.ocsp.OCSPResponseStatus;
 import org.bouncycastle.cert.ocsp.OCSPException;
 import org.bouncycastle.cert.ocsp.OCSPResp;
@@ -347,7 +348,8 @@ class SubjectCertificateNotRevokedValidatorTest {
     }
 
     private SubjectCertificateNotRevokedValidator getSubjectCertificateNotRevokedValidator(OcspClient client, OcspServiceProvider ocspServiceProvider) {
-        return new SubjectCertificateNotRevokedValidator(trustedValidator, client, ocspServiceProvider, CONFIGURATION.getAllowedOcspResponseTimeSkew(), CONFIGURATION.getMaxOcspResponseThisUpdateAge());
+        ResilientOcspService resilientOcspService = new ResilientOcspService(client, ocspServiceProvider, null, CONFIGURATION.getAllowedOcspResponseTimeSkew(), CONFIGURATION.getMaxOcspResponseThisUpdateAge());
+        return new SubjectCertificateNotRevokedValidator(resilientOcspService, trustedValidator);
     }
 
     private static void setSubjectCertificateIssuerCertificate(SubjectCertificateTrustedValidator trustedValidator) throws NoSuchFieldException, IllegalAccessException, CertificateException, IOException {

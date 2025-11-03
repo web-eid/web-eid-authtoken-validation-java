@@ -37,6 +37,7 @@ import eu.webeid.security.validator.certvalidators.SubjectCertificateTrustedVali
 import eu.webeid.security.validator.certvalidators.SubjectCertificateValidatorBatch;
 import eu.webeid.security.validator.ocsp.OcspClient;
 import eu.webeid.security.validator.ocsp.OcspServiceProvider;
+import eu.webeid.security.validator.ocsp.ResilientOcspService;
 import eu.webeid.security.validator.ocsp.service.AiaOcspServiceConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,9 +66,8 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
     private final CertStore trustedCACertificateCertStore;
     // OcspClient uses built-in HttpClient internally by default.
     // A single HttpClient instance is reused for all HTTP calls to utilize connection and thread pools.
-    private OcspClient ocspClient;
-    private OcspServiceProvider ocspServiceProvider;
     private final AuthTokenSignatureValidator authTokenSignatureValidator;
+    private ResilientOcspService resilientOcspService;
 
     /**
      * @param configuration configuration parameters for the token validator
@@ -88,12 +88,15 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
 
         if (configuration.isUserCertificateRevocationCheckWithOcspEnabled()) {
             // The OCSP client may be provided by the API consumer.
-            this.ocspClient = Objects.requireNonNull(ocspClient, "OCSP client must not be null when OCSP check is enabled");
-            ocspServiceProvider = new OcspServiceProvider(
+            Objects.requireNonNull(ocspClient, "OCSP client must not be null when OCSP check is enabled");
+            OcspServiceProvider ocspServiceProvider = new OcspServiceProvider(
                 configuration.getDesignatedOcspServiceConfiguration(),
                 new AiaOcspServiceConfiguration(configuration.getNonceDisabledOcspUrls(),
                     trustedCACertificateAnchors,
-                    trustedCACertificateCertStore));
+                    trustedCACertificateCertStore),
+                configuration.getFallbackOcspServiceConfigurations());
+            resilientOcspService = new ResilientOcspService(ocspClient, ocspServiceProvider, configuration.getCircuitBreakerConfig(), configuration.getAllowedOcspResponseTimeSkew(),
+                configuration.getMaxOcspResponseThisUpdateAge());
         }
 
         authTokenSignatureValidator = new AuthTokenSignatureValidator(configuration.getSiteOrigin());
@@ -182,11 +185,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         return SubjectCertificateValidatorBatch.createFrom(
             certTrustedValidator::validateCertificateTrusted
         ).addOptional(configuration.isUserCertificateRevocationCheckWithOcspEnabled(),
-            new SubjectCertificateNotRevokedValidator(certTrustedValidator,
-                ocspClient, ocspServiceProvider,
-                configuration.getAllowedOcspResponseTimeSkew(),
-                configuration.getMaxOcspResponseThisUpdateAge()
-            )::validateCertificateNotRevoked
+            new SubjectCertificateNotRevokedValidator(resilientOcspService, certTrustedValidator)::validateCertificateNotRevoked
         );
     }
 
