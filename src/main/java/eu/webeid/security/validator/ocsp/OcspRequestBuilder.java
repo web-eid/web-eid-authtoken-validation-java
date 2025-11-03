@@ -20,23 +20,6 @@
  * SOFTWARE.
  */
 
-/*
- * Copyright 2017 The Netty Project
- * Copyright (c) 2020-2025 Estonian Information System Authority
- *
- * The Netty Project and The Web eID Project license this file to you under the
- * Apache License, version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at:
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
- */
-
 package eu.webeid.security.validator.ocsp;
 
 import org.bouncycastle.asn1.DEROctetString;
@@ -48,17 +31,17 @@ import org.bouncycastle.cert.ocsp.OCSPException;
 import org.bouncycastle.cert.ocsp.OCSPReq;
 import org.bouncycastle.cert.ocsp.OCSPReqBuilder;
 
+import java.io.IOException;
 import java.security.SecureRandom;
 import java.util.Objects;
 
 /**
- * This is a simplified version of Bouncy Castle's {@link OCSPReqBuilder}.
- *
- * @see OCSPReqBuilder
+ * This is a wrapper around Bouncy Castle's {@link OCSPReqBuilder} that
+ * adds the OCSP nonce extension to the request if needed.
  */
 public final class OcspRequestBuilder {
 
-    private static final SecureRandom GENERATOR = new SecureRandom();
+    private static final SecureRandom RANDOM_GENERATOR = new SecureRandom();
 
     private boolean ocspNonceEnabled = true;
     private CertificateID certificateId;
@@ -82,19 +65,24 @@ public final class OcspRequestBuilder {
         builder.addRequest(Objects.requireNonNull(certificateId, "certificateId"));
 
         if (ocspNonceEnabled) {
-            addNonce(builder);
+            try {
+                addNonce(builder);
+            } catch (IOException e) {
+                throw new OCSPException("Failed to generate OCSP nonce extension", e);
+            }
         }
 
         return builder.build();
     }
 
-    private void addNonce(OCSPReqBuilder builder) {
-        final byte[] nonce = new byte[8];
-        GENERATOR.nextBytes(nonce);
+    private void addNonce(OCSPReqBuilder builder) throws IOException {
+        final byte[] nonce = new byte[32];
+        RANDOM_GENERATOR.nextBytes(nonce);
 
         final Extension[] extensions = new Extension[]{
             new Extension(OCSPObjectIdentifiers.id_pkix_ocsp_nonce, false,
-                new DEROctetString(nonce))
+                // Follow OpenSSL OCSP nonce encoding convention and add double octet string header.
+                new DEROctetString(new DEROctetString(nonce)))
         };
         builder.setRequestExtensions(new Extensions(extensions));
     }
