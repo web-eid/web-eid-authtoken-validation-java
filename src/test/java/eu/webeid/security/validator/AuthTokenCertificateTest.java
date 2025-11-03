@@ -24,19 +24,31 @@ package eu.webeid.security.validator;
 
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import eu.webeid.security.authtoken.WebEidAuthToken;
-import eu.webeid.security.exceptions.*;
+import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.exceptions.AuthTokenParseException;
+import eu.webeid.security.exceptions.CertificateDecodingException;
+import eu.webeid.security.exceptions.CertificateExpiredException;
+import eu.webeid.security.exceptions.CertificateNotTrustedException;
+import eu.webeid.security.exceptions.CertificateNotYetValidException;
+import eu.webeid.security.exceptions.UserCertificateDisallowedPolicyException;
+import eu.webeid.security.exceptions.UserCertificateMissingPurposeException;
+import eu.webeid.security.exceptions.UserCertificateRevokedException;
+import eu.webeid.security.exceptions.UserCertificateWrongPurposeException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
 import eu.webeid.security.testutil.AuthTokenValidators;
-import eu.webeid.security.testutil.Dates;
+import eu.webeid.security.util.DateAndTime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 import java.security.cert.CertificateException;
-import java.text.ParseException;
 
+import static eu.webeid.security.testutil.DateMocker.mockDate;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mockStatic;
 
 class AuthTokenCertificateTest extends AbstractTestWithValidator {
 
@@ -46,7 +58,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
         "\"signature\":\"arx164xRiwhIQDINe0J+ZxJWZFOQTx0PBtOaWaxAe7gofEIHRIbV1w0sOCYBJnvmvMem9hU4nc2+iJx2x8poYck4Z6eI3GwtiksIec3XQ9ZIk1n/XchXnmPn3GYV+HzJ\"," +
         "\"format\":\"web-eid:1\"}";
 
-    private static final String MISSING_PURPOSE_CERT = "MIICxjCCAa6gAwIBAgIJANTbd26vS6fmMA0GCSqGSIb3DQEBBQUAMBUxEzARBgNVBAMTCndlYi1laWQuZXUwHhcNMjAwOTI0MTIyNDMzWhcNMzAwOTIyMTIyNDMzWjAVMRMwEQYDVQQDEwp3ZWItZWlkLmV1MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAza5qBFu5fvs47rx3o9yzBVfIxHjMotID8ppkwWVen/uFxlqsRVi+XnWkggW+K8X45inAnBAVi1rIw7GQNdacSHglyvQfwM64AallmD0+K+QgbqxcO9fvRvlAeISENBc2bGgqTIytPEON5ZmazzbOZjqY3M1QcPlPZOeUm6M9ZcZFhsxpiB4gwZUic9tnCz9eujd6k6DzNVfSRaJcpGA5hJ9aKH4vXS3x7anewna+USEXkRb4Il5zSlZR0i1yrVA1YNOxCG/+GgWvXfvXwdQ0z9BpGwNEyc0mRDNx+umaTukz9t+7/qTcB2JLTuiwM9Gqg5sDDnzPlcZSa7GnIU0MLQIDAQABoxkwFzAVBgNVHREEDjAMggp3ZWItZWlkLmV1MA0GCSqGSIb3DQEBBQUAA4IBAQAYGkBhTlet47uw3JYunYo6dj4nGWSGV4x6LYjCp5QlAmGd28HpC1RFB3ba+inwW8SP69kEOcB0sJQAZ/tV90oCATNsy/Whg/TtiHISL2pr1dyBoKDRWbgTp8jjzcp2Bj9nL14aqpj1t4K1lcoYETX41yVmyyJu6VFs80M5T3yikm2giAhszjChnjyoT2kaEKoua9EUK9SS27pVltgbbvtmeTp3ZPHtBfiDOATL6E03RZ5WfMLRefI796a+RcznnudzQHhMSwcjLpMDgIWpUU4OU7RiwrU+S3MrvgzCjkWh2MGu/OGLB+d3JZoW+eCvigoshmAsbJCMLbh4N78BCPqk";
+    private static final String MISSING_KEY_USAGE_CERT = "MIICxjCCAa6gAwIBAgIJANTbd26vS6fmMA0GCSqGSIb3DQEBBQUAMBUxEzARBgNVBAMTCndlYi1laWQuZXUwHhcNMjAwOTI0MTIyNDMzWhcNMzAwOTIyMTIyNDMzWjAVMRMwEQYDVQQDEwp3ZWItZWlkLmV1MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAza5qBFu5fvs47rx3o9yzBVfIxHjMotID8ppkwWVen/uFxlqsRVi+XnWkggW+K8X45inAnBAVi1rIw7GQNdacSHglyvQfwM64AallmD0+K+QgbqxcO9fvRvlAeISENBc2bGgqTIytPEON5ZmazzbOZjqY3M1QcPlPZOeUm6M9ZcZFhsxpiB4gwZUic9tnCz9eujd6k6DzNVfSRaJcpGA5hJ9aKH4vXS3x7anewna+USEXkRb4Il5zSlZR0i1yrVA1YNOxCG/+GgWvXfvXwdQ0z9BpGwNEyc0mRDNx+umaTukz9t+7/qTcB2JLTuiwM9Gqg5sDDnzPlcZSa7GnIU0MLQIDAQABoxkwFzAVBgNVHREEDjAMggp3ZWItZWlkLmV1MA0GCSqGSIb3DQEBBQUAA4IBAQAYGkBhTlet47uw3JYunYo6dj4nGWSGV4x6LYjCp5QlAmGd28HpC1RFB3ba+inwW8SP69kEOcB0sJQAZ/tV90oCATNsy/Whg/TtiHISL2pr1dyBoKDRWbgTp8jjzcp2Bj9nL14aqpj1t4K1lcoYETX41yVmyyJu6VFs80M5T3yikm2giAhszjChnjyoT2kaEKoua9EUK9SS27pVltgbbvtmeTp3ZPHtBfiDOATL6E03RZ5WfMLRefI796a+RcznnudzQHhMSwcjLpMDgIWpUU4OU7RiwrU+S3MrvgzCjkWh2MGu/OGLB+d3JZoW+eCvigoshmAsbJCMLbh4N78BCPqk";
     private static final String WRONG_PURPOSE_CERT = "MIIEBDCCA2WgAwIBAgIQGIgoZxFL7VZbyFH7MAVEkTAKBggqhkjOPQQDBDBgMQswCQYDVQQGEwJFRTEbMBkGA1UECgwSU0sgSUQgU29sdXRpb25zIEFTMRcwFQYDVQRhDA5OVFJFRS0xMDc0NzAxMzEbMBkGA1UEAwwSVEVTVCBvZiBFU1RFSUQyMDE4MB4XDTE4MTAxODA5MjcyM1oXDTIzMTAxNzIxNTk1OVowfzELMAkGA1UEBhMCRUUxKjAoBgNVBAMMIUrDlUVPUkcsSkFBSy1LUklTVEpBTiwzODAwMTA4NTcxODEQMA4GA1UEBAwHSsOVRU9SRzEWMBQGA1UEKgwNSkFBSy1LUklTVEpBTjEaMBgGA1UEBRMRUE5PRUUtMzgwMDEwODU3MTgwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAAT3SZB34CUGYhQyLsLd9b2ihv35q7NT47Id9ugLIdgg3NSFDccH6rV16D2m8DKfuD2mn3V6QdaaZnbWF4YdDK1W0C9kLNsB70ob//y39pugMftepmQpJcBGPqug81tf5jujggHDMIIBvzAJBgNVHRMEAjAAMA4GA1UdDwEB/wQEAwIDiDBHBgNVHSAEQDA+MDIGCysGAQQBg5EhAQIBMCMwIQYIKwYBBQUHAgEWFWh0dHBzOi8vd3d3LnNrLmVlL0NQUzAIBgYEAI96AQIwHwYDVR0RBBgwFoEUMzgwMDEwODU3MThAZWVzdGkuZWUwHQYDVR0OBBYEFPhJx7ro54+N8r2ByiZXzZyWBbjFMGEGCCsGAQUFBwEDBFUwUzBRBgYEAI5GAQUwRzBFFj9odHRwczovL3NrLmVlL2VuL3JlcG9zaXRvcnkvY29uZGl0aW9ucy1mb3ItdXNlLW9mLWNlcnRpZmljYXRlcy8TAkVOMCAGA1UdJQEB/wQWMBQGCCsG/wUFBwMCBggrBgEFBQcDBDAfBgNVHSMEGDAWgBTAhJkpxE6fOwI09pnhClYACCk+ezBzBggrBgEFBQcBAQRnMGUwLAYIKwYBBQUHMAGGIGh0dHA6Ly9haWEuZGVtby5zay5lZS9lc3RlaWQyMDE4MDUGCCsGAQUFBzAChilodHRwOi8vYy5zay5lZS9UZXN0X29mX0VTVEVJRDIwMTguZGVyLmNydDAKBggqhkjOPQQDBAOBjAAwgYgCQgFi5XSCFGgsc8SKLWwMBWS0nu/20FjEqh6OGvsI4iPctNDkinsxcYgARdfqPsNnDX+KjALKPEKZCLKRixGL2kPLMgJCAQFXP9gstThxlj/1Q5YFb7KWhPWFiKgQEi9JdvxJQNXLkWV9onEh96mRFgv4IJJpGazuoSMZtzNpyBxmM0dwnxOf";
     private static final String WRONG_POLICY_CERT = "MIIEATCCA2OgAwIBAgIQOWkBWXNDJm1byFd3XsWkvjAKBggqhkjOPQQDBDBgMQswCQYDVQQGEwJFRTEbMBkGA1UECgwSU0sgSUQgU29sdXRpb25zIEFTMRcwFQYDVQRhDA5OVFJFRS0xMDc0NzAxMzEbMBkGA1UEAwwSVEVTVCBvZiBFU1RFSUQyMDE4MB4XDTE4MTAxODA5NTA0N1oXDTIzMTAxNzIxNTk1OVowfzELMAkGA1UEBhMCRUUxKjAoBgNVBAMMIUrDlUVPUkcsSkFBSy1LUklTVEpBTiwzODAwMTA4NTcxODEQMA4GA1UEBAwHSsOVRU9SRzEWMBQGA1UEKgwNSkFBSy1LUklTVEpBTjEaMBgGA1UEBRMRUE5PRUUtMzgwMDEwODU3MTgwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAAR5k1lXzvSeI9O/1s1pZvjhEW8nItJoG0EBFxmLEY6S7ki1vF2Q3TEDx6dNztI1Xtx96cs8r4zYTwdiQoDg7k3diUuR9nTWGxQEMO1FDo4Y9fAmiPGWT++GuOVoZQY3XxijggHBMIIBvTAJBgNVHRMEAjAAMA4GA1UdDwEB/wQEAwIDiDBFBgNVHSAEPjA8MDAGCSsGAQQBzh8BAzAjMCEGCCsGAQUFBwIBFhVodHRwczovL3d3dy5zay5lZS9DUFMwCAYGBACPegECMB8GA1UdEQQYMBaBFDM4MDAxMDg1NzE4QGVlc3RpLmVlMB0GA1UdDgQWBBTkLL00CRAVTDEpocmV+W4m2CbmwDBhBggrBgEFBQcBAwRVMFMwUQYGBACORgEFMEcwRRY/aHR0cHM6Ly9zay5lZS9lbi9yZXBvc2l0b3J5L2NvbmRpdGlvbnMtZm9yLXVzZS1vZi1jZXJ0aWZpY2F0ZXMvEwJFTjAgBgNVHSUBAf8EFjAUBggrBgEFBQcDAgYIKwYBBQUHAwQwHwYDVR0jBBgwFoAUwISZKcROnzsCNPaZ4QpWAAgpPnswcwYIKwYBBQUHAQEEZzBlMCwGCCsGAQUFBzABhiBodHRwOi8vYWlhLmRlbW8uc2suZWUvZXN0ZWlkMjAxODA1BggrBgEFBQcwAoYpaHR0cDovL2Muc2suZWUvVGVzdF9vZl9FU1RFSUQyMDE4LmRlci5jcnQwCgYIKoZIzj0EAwQDgYsAMIGHAkIB9VLJjHbS2bYudRatkEeMFJAMKbJ4bAVdh0KlFxWASexF5ywpGl43WSpB6QAXzNEBMe1FIWiOIud44iexNWO1jgACQQ1+M+taZ4hyWqSNW5DCIiUP7Yu4WvH3SUjEqQHbOQshyMh5EM1pVcvOn/ZgOxLt6ETv9avnhVMw2zTd1b8u4EFk";
 
@@ -56,21 +68,21 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     private static final String EXPIRED_ECDSA_CERT = "MIIF0TCCA7mgAwIBAgIQMBVFXroEt3hZ8FHcKKE65TANBgkqhkiG9w0BAQsFADBjMQswCQYDVQQGEwJFRTEiMCAGA1UECgwZQVMgU2VydGlmaXRzZWVyaW1pc2tlc2t1czEXMBUGA1UEYQwOTlRSRUUtMTA3NDcwMTMxFzAVBgNVBAMMDkVTVEVJRC1TSyAyMDE1MB4XDTE3MTAyNTA4NTcwMFoXDTIxMDIxMDIxNTk1OVowgYsxCzAJBgNVBAYTAkVFMQ8wDQYDVQQKDAZFU1RFSUQxFzAVBgNVBAsMDmF1dGhlbnRpY2F0aW9uMR4wHAYDVQQDDBVUT09NLE1BUlQsMzc2MDIwNDAzMzQxDTALBgNVBAQMBFRPT00xDTALBgNVBCoMBE1BUlQxFDASBgNVBAUTCzM3NjAyMDQwMzM0MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAExS1YQQBDLVvOi0a2GA5Y34AXODpx0AL8eKDOB7BjwBc/FAyVExhfb6O+lT5Tnaec3GnT4JNRyeV8d82L8cyOgFn4PWc+5cjFdmcZjJbtCvgyBOQQ831tteIDL2XSrvZEo4ICBDCCAgAwCQYDVR0TBAIwADAOBgNVHQ8BAf8EBAMCA4gwUwYDVR0gBEwwSjA+BgkrBgEEAc4fAQEwMTAvBggrBgEFBQcCARYjaHR0cHM6Ly93d3cuc2suZWUvcmVwb3NpdG9vcml1bS9DUFMwCAYGBACPegECMB8GA1UdEQQYMBaBFG1hcnQudG9vbS4zQGVlc3RpLmVlMB0GA1UdDgQWBBSzneoLqtqbvHvJ19cjhp2XR5ovQTAgBgNVHSUBAf8EFjAUBggrBgEFBQcDAgYIKwYBBQUHAwQwHwYDVR0jBBgwFoAUs6uIvJnVYqSFKgjNtB1yO4NyR1EwYQYIKwYBBQUHAQMEVTBTMFEGBgQAjkYBBTBHMEUWP2h0dHBzOi8vc2suZWUvZW4vcmVwb3NpdG9yeS9jb25kaXRpb25zLWZvci11c2Utb2YtY2VydGlmaWNhdGVzLxMCRU4wagYIKwYBBQUHAQEEXjBcMCcGCCsGAQUFBzABhhtodHRwOi8vYWlhLnNrLmVlL2VzdGVpZDIwMTUwMQYIKwYBBQUHMAKGJWh0dHA6Ly9jLnNrLmVlL0VTVEVJRC1TS18yMDE1LmRlci5jcnQwPAYDVR0fBDUwMzAxoC+gLYYraHR0cDovL3d3dy5zay5lZS9jcmxzL2VzdGVpZC9lc3RlaWQyMDE1LmNybDANBgkqhkiG9w0BAQsFAAOCAgEAOXTvktUXqPgaK/uxzgH0xSEYClBAWIQaNgpqY5lwsQtgQnpfKlsADqMZxCp7UuuMvQmpDbBxv1kIr0oG1uUXrUtPw81XOH1ClwPPXWpg9VRTAetNbHTBbHDyzuXQMNeDmrntChs+BteletejGD+aYG39HGMlrMbGQZOgvQrpYHMDek0ckCPEsZRXqUP0g7Ie7uBQhz5At7l4EDAeOW8xGoI6t+Ke4GedccXKef60w2ZIIDzvOFHPTc6POCsIlFtF/nCKwVi7GoQKjbUbM5OdBLZ0jyLq2LvzZuT86Jo8wObziuSzApGlBexHAqLrR83q+/Xl61yPnFf3w2kAfS9kBjeunzTH7Jm3pNT3Zq9JRLvEDqtpOPqr4zm9nG6OSghFU6tySkpQ5HiakGpMcnt5o5KuXhQ+Dg317tdXPyQkSiuJ9NfEBW0ijrwO12SVRzYo/jRl4ZQUkAEEUSMEsC6gTsZypPdIsLDVoQWTytHDU89s1xJDn4HulPl12dFnrhlLeX4RxOjDxppZxdjBU0FoJoDB0qwEAN2TMAPJWh+Pp9mFuS/u0dht9sKvAkpx+o0Z7v7QMz03XlzCHOLTIK+f81Rjokl8f+wiog5Ojj0wZkDe6DuQC9L5uDey3PJHv3naVovhs7jrEJu+yrsLue/OHhAgWRh2S75/wlVPHPEE44k=";
     private static final String REVOKED_CERT = "MIIERDCCA6agAwIBAgIQSs8/WoDixVxbKRhNnF/GEzAKBggqhkjOPQQDBDBgMQswCQYDVQQGEwJFRTEbMBkGA1UECgwSU0sgSUQgU29sdXRpb25zIEFTMRcwFQYDVQRhDA5OVFJFRS0xMDc0NzAxMzEbMBkGA1UEAwwSVEVTVCBvZiBFU1RFSUQyMDE4MB4XDTE4MDYxOTE0NTA1M1oXDTIwMDEwMjIxNTk1OVowfzELMAkGA1UEBhMCRUUxKjAoBgNVBAMMIUrDlUVPUkcsSkFBSy1LUklTVEpBTiwzODAwMTA4NTcxODEQMA4GA1UEBAwHSsOVRU9SRzEWMBQGA1UEKgwNSkFBSy1LUklTVEpBTjEaMBgGA1UEBRMRUE5PRUUtMzgwMDEwODU3MTgwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAAR/jopNG3KL0ZQUvO4OGSvcaqUtFDm3azOtsM2VRp666r0d36Zh0Zx/xej8f+SzEfWvvDT1HQLo3USiSbYn1FyNHTNxifV+Zvf6StXJAkdu24d1UvKbf+LylglO/yS7o4ijggIEMIICADAJBgNVHRMEAjAAMA4GA1UdDwEB/wQEAwIDiDBHBgNVHSAEQDA+MDIGCysGAQQBg5F/AQIBMCMwIQYIKwYBBQUHAgEWFWh0dHBzOi8vd3d3LnNrLmVlL0NQUzAIBgYEAI96AQIwHwYDVR0RBBgwFoEUMzgwMDEwODU3MThAZWVzdGkuZWUwHQYDVR0OBBYEFEQA6/1GXJtp+6czUzorhEJ7B95pMGEGCCsGAQUFBwEDBFUwUzBRBgYEAI5GAQUwRzBFFj9odHRwczovL3NrLmVlL2VuL3JlcG9zaXRvcnkvY29uZGl0aW9ucy1mb3ItdXNlLW9mLWNlcnRpZmljYXRlcy8TAkVOMCAGA1UdJQEB/wQWMBQGCCsGAQUFBwMCBggrBgEFBQcDBDAfBgNVHSMEGDAWgBTAhJkpxE6fOwI09pnhClYACCk+ezB/BggrBgEFBQcBAQRzMHEwLAYIKwYBBQUHMAGGIGh0dHA6Ly9haWEuZGVtby5zay5lZS9lc3RlaWQyMDE4MEEGCCsGAQUFBzAChjVodHRwczovL3NrLmVlL3VwbG9hZC9maWxlcy9URVNUX29mX0VTVEVJRDIwMTguZGVyLmNydDAzBgNVHR8ELDAqMCigJqAkhiJodHRwOi8vYy5zay5lZS90ZXN0X2VzdGVpZDIwMTguY3JsMAoGCCqGSM49BAMEA4GLADCBhwJBcmcfLC+HcSJ6BuRrDGL+K+7BAW8BfAiiWWAuBV4ebLkbbAWmkc9dSKgr4BEGEt90xDTQ85yW4SjGulFXu9C3yQsCQgETaXTs3Hp6vDAcQYL8Bx4BO3DwJbDuD4BUJyT0+9HQiFCQmTQ4xrNjeaeOwRWyMOM9z5ORMeJCiQUyil1x4YPIbg==";
 
+    private MockedStatic<DateAndTime.DefaultClock> mockedClock;
+
+
     @Override
     @BeforeEach
     protected void setup() {
         super.setup();
+        mockedClock = mockStatic(DateAndTime.DefaultClock.class);
         // Ensure that the certificates do not expire.
-        mockDate("2021-03-01");
+        mockDate("2021-08-01", mockedClock);
     }
 
     @AfterEach
-    public void tearDown() {
-        try {
-            Dates.resetMockedCertificateValidatorDate();
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new RuntimeException(e);
-        }
+    void tearDown() {
+        mockedClock.close();
     }
 
     @Test
@@ -135,8 +147,8 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     }
 
     @Test
-    void whenCertificatePurposeIsMissing_thenValidationFails() throws AuthTokenException {
-        final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", MISSING_PURPOSE_CERT);
+    void whenCertificateKeyUsageIsMissing_thenValidationFails() throws AuthTokenException {
+        final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", MISSING_KEY_USAGE_CERT);
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
             .isInstanceOf(UserCertificateMissingPurposeException.class);
@@ -168,6 +180,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
 
     @Test
     void whenUsingOldMobileIdCertificate_thenValidationFails() throws AuthTokenException {
+        mockDate("2021-03-01", mockedClock);
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", OLD_MOBILE_ID_CERT);
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
@@ -179,6 +192,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", NEW_MOBILE_ID_CERT);
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
+            // FIXME: should be .isInstanceOf(UserCertificateDisallowedPolicyException.class);
             .isInstanceOf(UserCertificateMissingPurposeException.class);
     }
 
@@ -209,7 +223,17 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
 
     @Test
     void whenUserCertificateIsNotYetValid_thenValidationFails() {
-        mockDate("2018-10-17");
+        mockDate("2018-10-17", mockedClock);
+        assertThatThrownBy(() -> validator
+            .validate(validAuthToken, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(CertificateNotYetValidException.class)
+            .hasMessage("User certificate is not yet valid");
+    }
+
+    // In this case both CA and user certificate are not yet valid, we expect the user certificate to be checked first.
+    @Test
+    void whenTrustedCACertificateIsNotYetValid_thenUserCertValidationFails() {
+        mockDate("2018-08-17", mockedClock);
         assertThatThrownBy(() -> validator
             .validate(validAuthToken, VALID_CHALLENGE_NONCE))
             .isInstanceOf(CertificateNotYetValidException.class)
@@ -217,36 +241,40 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     }
 
     @Test
-    void whenTrustedCACertificateIsNotYetValid_thenValidationFails() {
-        mockDate("2018-08-17");
-        assertThatThrownBy(() -> validator
-            .validate(validAuthToken, VALID_CHALLENGE_NONCE))
-            .isInstanceOf(CertificateNotYetValidException.class)
-            .hasMessage("Trusted CA certificate is not yet valid");
-    }
-
-    @Test
     void whenUserCertificateIsNoLongerValid_thenValidationFails() {
-        mockDate("2024-10-19");
+        mockDate("2026-10-19", mockedClock);
         assertThatThrownBy(() -> validator
             .validate(validAuthToken, VALID_CHALLENGE_NONCE))
             .isInstanceOf(CertificateExpiredException.class)
             .hasMessage("User certificate has expired");
     }
 
+    // In this case both CA and user certificate have expired, we expect the user certificate to be checked first.
     @Test
-    void whenTrustedCACertificateIsNoLongerValid_thenValidationFails() {
-        mockDate("2033-10-19");
+    void whenTrustedCACertificateIsNoLongerValid_thenUserCertValidationFails() {
+        mockDate("2033-10-19", mockedClock);
         assertThatThrownBy(() -> validator
             .validate(validAuthToken, VALID_CHALLENGE_NONCE))
             .isInstanceOf(CertificateExpiredException.class)
-            .hasMessage("Trusted CA certificate has expired");
+            .hasMessage("User certificate has expired");
+    }
+
+    // The certificate validation process must only check the expiration of the CA certificate that is directly part of
+    // the user's certificate chain. Expired but unrelated CA certificates must not cause exceptions.
+    @Test
+    void whenUnrelatedCACertificateIsExpired_thenValidationSucceeds() throws Exception {
+        mockDate("2024-07-01", mockedClock);
+        final AuthTokenValidator validatorWithExpiredUnrelatedTrustedCA = AuthTokenValidators.getAuthTokenValidatorWithJuly2024ExpiredUnrelatedTrustedCA();
+
+        assertThatCode(() -> validatorWithExpiredUnrelatedTrustedCA
+            .validate(validAuthToken, VALID_CHALLENGE_NONCE))
+            .doesNotThrowAnyException();
     }
 
     @Test
     @Disabled("A new designated test OCSP responder certificate was issued whose validity period no longer overlaps with the revoked certificate")
     void whenCertificateIsRevoked_thenOcspCheckFails() throws Exception {
-        mockDate("2020-01-01");
+        mockDate("2020-01-01", mockedClock);
         final AuthTokenValidator validatorWithOcspCheck = AuthTokenValidators.getAuthTokenValidatorWithOcspCheck();
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", REVOKED_CERT);
         assertThatThrownBy(() -> validatorWithOcspCheck
@@ -257,7 +285,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     @Test
     @Disabled("A new designated test OCSP responder certificate was issued whose validity period no longer overlaps with the revoked certificate")
     void whenCertificateIsRevoked_thenOcspCheckWithDesignatedOcspServiceFails() throws Exception {
-        mockDate("2020-01-01");
+        mockDate("2020-01-01", mockedClock);
         final AuthTokenValidator validatorWithOcspCheck = AuthTokenValidators.getAuthTokenValidatorWithDesignatedOcspCheck();
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", REVOKED_CERT);
         assertThatThrownBy(() -> validatorWithOcspCheck
@@ -271,14 +299,6 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
         assertThatThrownBy(() -> validatorWithWrongTrustedCA
             .validate(validAuthToken, VALID_CHALLENGE_NONCE))
             .isInstanceOf(CertificateNotTrustedException.class);
-    }
-
-    private void mockDate(String date) {
-        try {
-            Dates.setMockedCertificateValidatorDate(Dates.create(date));
-        } catch (ParseException | NoSuchFieldException | IllegalAccessException e) {
-            throw new RuntimeException(e);
-        }
     }
 
 }

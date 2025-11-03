@@ -22,68 +22,101 @@
 
 package eu.webeid.security.validator.ocsp;
 
-import eu.webeid.security.testutil.Dates;
+import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 import org.bouncycastle.cert.ocsp.SingleResp;
 import org.junit.jupiter.api.Test;
-import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
+import static eu.webeid.security.validator.AuthTokenValidatorBuilderTest.CONFIGURATION;
+import static eu.webeid.security.validator.ocsp.OcspResponseValidator.validateCertificateStatusUpdateTime;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static eu.webeid.security.validator.ocsp.OcspResponseValidator.validateCertificateStatusUpdateTime;
 
 class OcspResponseValidatorTest {
 
+    private static final Duration TIME_SKEW = CONFIGURATION.getAllowedOcspResponseTimeSkew();
+    private static final Duration THIS_UPDATE_AGE = CONFIGURATION.getMaxOcspResponseThisUpdateAge();
+
     @Test
-    void whenThisUpdateDayBeforeProducedAt_thenThrows() throws Exception {
+    void whenThisAndNextUpdateWithinSkew_thenValidationSucceeds() {
         final SingleResp mockResponse = mock(SingleResp.class);
-        // yyyy-MM-dd'T'HH:mm:ss.SSSZ
-        when(mockResponse.getThisUpdate()).thenReturn(Dates.create("2021-09-01T00:00:00.000Z"));
-        final Date producedAt = Dates.create("2021-09-02T00:00:00.000Z");
-        assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
-            .isThrownBy(() ->
-                validateCertificateStatusUpdateTime(mockResponse, producedAt))
-            .withMessage("User certificate revocation check has failed: "
-                + "Certificate status update time check failed: "
-                + "notAllowedBefore: 2021-09-01 23:45:00 UTC, "
-                + "notAllowedAfter: 2021-09-02 00:15:00 UTC, "
-                + "thisUpdate: 2021-09-01 00:00:00 UTC, "
-                + "nextUpdate: null");
+        Instant now = Instant.now();
+        Date thisUpdateWithinAgeLimit = getThisUpdateWithinAgeLimit(now);
+        Date nextUpdateWithinAgeLimit = Date.from(now.minus(THIS_UPDATE_AGE.minusSeconds(2)));
+        when(mockResponse.getThisUpdate()).thenReturn(thisUpdateWithinAgeLimit);
+        when(mockResponse.getNextUpdate()).thenReturn(nextUpdateWithinAgeLimit);
+        assertThatCode(() -> validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE))
+            .doesNotThrowAnyException();
     }
 
     @Test
-    void whenThisUpdateDayAfterProducedAt_thenThrows() throws Exception {
+    void whenNextUpdateBeforeThisUpdate_thenThrows() {
         final SingleResp mockResponse = mock(SingleResp.class);
-        when(mockResponse.getThisUpdate()).thenReturn(Dates.create("2021-09-02"));
-        final Date producedAt = Dates.create("2021-09-01");
+        Instant now = Instant.now();
+        Date thisUpdateWithinAgeLimit = getThisUpdateWithinAgeLimit(now);
+        Date beforeThisUpdate = new Date(thisUpdateWithinAgeLimit.getTime() - 1000);
+        when(mockResponse.getThisUpdate()).thenReturn(thisUpdateWithinAgeLimit);
+        when(mockResponse.getNextUpdate()).thenReturn(beforeThisUpdate);
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
-                validateCertificateStatusUpdateTime(mockResponse, producedAt))
-            .withMessage("User certificate revocation check has failed: "
+                validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE))
+            .withMessageStartingWith("User certificate revocation check has failed: "
                 + "Certificate status update time check failed: "
-                + "notAllowedBefore: 2021-08-31 23:45:00 UTC, "
-                + "notAllowedAfter: 2021-09-01 00:15:00 UTC, "
-                + "thisUpdate: 2021-09-02 00:00:00 UTC, "
-                + "nextUpdate: null");
+                + "nextUpdate '" + beforeThisUpdate.toInstant() + "' is before thisUpdate '" + thisUpdateWithinAgeLimit.toInstant() + "'");
     }
 
     @Test
-    void whenNextUpdateDayBeforeProducedAt_thenThrows() throws Exception {
+    void whenThisUpdateHalfHourBeforeNow_thenThrows() {
         final SingleResp mockResponse = mock(SingleResp.class);
-        when(mockResponse.getThisUpdate()).thenReturn(Dates.create("2021-09-02"));
-        when(mockResponse.getNextUpdate()).thenReturn(Dates.create("2021-09-01"));
-        final Date producedAt = Dates.create("2021-09-02");
+        Instant now = Instant.now();
+        Date halfHourBeforeNow = Date.from(now.minus(30, ChronoUnit.MINUTES));
+        when(mockResponse.getThisUpdate()).thenReturn(halfHourBeforeNow);
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
-                validateCertificateStatusUpdateTime(mockResponse, producedAt))
+                validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE))
+            .withMessageStartingWith("User certificate revocation check has failed: "
+                + "Certificate status update time check failed: "
+                + "thisUpdate '" + halfHourBeforeNow.toInstant() + "' is too old, minimum time allowed: ");
+    }
+
+    @Test
+    void whenThisUpdateHalfHourAfterNow_thenThrows() {
+        final SingleResp mockResponse = mock(SingleResp.class);
+        Instant now = Instant.now();
+        Date halfHourAfterNow = Date.from(now.plus(30, ChronoUnit.MINUTES));
+        when(mockResponse.getThisUpdate()).thenReturn(halfHourAfterNow);
+        assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
+            .isThrownBy(() ->
+                validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE))
+            .withMessageStartingWith("User certificate revocation check has failed: "
+                + "Certificate status update time check failed: "
+                + "thisUpdate '" + halfHourAfterNow.toInstant() + "' is too far in the future, latest allowed: ");
+    }
+
+    @Test
+    void whenNextUpdateHalfHourBeforeNow_thenThrows() {
+        final SingleResp mockResponse = mock(SingleResp.class);
+        Instant now = Instant.now();
+        Date thisUpdateWithinAgeLimit = getThisUpdateWithinAgeLimit(now);
+        Date halfHourBeforeNow = Date.from(now.minus(30, ChronoUnit.MINUTES));
+        when(mockResponse.getThisUpdate()).thenReturn(thisUpdateWithinAgeLimit);
+        when(mockResponse.getNextUpdate()).thenReturn(halfHourBeforeNow);
+        assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
+            .isThrownBy(() ->
+                validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE))
             .withMessage("User certificate revocation check has failed: "
                 + "Certificate status update time check failed: "
-                + "notAllowedBefore: 2021-09-01 23:45:00 UTC, "
-                + "notAllowedAfter: 2021-09-02 00:15:00 UTC, "
-                + "thisUpdate: 2021-09-02 00:00:00 UTC, "
-                + "nextUpdate: 2021-09-01 00:00:00 UTC");
+                + "nextUpdate '" + halfHourBeforeNow.toInstant() + "' is in the past");
+    }
+
+    private static Date getThisUpdateWithinAgeLimit(Instant now) {
+        return Date.from(now.minus(THIS_UPDATE_AGE.minusSeconds(1)));
     }
 
 }

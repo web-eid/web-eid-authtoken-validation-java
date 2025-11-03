@@ -12,17 +12,17 @@
 
     <properties>
         <maven.version>3.3.9</maven.version>
-        <maven-surefire-plugin.version>2.22.2</maven-surefire-plugin.version>
+        <maven-surefire-plugin.version>3.5.4</maven-surefire-plugin.version>
         <java.version>1.8</java.version>
         <jjwt.version>0.11.5</jjwt.version>
-        <jackson.version>2.13.4.2</jackson.version>
+        <jackson.version>2.18.5</jackson.version>
         <slf4j.version>1.7.36</slf4j.version>
         <bouncycastle.version>1.70</bouncycastle.version>
         <okhttp.version>4.10.0</okhttp.version>
-        <junit-jupiter.version>5.8.2</junit-jupiter.version>
-        <assertj.version>3.23.1</assertj.version>
-        <mockito.version>4.6.1</mockito.version>
-        <jacoco.version>0.8.5</jacoco.version>
+        <junit-jupiter.version>5.12.0</junit-jupiter.version>
+        <assertj.version>3.27.3</assertj.version>
+        <mockito.version>4.11.0</mockito.version>
+        <jacoco.version>0.8.12</jacoco.version>
         <sonar.coverage.jacoco.xmlReportPaths>
             ${project.basedir}/../jacoco-coverage-report/target/site/jacoco-aggregate/jacoco.xml
         </sonar.coverage.jacoco.xmlReportPaths>
@@ -84,7 +84,7 @@
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
+            <artifactId>mockito-inline</artifactId>
             <version>${mockito.version}</version>
             <scope>test</scope>
         </dependency>
@@ -129,7 +129,7 @@
 
     <!-- For publishing the library to GitHub Packages/GitLab Package Repository -->
     <distributionManagement>
-        <!-- Github Packages does not currently support public access, so disabled until it does.
+        <!-- GitHub Packages does not currently support public access, so disabled until it does.
              See https://github.community/t/download-from-github-package-registry-without-authentication/14407
         <repository>
             <id>github</id>

@@ -25,6 +25,7 @@ package eu.webeid.security.validator.ocsp;
 import eu.webeid.security.exceptions.OCSPCertificateException;
 import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.security.exceptions.UserCertificateRevokedException;
+import eu.webeid.security.util.DateAndTime;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.ocsp.BasicOCSPResp;
 import org.bouncycastle.cert.ocsp.CertificateStatus;
@@ -39,11 +40,9 @@ import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Objects;
-import java.util.TimeZone;
-import java.util.concurrent.TimeUnit;
 
 public final class OcspResponseValidator {
 
@@ -53,14 +52,13 @@ public final class OcspResponseValidator {
      * https://oidref.com/1.3.6.1.5.5.7.3.9
      */
     private static final String OID_OCSP_SIGNING = "1.3.6.1.5.5.7.3.9";
-
-    private static final long ALLOWED_TIME_SKEW = TimeUnit.MINUTES.toMillis(15);
+    private static final String ERROR_PREFIX = "Certificate status update time check failed: ";
 
     public static void validateHasSigningExtension(X509Certificate certificate) throws OCSPCertificateException {
         Objects.requireNonNull(certificate, "certificate");
         try {
             if (certificate.getExtendedKeyUsage() == null || !certificate.getExtendedKeyUsage().contains(OID_OCSP_SIGNING)) {
-                throw new OCSPCertificateException("Certificate " + certificate.getSubjectDN() +
+                throw new OCSPCertificateException("Certificate " + certificate.getSubjectX500Principal() +
                     " does not contain the key usage extension for OCSP response signing");
             }
         } catch (CertificateParsingException e) {
@@ -77,7 +75,7 @@ public final class OcspResponseValidator {
         }
     }
 
-    public static void validateCertificateStatusUpdateTime(SingleResp certStatusResponse, Date producedAt) throws UserCertificateOCSPCheckFailedException {
+    public static void validateCertificateStatusUpdateTime(SingleResp certStatusResponse, Duration allowedTimeSkew, Duration maxThisupdateAge) throws UserCertificateOCSPCheckFailedException {
         // From RFC 2560, https://www.ietf.org/rfc/rfc2560.txt:
         // 4.2.2.  Notes on OCSP Responses
         // 4.2.2.1.  Time
@@ -87,17 +85,34 @@ public final class OcspResponseValidator {
         //   SHOULD be considered unreliable.
         //   If nextUpdate is not set, the responder is indicating that newer
         //   revocation information is available all the time.
-        final Date notAllowedBefore = new Date(producedAt.getTime() - ALLOWED_TIME_SKEW);
-        final Date notAllowedAfter = new Date(producedAt.getTime() + ALLOWED_TIME_SKEW);
-        final Date thisUpdate = certStatusResponse.getThisUpdate();
-        final Date nextUpdate = certStatusResponse.getNextUpdate() != null ? certStatusResponse.getNextUpdate() : thisUpdate;
-        if (notAllowedAfter.before(thisUpdate) ||
-            notAllowedBefore.after(nextUpdate)) {
-            throw new UserCertificateOCSPCheckFailedException("Certificate status update time check failed: " +
-                "notAllowedBefore: " + toUtcString(notAllowedBefore) +
-                ", notAllowedAfter: " + toUtcString(notAllowedAfter) +
-                ", thisUpdate: " + toUtcString(thisUpdate) +
-                ", nextUpdate: " + toUtcString(certStatusResponse.getNextUpdate()));
+        final Instant now = DateAndTime.DefaultClock.getInstance().now().toInstant();
+        final Instant earliestAcceptableTimeSkew = now.minus(allowedTimeSkew);
+        final Instant latestAcceptableTimeSkew = now.plus(allowedTimeSkew);
+        final Instant minimumValidThisUpdateTime = now.minus(maxThisupdateAge);
+
+        final Instant thisUpdate = certStatusResponse.getThisUpdate().toInstant();
+        if (thisUpdate.isAfter(latestAcceptableTimeSkew)) {
+            throw new UserCertificateOCSPCheckFailedException(ERROR_PREFIX +
+                "thisUpdate '" + thisUpdate + "' is too far in the future, " +
+                "latest allowed: '" + latestAcceptableTimeSkew + "'");
+        }
+        if (thisUpdate.isBefore(minimumValidThisUpdateTime)) {
+            throw new UserCertificateOCSPCheckFailedException(ERROR_PREFIX +
+                "thisUpdate '" + thisUpdate + "' is too old, " +
+                "minimum time allowed: '" + minimumValidThisUpdateTime + "'");
+        }
+
+        if (certStatusResponse.getNextUpdate() == null) {
+            return;
+        }
+        final Instant nextUpdate = certStatusResponse.getNextUpdate().toInstant();
+        if (nextUpdate.isBefore(earliestAcceptableTimeSkew)) {
+            throw new UserCertificateOCSPCheckFailedException(ERROR_PREFIX +
+                "nextUpdate '" + nextUpdate + "' is in the past");
+        }
+        if (nextUpdate.isBefore(thisUpdate)) {
+            throw new UserCertificateOCSPCheckFailedException(ERROR_PREFIX +
+                "nextUpdate '" + nextUpdate + "' is before thisUpdate '" + thisUpdate + "'");
         }
     }
 
@@ -116,15 +131,6 @@ public final class OcspResponseValidator {
         } else {
             throw new UserCertificateRevokedException("Status is neither good, revoked nor unknown");
         }
-    }
-
-    private static String toUtcString(Date date) {
-        if (date == null) {
-            return String.valueOf((Object) null);
-        }
-        final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
-        dateFormatter.setTimeZone(TimeZone.getTimeZone("UTC"));
-        return dateFormatter.format(date);
     }
 
     private OcspResponseValidator() {

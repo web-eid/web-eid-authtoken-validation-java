@@ -37,8 +37,6 @@ import java.util.Optional;
 
 public final class OcspUrl {
 
-    public static final URI AIA_ESTEID_2015 = URI.create("http://aia.sk.ee/esteid2015");
-
     /**
      * Returns the OCSP responder {@link URI} or an empty {@code Optional} if it doesn't have one.
      */

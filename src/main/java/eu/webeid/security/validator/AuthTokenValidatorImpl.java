@@ -23,13 +23,13 @@
 package eu.webeid.security.validator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.certificate.CertificateLoader;
 import eu.webeid.security.certificate.CertificateValidator;
 import eu.webeid.security.exceptions.JceException;
 import eu.webeid.security.exceptions.AuthTokenParseException;
 import eu.webeid.security.exceptions.AuthTokenException;
-import eu.webeid.security.validator.certvalidators.SubjectCertificateExpiryValidator;
 import eu.webeid.security.validator.certvalidators.SubjectCertificateNotRevokedValidator;
 import eu.webeid.security.validator.certvalidators.SubjectCertificatePolicyValidator;
 import eu.webeid.security.validator.certvalidators.SubjectCertificatePurposeValidator;
@@ -57,7 +57,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
     private static final int TOKEN_MAX_LENGTH = 10000;
     private static final Logger LOG = LoggerFactory.getLogger(AuthTokenValidatorImpl.class);
 
-    private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final ObjectReader OBJECT_READER = new ObjectMapper().readerFor(WebEidAuthToken.class);
 
     private final AuthTokenValidationConfiguration configuration;
     private final SubjectCertificateValidatorBatch simpleSubjectCertificateValidators;
@@ -84,7 +84,6 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         trustedCACertificateCertStore = CertificateValidator.buildCertStoreFromCertificates(configuration.getTrustedCACertificates());
 
         simpleSubjectCertificateValidators = SubjectCertificateValidatorBatch.createFrom(
-            new SubjectCertificateExpiryValidator(trustedCACertificateAnchors)::validateCertificateExpiry,
             SubjectCertificatePurposeValidator::validateCertificatePurpose,
             new SubjectCertificatePolicyValidator(configuration.getDisallowedSubjectCertificatePolicies())::validateCertificatePolicies
         );
@@ -109,7 +108,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
             validateTokenLength(authToken);
             return parseToken(authToken);
         } catch (Exception e) {
-            // Generally "log and rethrow" is an anti-pattern, but it fits with the surrounding logging style.
+            // Generally "log and rethrow" is an antipattern, but it fits with the surrounding logging style.
             LOG.warn("Token parsing was interrupted:", e);
             throw e;
         }
@@ -121,7 +120,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
             LOG.info("Starting token validation");
             return validateToken(authToken, currentChallengeNonce);
         } catch (Exception e) {
-            // Generally "log and rethrow" is an anti-pattern, but it fits with the surrounding logging style.
+            // Generally "log and rethrow" is an antipattern, but it fits with the surrounding logging style.
             LOG.warn("Token validation was interrupted:", e);
             throw e;
         }
@@ -138,7 +137,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
 
     private WebEidAuthToken parseToken(String authToken) throws AuthTokenParseException {
         try {
-            final WebEidAuthToken token = objectMapper.readValue(authToken, WebEidAuthToken.class);
+            final WebEidAuthToken token = OBJECT_READER.readValue(authToken);
             if (token == null) {
                 throw new AuthTokenParseException("Web eID authentication token is null");
             }
@@ -185,7 +184,11 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         return SubjectCertificateValidatorBatch.createFrom(
             certTrustedValidator::validateCertificateTrusted
         ).addOptional(configuration.isUserCertificateRevocationCheckWithOcspEnabled(),
-            new SubjectCertificateNotRevokedValidator(certTrustedValidator, ocspClient, ocspServiceProvider)::validateCertificateNotRevoked
+            new SubjectCertificateNotRevokedValidator(certTrustedValidator,
+                ocspClient, ocspServiceProvider,
+                configuration.getAllowedOcspResponseTimeSkew(),
+                configuration.getMaxOcspResponseThisUpdateAge()
+            )::validateCertificateNotRevoked
         );
     }
 

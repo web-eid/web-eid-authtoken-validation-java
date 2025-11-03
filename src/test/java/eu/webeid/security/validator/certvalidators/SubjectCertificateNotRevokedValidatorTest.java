@@ -22,9 +22,15 @@
 
 package eu.webeid.security.validator.certvalidators;
 
+import eu.webeid.security.exceptions.CertificateExpiredException;
+import eu.webeid.security.exceptions.CertificateNotTrustedException;
 import eu.webeid.security.exceptions.JceException;
+import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
+import eu.webeid.security.exceptions.UserCertificateRevokedException;
+import eu.webeid.security.util.DateAndTime;
 import eu.webeid.security.validator.ocsp.OcspClient;
 import eu.webeid.security.validator.ocsp.OkHttpOcspClient;
+import eu.webeid.security.validator.ocsp.OcspServiceProvider;
 import okhttp3.MediaType;
 import okhttp3.Protocol;
 import okhttp3.Request;
@@ -33,33 +39,32 @@ import okhttp3.ResponseBody;
 import org.bouncycastle.asn1.ocsp.OCSPResponseStatus;
 import org.bouncycastle.cert.ocsp.OCSPException;
 import org.bouncycastle.cert.ocsp.OCSPResp;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import eu.webeid.security.exceptions.CertificateNotTrustedException;
-import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
-import eu.webeid.security.exceptions.UserCertificateRevokedException;
-import eu.webeid.security.validator.ocsp.OcspServiceProvider;
+import org.mockito.MockedStatic;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
+import java.net.ConnectException;
+import java.net.UnknownHostException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Objects;
 
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static eu.webeid.security.testutil.Certificates.getJaakKristjanEsteid2018Cert;
 import static eu.webeid.security.testutil.Certificates.getTestEsteid2018CA;
+import static eu.webeid.security.testutil.DateMocker.mockDate;
 import static eu.webeid.security.testutil.OcspServiceMaker.getAiaOcspServiceProvider;
 import static eu.webeid.security.testutil.OcspServiceMaker.getDesignatedOcspServiceProvider;
+import static eu.webeid.security.validator.AuthTokenValidatorBuilderTest.CONFIGURATION;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.mockito.Mockito.mockStatic;
 
 class SubjectCertificateNotRevokedValidatorTest {
-
-    private static final MediaType OCSP_RESPONSE = MediaType.get("application/ocsp-response");
 
     private final OcspClient ocspClient = OkHttpOcspClient.build(Duration.ofSeconds(5));
     private SubjectCertificateTrustedValidator trustedValidator;
@@ -74,7 +79,7 @@ class SubjectCertificateNotRevokedValidatorTest {
 
     @Test
     void whenValidAiaOcspResponderConfiguration_thenSucceeds() throws Exception {
-        final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidatorWithAiaOcsp(ocspClient);
+        final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidator(ocspClient, getAiaOcspServiceProvider());
         assertThatCode(() ->
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .doesNotThrowAnyException();
@@ -84,7 +89,7 @@ class SubjectCertificateNotRevokedValidatorTest {
     @Disabled("As new designated test OCSP responder certificates are issued more frequently now, it is no longer feasible to keep the certificates up to date")
     void whenValidDesignatedOcspResponderConfiguration_thenSucceeds() throws Exception {
         final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider();
-        final SubjectCertificateNotRevokedValidator validator = new SubjectCertificateNotRevokedValidator(trustedValidator, ocspClient, ocspServiceProvider);
+        final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidator(ocspServiceProvider);
         assertThatCode(() ->
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .doesNotThrowAnyException();
@@ -94,7 +99,7 @@ class SubjectCertificateNotRevokedValidatorTest {
     @Disabled("As new designated test OCSP responder certificates are issued more frequently now, it is no longer feasible to keep the certificates up to date")
     void whenValidOcspNonceDisabledConfiguration_thenSucceeds() throws Exception {
         final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider(false);
-        final SubjectCertificateNotRevokedValidator validator = new SubjectCertificateNotRevokedValidator(trustedValidator, ocspClient, ocspServiceProvider);
+        final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidator(ocspServiceProvider);
         assertThatCode(() ->
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .doesNotThrowAnyException();
@@ -103,34 +108,31 @@ class SubjectCertificateNotRevokedValidatorTest {
     @Test
     void whenOcspUrlIsInvalid_thenThrows() throws Exception {
         final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider("http://invalid.invalid");
-        final SubjectCertificateNotRevokedValidator validator = new SubjectCertificateNotRevokedValidator(trustedValidator, ocspClient, ocspServiceProvider);
+        final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidator(ocspServiceProvider);
         assertThatCode(() ->
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
             .cause()
-            .isInstanceOf(IOException.class)
-            .hasMessageMatching("invalid.invalid: (Name or service not known|"
-                + "Temporary failure in name resolution)");
+            .isInstanceOf(UnknownHostException.class);
     }
 
     @Test
     void whenOcspRequestFails_thenThrows() throws Exception {
-        final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider("https://web-eid-test.free.beeceptor.com");
-        final SubjectCertificateNotRevokedValidator validator = new SubjectCertificateNotRevokedValidator(trustedValidator, ocspClient, ocspServiceProvider);
+        final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider("http://demo.sk.ee/ocsps");
+        final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidator(ocspServiceProvider);
         assertThatCode(() ->
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
             .cause()
             .isInstanceOf(IOException.class)
-            .hasMessageStartingWith("OCSP request was not successful, response: Response{");
+            .hasMessageStartingWith("OCSP request was not successful, response: Response{protocol=http/1.1, code=404, message=Not Found, url=http://demo.sk.ee/ocsps}");
     }
 
     @Test
     void whenOcspRequestHasInvalidBody_thenThrows() throws Exception {
         final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidatorWithAiaOcsp(
-            getResponseBuilder()
-                .body(ResponseBody.create("invalid", OCSP_RESPONSE))
-                .build());
+            getMockedResponse("invalid".getBytes())
+        );
         assertThatCode(() ->
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
@@ -142,9 +144,8 @@ class SubjectCertificateNotRevokedValidatorTest {
     @Test
     void whenOcspResponseIsNotSuccessful_thenThrows() throws Exception {
         final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidatorWithAiaOcsp(
-            getResponseBuilder()
-                .body(ResponseBody.create(buildOcspResponseBodyWithInternalErrorStatus(), OCSP_RESPONSE))
-                .build());
+            getMockedResponse(buildOcspResponseBodyWithInternalErrorStatus())
+        );
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
                 validator.validateCertificateNotRevoked(estEid2018Cert))
@@ -154,9 +155,8 @@ class SubjectCertificateNotRevokedValidatorTest {
     @Test
     void whenOcspResponseHasInvalidCertificateId_thenThrows() throws Exception {
         final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidatorWithAiaOcsp(
-            getResponseBuilder()
-                .body(ResponseBody.create(buildOcspResponseBodyWithInvalidCertificateId(), OCSP_RESPONSE))
-                .build());
+            getMockedResponse(buildOcspResponseBodyWithInvalidCertificateId())
+        );
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
                 validator.validateCertificateNotRevoked(estEid2018Cert))
@@ -166,9 +166,8 @@ class SubjectCertificateNotRevokedValidatorTest {
     @Test
     void whenOcspResponseHasInvalidSignature_thenThrows() throws Exception {
         final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidatorWithAiaOcsp(
-            getResponseBuilder()
-                .body(ResponseBody.create(buildOcspResponseBodyWithInvalidSignature(), OCSP_RESPONSE))
-                .build());
+            getMockedResponse(buildOcspResponseBodyWithInvalidSignature())
+        );
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
                 validator.validateCertificateNotRevoked(estEid2018Cert))
@@ -178,9 +177,8 @@ class SubjectCertificateNotRevokedValidatorTest {
     @Test
     void whenOcspResponseHasInvalidResponderCert_thenThrows() throws Exception {
         final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidatorWithAiaOcsp(
-            getResponseBuilder()
-                .body(ResponseBody.create(buildOcspResponseBodyWithInvalidResponderCert(), OCSP_RESPONSE))
-                .build());
+            getMockedResponse(buildOcspResponseBodyWithInvalidResponderCert())
+        );
         assertThatCode(() ->
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
@@ -192,9 +190,8 @@ class SubjectCertificateNotRevokedValidatorTest {
     @Test
     void whenOcspResponseHasInvalidTag_thenThrows() throws Exception {
         final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidatorWithAiaOcsp(
-            getResponseBuilder()
-                .body(ResponseBody.create(buildOcspResponseBodyWithInvalidTag(), OCSP_RESPONSE))
-                .build());
+            getMockedResponse(buildOcspResponseBodyWithInvalidTag())
+        );
         assertThatCode(() ->
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
@@ -206,9 +203,8 @@ class SubjectCertificateNotRevokedValidatorTest {
     @Test
     void whenOcspResponseHas2CertResponses_thenThrows() throws Exception {
         final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidatorWithAiaOcsp(
-            getResponseBuilder()
-                .body(ResponseBody.create(getOcspResponseBytesFromResources("ocsp_response_with_2_responses.der"), OCSP_RESPONSE))
-                .build());
+            getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_with_2_responses.der"))
+        );
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
                 validator.validateCertificateNotRevoked(estEid2018Cert))
@@ -218,9 +214,8 @@ class SubjectCertificateNotRevokedValidatorTest {
     @Disabled("It is difficult to make Python and Java CertId equal, needs more work")
     void whenOcspResponseHas2ResponderCerts_thenThrows() throws Exception {
         final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidatorWithAiaOcsp(
-            getResponseBuilder()
-                .body(ResponseBody.create(getOcspResponseBytesFromResources("ocsp_response_with_2_responder_certs.der"), OCSP_RESPONSE))
-                .build());
+            getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_with_2_responder_certs.der"))
+        );
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
                 validator.validateCertificateNotRevoked(estEid2018Cert))
@@ -230,23 +225,24 @@ class SubjectCertificateNotRevokedValidatorTest {
     @Test
     void whenOcspResponseRevoked_thenThrows() throws Exception {
         final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidatorWithAiaOcsp(
-            getResponseBuilder()
-                .body(ResponseBody.create(getOcspResponseBytesFromResources("ocsp_response_revoked.der"), OCSP_RESPONSE))
-                .build());
-        assertThatExceptionOfType(UserCertificateRevokedException.class)
-            .isThrownBy(() ->
-                validator.validateCertificateNotRevoked(estEid2018Cert))
-            .withMessage("User certificate has been revoked: Revocation reason: 0");
+            getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_revoked.der"))
+        );
+        try (MockedStatic<DateAndTime.DefaultClock> mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
+            mockDate("2021-09-18", mockedClock);
+            assertThatExceptionOfType(UserCertificateRevokedException.class)
+                .isThrownBy(() ->
+                    validator.validateCertificateNotRevoked(estEid2018Cert))
+                .withMessage("User certificate has been revoked: Revocation reason: 0");
+        }
     }
 
     @Test
     void whenOcspResponseUnknown_thenThrows() throws Exception {
         final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider("https://web-eid-test.free.beeceptor.com");
-        try (final Response response = getResponseBuilder()
-            .body(ResponseBody.create(getOcspResponseBytesFromResources("ocsp_response_unknown.der"), OCSP_RESPONSE))
-            .build()) {
-            final OcspClient client = (url, request) -> new OCSPResp(Objects.requireNonNull(response.body()).bytes());
-            final SubjectCertificateNotRevokedValidator validator = new SubjectCertificateNotRevokedValidator(trustedValidator, client, ocspServiceProvider);
+        final Response response = getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_unknown.der"));
+        final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidator(getMockClient(response), ocspServiceProvider);
+        try (MockedStatic<DateAndTime.DefaultClock> mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
+            mockDate("2021-09-18T00:16:25", mockedClock);
             assertThatExceptionOfType(UserCertificateRevokedException.class)
                 .isThrownBy(() ->
                     validator.validateCertificateNotRevoked(estEid2018Cert))
@@ -255,27 +251,42 @@ class SubjectCertificateNotRevokedValidatorTest {
     }
 
     @Test
-    void whenOcspResponseCANotTrusted_thenThrows() throws Exception {
+    void whenOcspResponseCACertNotTrusted_thenThrows() throws Exception {
         final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidatorWithAiaOcsp(
-            getResponseBuilder()
-                .body(ResponseBody.create(getOcspResponseBytesFromResources("ocsp_response_unknown.der"), OCSP_RESPONSE))
-                .build());
-        assertThatExceptionOfType(CertificateNotTrustedException.class)
+            getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_unknown.der"))
+        );
+        try (MockedStatic<DateAndTime.DefaultClock> mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
+            mockDate("2021-09-18T00:16:25", mockedClock);
+            assertThatExceptionOfType(CertificateNotTrustedException.class)
+                .isThrownBy(() ->
+                    validator.validateCertificateNotRevoked(estEid2018Cert))
+                .withMessage("Certificate EMAILADDRESS=pki@sk.ee, CN=TEST of SK OCSP RESPONDER 2020, OU=OCSP, O=AS Sertifitseerimiskeskus, C=EE is not trusted");
+        }
+    }
+
+    @Test
+    void whenOcspResponseCACertExpired_thenThrows() throws Exception {
+        final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidatorWithAiaOcsp(
+            getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_unknown.der"))
+        );
+        assertThatExceptionOfType(CertificateExpiredException.class)
             .isThrownBy(() ->
                 validator.validateCertificateNotRevoked(estEid2018Cert))
-            .withMessage("Certificate EMAILADDRESS=pki@sk.ee, CN=TEST of SK OCSP RESPONDER 2020, OU=OCSP, O=AS Sertifitseerimiskeskus, C=EE is not trusted");
+            .withMessage("AIA OCSP responder certificate has expired");
     }
 
     @Test
     void whenNonceDiffers_thenThrows() throws Exception {
         final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidatorWithAiaOcsp(
-            getResponseBuilder()
-                .body(ResponseBody.create(getOcspResponseBytesFromResources(), OCSP_RESPONSE))
-                .build());
-        assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
-            .isThrownBy(() ->
-                validator.validateCertificateNotRevoked(estEid2018Cert))
-            .withMessage("User certificate revocation check has failed: OCSP request and response nonces differ, possible replay attack");
+            getMockedResponse(getOcspResponseBytesFromResources())
+        );
+        try (MockedStatic<DateAndTime.DefaultClock> mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
+            mockDate("2021-09-17T18:25:24", mockedClock);
+            assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
+                .isThrownBy(() ->
+                    validator.validateCertificateNotRevoked(estEid2018Cert))
+                .withMessage("User certificate revocation check has failed: OCSP request and response nonces differ, possible replay attack");
+        }
     }
 
     private static byte[] buildOcspResponseBodyWithInternalErrorStatus() throws IOException {
@@ -326,15 +337,16 @@ class SubjectCertificateNotRevokedValidatorTest {
         }
     }
 
-    @NotNull
     private SubjectCertificateNotRevokedValidator getSubjectCertificateNotRevokedValidatorWithAiaOcsp(Response response) throws JceException {
-        final OcspClient client = (url, request) -> new OCSPResp(Objects.requireNonNull(response.body()).bytes());
-        return getSubjectCertificateNotRevokedValidatorWithAiaOcsp(client);
+        return getSubjectCertificateNotRevokedValidator(getMockClient(response), getAiaOcspServiceProvider());
     }
 
-    @NotNull
-    private SubjectCertificateNotRevokedValidator getSubjectCertificateNotRevokedValidatorWithAiaOcsp(OcspClient client) throws JceException {
-        return new SubjectCertificateNotRevokedValidator(trustedValidator, client, getAiaOcspServiceProvider());
+    private SubjectCertificateNotRevokedValidator getSubjectCertificateNotRevokedValidator(OcspServiceProvider ocspServiceProvider) {
+        return getSubjectCertificateNotRevokedValidator(ocspClient, ocspServiceProvider);
+    }
+
+    private SubjectCertificateNotRevokedValidator getSubjectCertificateNotRevokedValidator(OcspClient client, OcspServiceProvider ocspServiceProvider) {
+        return new SubjectCertificateNotRevokedValidator(trustedValidator, client, ocspServiceProvider, CONFIGURATION.getAllowedOcspResponseTimeSkew(), CONFIGURATION.getMaxOcspResponseThisUpdateAge());
     }
 
     private static void setSubjectCertificateIssuerCertificate(SubjectCertificateTrustedValidator trustedValidator) throws NoSuchFieldException, IllegalAccessException, CertificateException, IOException {
@@ -343,13 +355,25 @@ class SubjectCertificateNotRevokedValidatorTest {
         field.set(trustedValidator, getTestEsteid2018CA());
     }
 
-    @NotNull
-    private static Response.Builder getResponseBuilder() {
+    private Response getMockedResponse(byte[] bodyContent) {
+        final Request req = new Request.Builder()
+            .url("http://testing")
+            .build();
         return new Response.Builder()
-            .request(new Request.Builder().url("http://testing").build())
-            .message("testing")
+            .request(req)
             .protocol(Protocol.HTTP_1_1)
-            .code(200);
+            .code(200)
+            .message("OK")
+            .body(ResponseBody.create(bodyContent, MediaType.get("application/ocsp-response")))
+            .build();
+    }
+
+    private OcspClient getMockClient(Response response) {
+        return (url, request) -> {
+            try (final ResponseBody body = Objects.requireNonNull(response.body())) {
+                return new OCSPResp(body.bytes());
+            }
+        };
     }
 
     private static byte[] toByteArray(InputStream resourceAsStream) throws IOException {
