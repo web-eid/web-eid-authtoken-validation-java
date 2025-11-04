@@ -30,7 +30,7 @@ import java.security.cert.X509Certificate;
 public class CertificateNotTrustedException extends AuthTokenException {
 
     public CertificateNotTrustedException(X509Certificate certificate, Throwable e) {
-        super("Certificate " + certificate.getSubjectDN() + " is not trusted", e);
+        super("Certificate " + certificate.getSubjectX500Principal() + " is not trusted", e);
     }
 
 }
