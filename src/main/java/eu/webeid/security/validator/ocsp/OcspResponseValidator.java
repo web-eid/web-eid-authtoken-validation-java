@@ -26,6 +26,7 @@ import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.OCSPCertificateException;
 import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.security.exceptions.UserCertificateRevokedException;
+import eu.webeid.security.exceptions.UserCertificateUnknownException;
 import eu.webeid.security.util.DateAndTime;
 import eu.webeid.security.validator.ocsp.service.OcspService;
 import org.bouncycastle.asn1.ocsp.OCSPObjectIdentifiers;
@@ -54,7 +55,7 @@ import java.util.Objects;
 
 public final class OcspResponseValidator {
 
-    public static void validateOcspResponse(BasicOCSPResp basicResponse, OcspService ocspService, Duration allowedOcspResponseTimeSkew, Duration maxOcspResponseThisUpdateAge, CertificateID requestCertificateId) throws AuthTokenException, OCSPException, CertificateException, OperatorCreationException {
+    public static void validateOcspResponse(BasicOCSPResp basicResponse, OcspService ocspService, Duration allowedOcspResponseTimeSkew, Duration maxOcspResponseThisUpdateAge, boolean rejectUnknownOcspResponseStatus, CertificateID requestCertificateId) throws AuthTokenException, OCSPException, CertificateException, OperatorCreationException {
         // The verification algorithm follows RFC 2560, https://www.ietf.org/rfc/rfc2560.txt.
         //
         // 3.2.  Signed Response Acceptance Requirements
@@ -107,7 +108,7 @@ public final class OcspResponseValidator {
         OcspResponseValidator.validateCertificateStatusUpdateTime(certStatusResponse, allowedOcspResponseTimeSkew, maxOcspResponseThisUpdateAge);
 
         // Now we can accept the signed response as valid and validate the certificate status.
-        OcspResponseValidator.validateSubjectCertificateStatus(certStatusResponse);
+        OcspResponseValidator.validateSubjectCertificateStatus(certStatusResponse, rejectUnknownOcspResponseStatus);
     }
 
     /**
@@ -180,7 +181,7 @@ public final class OcspResponseValidator {
         }
     }
 
-    public static void validateSubjectCertificateStatus(SingleResp certStatusResponse) throws UserCertificateRevokedException {
+    public static void validateSubjectCertificateStatus(SingleResp certStatusResponse, boolean rejectUnknownOcspResponseStatus) throws AuthTokenException {
         final CertificateStatus status = certStatusResponse.getCertStatus();
         if (status == null) {
             return;
@@ -191,9 +192,11 @@ public final class OcspResponseValidator {
                 new UserCertificateRevokedException("Revocation reason: " + revokedStatus.getRevocationReason()) :
                 new UserCertificateRevokedException());
         } else if (status instanceof UnknownStatus) {
-            throw new UserCertificateRevokedException("Unknown status");
+            throw rejectUnknownOcspResponseStatus ? new UserCertificateUnknownException("User certificate has been revoked: Unknown status")
+                : new UserCertificateRevokedException("Unknown status");
         } else {
-            throw new UserCertificateRevokedException("Status is neither good, revoked nor unknown");
+            throw rejectUnknownOcspResponseStatus ? new UserCertificateUnknownException("Status is neither good, revoked nor unknown")
+                : new UserCertificateRevokedException("Status is neither good, revoked nor unknown");
         }
     }
 

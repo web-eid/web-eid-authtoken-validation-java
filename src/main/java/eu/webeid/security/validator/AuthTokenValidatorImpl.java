@@ -95,8 +95,11 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
                     trustedCACertificateAnchors,
                     trustedCACertificateCertStore),
                 configuration.getFallbackOcspServiceConfigurations());
-            resilientOcspService = new ResilientOcspService(ocspClient, ocspServiceProvider, configuration.getCircuitBreakerConfig(), configuration.getAllowedOcspResponseTimeSkew(),
-                configuration.getMaxOcspResponseThisUpdateAge());
+            resilientOcspService = new ResilientOcspService(ocspClient, ocspServiceProvider,
+                configuration.getCircuitBreakerConfig(),
+                configuration.getAllowedOcspResponseTimeSkew(),
+                configuration.getMaxOcspResponseThisUpdateAge(),
+                configuration.isRejectUnknownOcspResponseStatus());
         }
 
         authTokenSignatureValidator = new AuthTokenSignatureValidator(configuration.getSiteOrigin());

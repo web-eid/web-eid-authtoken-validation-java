@@ -52,6 +52,7 @@ public final class AuthTokenValidationConfiguration {
     private Duration ocspRequestTimeout = Duration.ofSeconds(5);
     private Duration allowedOcspResponseTimeSkew = Duration.ofMinutes(15);
     private Duration maxOcspResponseThisUpdateAge = Duration.ofMinutes(2);
+    private boolean rejectUnknownOcspResponseStatus;
     private DesignatedOcspServiceConfiguration designatedOcspServiceConfiguration;
     private Collection<FallbackOcspServiceConfiguration> fallbackOcspServiceConfigurations = new HashSet<>();
     private CircuitBreakerConfig circuitBreakerConfig;
@@ -74,6 +75,7 @@ public final class AuthTokenValidationConfiguration {
         this.ocspRequestTimeout = other.ocspRequestTimeout;
         this.allowedOcspResponseTimeSkew = other.allowedOcspResponseTimeSkew;
         this.maxOcspResponseThisUpdateAge = other.maxOcspResponseThisUpdateAge;
+        this.rejectUnknownOcspResponseStatus = other.rejectUnknownOcspResponseStatus;
         this.designatedOcspServiceConfiguration = other.designatedOcspServiceConfiguration;
         this.fallbackOcspServiceConfigurations = Set.copyOf(other.fallbackOcspServiceConfigurations);
         this.circuitBreakerConfig = other.circuitBreakerConfig;
@@ -151,6 +153,14 @@ public final class AuthTokenValidationConfiguration {
 
     public void setCircuitBreakerConfig(CircuitBreakerConfig circuitBreakerConfig) {
         this.circuitBreakerConfig = circuitBreakerConfig;
+    }
+
+    public boolean isRejectUnknownOcspResponseStatus() {
+        return rejectUnknownOcspResponseStatus;
+    }
+
+    public void setRejectUnknownOcspResponseStatus(boolean rejectUnknownOcspResponseStatus) {
+        this.rejectUnknownOcspResponseStatus = rejectUnknownOcspResponseStatus;
     }
 
     /**

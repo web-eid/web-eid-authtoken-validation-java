@@ -228,6 +228,18 @@ public class AuthTokenValidatorBuilder {
     }
 
     /**
+     * // TODO: Describe the configuration option
+     *
+     * @param rejectUnknownOcspResponseStatus configures whether only GOOD or REVOKED are accepted as valid OCSP response statuses
+     * @return the builder instance for method chaining
+     */
+    public AuthTokenValidatorBuilder withRejectUnknownOcspResponseStatus(boolean rejectUnknownOcspResponseStatus) {
+        configuration.setRejectUnknownOcspResponseStatus(rejectUnknownOcspResponseStatus);
+        LOG.debug("Using the reject unknown OCSP response status validation configuration");
+        return this;
+    }
+
+    /**
      * Uses the provided OCSP client instance during user certificate revocation check with OCSP.
      * The provided client instance must be thread-safe.
      *

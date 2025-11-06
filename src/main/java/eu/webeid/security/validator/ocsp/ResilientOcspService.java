@@ -25,6 +25,7 @@ package eu.webeid.security.validator.ocsp;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.security.exceptions.UserCertificateRevokedException;
+import eu.webeid.security.exceptions.UserCertificateUnknownException;
 import eu.webeid.security.validator.ocsp.service.OcspService;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -61,13 +62,15 @@ public class ResilientOcspService {
     private final OcspServiceProvider ocspServiceProvider;
     private final Duration allowedOcspResponseTimeSkew;
     private final Duration maxOcspResponseThisUpdateAge;
+    private final boolean rejectUnknownOcspResponseStatus;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
 
-    public ResilientOcspService(OcspClient ocspClient, OcspServiceProvider ocspServiceProvider, CircuitBreakerConfig circuitBreakerConfig, Duration allowedOcspResponseTimeSkew, Duration maxOcspResponseThisUpdateAge) {
+    public ResilientOcspService(OcspClient ocspClient, OcspServiceProvider ocspServiceProvider, CircuitBreakerConfig circuitBreakerConfig, Duration allowedOcspResponseTimeSkew, Duration maxOcspResponseThisUpdateAge, boolean rejectUnknownOcspResponseStatus) {
         this.ocspClient = ocspClient;
         this.ocspServiceProvider = ocspServiceProvider;
         this.allowedOcspResponseTimeSkew = allowedOcspResponseTimeSkew;
         this.maxOcspResponseThisUpdateAge = maxOcspResponseThisUpdateAge;
+        this.rejectUnknownOcspResponseStatus = rejectUnknownOcspResponseStatus;
         this.circuitBreakerRegistry = CircuitBreakerRegistry.custom()
             .withCircuitBreakerConfig(getCircuitBreakerConfig(circuitBreakerConfig))
             .build();
@@ -91,7 +94,7 @@ public class ResilientOcspService {
             CheckedFunction0<OcspService> fallbackSupplier = () -> request(ocspService.getFallbackService(), subjectCertificate, issuerCertificate);
             CheckedFunction0<OcspService> decoratedSupplier = Decorators.ofCheckedSupplier(primarySupplier)
                 .withCircuitBreaker(circuitBreaker)
-                .withFallback(List.of(UserCertificateOCSPCheckFailedException.class, CallNotPermittedException.class), e -> fallbackSupplier.apply()) // TODO: Any other exceptions to trigger fallback? Resilience4j does not support Predicate<Exception> shouldFallback = e -> !(e instanceof UserCertificateRevokedException); in withFallback API.
+                .withFallback(List.of(UserCertificateOCSPCheckFailedException.class, CallNotPermittedException.class, UserCertificateUnknownException.class), e -> fallbackSupplier.apply()) // TODO: Any other exceptions to trigger fallback? Resilience4j does not support Predicate<Exception> shouldFallback = e -> !(e instanceof UserCertificateRevokedException); in withFallback API.
                 .decorate();
 
             return Try.of(decoratedSupplier).getOrElseThrow(throwable -> {
@@ -129,7 +132,7 @@ public class ResilientOcspService {
                 throw new UserCertificateOCSPCheckFailedException("Missing Basic OCSP Response");
             }
 
-            OcspResponseValidator.validateOcspResponse(basicResponse, ocspService, allowedOcspResponseTimeSkew, maxOcspResponseThisUpdateAge, certificateId);
+            OcspResponseValidator.validateOcspResponse(basicResponse, ocspService, allowedOcspResponseTimeSkew, maxOcspResponseThisUpdateAge, rejectUnknownOcspResponseStatus, certificateId);
             LOG.debug("OCSP check result is GOOD");
 
             if (ocspService.doesSupportNonce()) {
@@ -153,7 +156,7 @@ public class ResilientOcspService {
             .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
             .slidingWindowSize(100)
             .minimumNumberOfCalls(10)
-            .ignoreExceptions(UserCertificateRevokedException.class) // TODO: Revoked status is a valid response, not a failure. Any other exceptions to ignore?
+            .ignoreExceptions(UserCertificateRevokedException.class) // TODO: Revoked status is a valid response, not a failure and should be ignored. Any other exceptions to ignore?
             .automaticTransitionFromOpenToHalfOpenEnabled(true);
 
         if (circuitBreakerConfig != null) { // TODO: What do we allow to configure?

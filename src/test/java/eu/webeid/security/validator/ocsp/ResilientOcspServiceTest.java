@@ -24,7 +24,9 @@ package eu.webeid.security.validator.ocsp;
 
 import eu.webeid.security.certificate.CertificateValidator;
 import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.security.exceptions.UserCertificateRevokedException;
+import eu.webeid.security.exceptions.UserCertificateUnknownException;
 import eu.webeid.security.util.DateAndTime;
 import eu.webeid.security.validator.ocsp.service.AiaOcspServiceConfiguration;
 import eu.webeid.security.validator.ocsp.service.FallbackOcspServiceConfiguration;
@@ -121,7 +123,8 @@ class ResilientOcspServiceTest {
             ocspServiceProvider,
             circuitBreakerConfig,
             ALLOWED_TIME_SKEW,
-            MAX_THIS_UPDATE_AGE
+            MAX_THIS_UPDATE_AGE,
+            false
         );
         CircuitBreakerRegistry circuitBreakerRegistry = resilientOcspService.getCircuitBreakerRegistry();
         CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(PRIMARY_OCSP_URL.toASCIIString());
@@ -205,7 +208,8 @@ class ResilientOcspServiceTest {
             ocspServiceProvider,
             null,
             ALLOWED_TIME_SKEW,
-            MAX_THIS_UPDATE_AGE
+            MAX_THIS_UPDATE_AGE,
+            false
         );
         CircuitBreakerRegistry circuitBreakerRegistry = resilientOcspService.getCircuitBreakerRegistry();
         CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(PRIMARY_OCSP_URL.toASCIIString());
@@ -235,7 +239,8 @@ class ResilientOcspServiceTest {
             ocspServiceProvider,
             null,
             ALLOWED_TIME_SKEW,
-            MAX_THIS_UPDATE_AGE
+            MAX_THIS_UPDATE_AGE,
+            false
         );
         CircuitBreakerRegistry circuitBreakerRegistry = resilientOcspService.getCircuitBreakerRegistry();
         CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(PRIMARY_OCSP_URL.toASCIIString());
@@ -266,7 +271,8 @@ class ResilientOcspServiceTest {
             ocspServiceProvider,
             null,
             ALLOWED_TIME_SKEW,
-            MAX_THIS_UPDATE_AGE
+            MAX_THIS_UPDATE_AGE,
+            false
         );
         CircuitBreakerRegistry circuitBreakerRegistry = resilientOcspService.getCircuitBreakerRegistry();
         CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(PRIMARY_OCSP_URL.toASCIIString());
@@ -280,6 +286,75 @@ class ResilientOcspServiceTest {
 
             verify(ocspClient, times(1)).request(eq(PRIMARY_OCSP_URL), any());
             verify(ocspClient, times(0)).request(eq(FALLBACK_OCSP_URL), any());
+            assertThat(circuitBreaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
+        }
+    }
+
+    @Test
+    void whenPrimaryOcspResponseUnknownAndRejectUnknownOcspResponseStatusConfiguration_thenFallbackAndSucceeds() throws Exception {
+        final OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_OCSP_URL), any()))
+            .thenReturn(new OCSPResp(unknownOcspResponseBytes));
+        when(ocspClient.request(eq(FALLBACK_OCSP_URL), any()))
+            .thenReturn(new OCSPResp(validOcspResponseBytes));
+        OcspServiceProvider ocspServiceProvider = createOcspServiceProviderWithFallback();
+        ResilientOcspService resilientOcspService = new ResilientOcspService(
+            ocspClient,
+            ocspServiceProvider,
+            null,
+            ALLOWED_TIME_SKEW,
+            MAX_THIS_UPDATE_AGE,
+            true // rejectUnknownOcspResponseStatus
+        );
+        CircuitBreakerRegistry circuitBreakerRegistry = resilientOcspService.getCircuitBreakerRegistry();
+        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(PRIMARY_OCSP_URL.toASCIIString());
+        try (var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
+            mockDate("2021-09-17T18:25:24", mockedClock);
+
+            assertThatCode(() ->
+                resilientOcspService.validateSubjectCertificateNotRevoked(subjectCertificate, issuerCertificate)
+            ).doesNotThrowAnyException();
+
+            verify(ocspClient, times(1)).request(eq(PRIMARY_OCSP_URL), any());
+            verify(ocspClient, times(1)).request(eq(FALLBACK_OCSP_URL), any());
+            assertThat(circuitBreaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
+        }
+    }
+
+    @Test
+    void whenPrimaryAndFallbackRevocationStatusUnknownAndRejectUnknownOcspResponseStatusConfiguration_thenThrows() throws Exception {
+        final OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_OCSP_URL), any()))
+            .thenReturn(new OCSPResp(unknownOcspResponseBytes));
+        when(ocspClient.request(eq(FALLBACK_OCSP_URL), any()))
+            .thenReturn(new OCSPResp(unknownOcspResponseBytes));
+        FallbackOcspServiceConfiguration fallbackConfig = new FallbackOcspServiceConfiguration(
+            PRIMARY_OCSP_URL,
+            FALLBACK_OCSP_URL,
+            getTestSkOcspResponder2020(),
+            false
+        );
+        OcspServiceProvider ocspServiceProvider = createOcspServiceProviderWithFallback(fallbackConfig);
+        ResilientOcspService resilientOcspService = new ResilientOcspService(
+            ocspClient,
+            ocspServiceProvider,
+            null,
+            ALLOWED_TIME_SKEW,
+            MAX_THIS_UPDATE_AGE,
+            true // rejectUnknownOcspResponseStatus
+        );
+        CircuitBreakerRegistry circuitBreakerRegistry = resilientOcspService.getCircuitBreakerRegistry();
+        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(PRIMARY_OCSP_URL.toASCIIString());
+        try (var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
+            mockDate("2021-09-18T00:16:25", mockedClock);
+
+            assertThatExceptionOfType(UserCertificateUnknownException.class)
+                .isThrownBy(() ->
+                    resilientOcspService.validateSubjectCertificateNotRevoked(subjectCertificate, issuerCertificate))
+                .withMessage("User certificate has been revoked: Unknown status");
+
+            verify(ocspClient, times(1)).request(eq(PRIMARY_OCSP_URL), any());
+            verify(ocspClient, times(1)).request(eq(FALLBACK_OCSP_URL), any());
             assertThat(circuitBreaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
         }
     }
@@ -328,7 +403,8 @@ class ResilientOcspServiceTest {
             ocspServiceProvider,
             null,
             ALLOWED_TIME_SKEW,
-            MAX_THIS_UPDATE_AGE
+            MAX_THIS_UPDATE_AGE,
+            false
         );
         try (var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
             mockDate("2021-09-17T18:25:24", mockedClock);
@@ -346,6 +422,10 @@ class ResilientOcspServiceTest {
             getTestSkOcspResponder2018(),
             false
         );
+        return createOcspServiceProviderWithFallback(fallbackConfig);
+    }
+
+    private OcspServiceProvider createOcspServiceProviderWithFallback(FallbackOcspServiceConfiguration fallbackConfig) throws Exception {
         List<X509Certificate> trustedCACertificates = Arrays.asList(
             getTestEsteid2018CA(),
             getTestSkOcspResponder2020(),

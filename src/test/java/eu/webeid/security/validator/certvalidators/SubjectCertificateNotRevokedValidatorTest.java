@@ -348,7 +348,11 @@ class SubjectCertificateNotRevokedValidatorTest {
     }
 
     private SubjectCertificateNotRevokedValidator getSubjectCertificateNotRevokedValidator(OcspClient client, OcspServiceProvider ocspServiceProvider) {
-        ResilientOcspService resilientOcspService = new ResilientOcspService(client, ocspServiceProvider, null, CONFIGURATION.getAllowedOcspResponseTimeSkew(), CONFIGURATION.getMaxOcspResponseThisUpdateAge());
+        ResilientOcspService resilientOcspService = new ResilientOcspService(client, ocspServiceProvider,
+            null,
+            CONFIGURATION.getAllowedOcspResponseTimeSkew(),
+            CONFIGURATION.getMaxOcspResponseThisUpdateAge(),
+            CONFIGURATION.isRejectUnknownOcspResponseStatus());
         return new SubjectCertificateNotRevokedValidator(resilientOcspService, trustedValidator);
     }
 
