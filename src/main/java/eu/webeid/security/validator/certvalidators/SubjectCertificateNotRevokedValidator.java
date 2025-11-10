@@ -23,6 +23,7 @@
 package eu.webeid.security.validator.certvalidators;
 
 import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.validator.ocsp.OcspValidationInfo;
 import eu.webeid.security.validator.ocsp.ResilientOcspService;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
@@ -50,8 +51,8 @@ public final class SubjectCertificateNotRevokedValidator {
      * @param subjectCertificate user certificate to be validated
      * @throws AuthTokenException when user certificate is revoked or revocation check fails.
      */
-    public void validateCertificateNotRevoked(X509Certificate subjectCertificate) throws AuthTokenException {
+    public OcspValidationInfo validateCertificateNotRevoked(X509Certificate subjectCertificate) throws AuthTokenException {
         final X509Certificate issuerCertificate = Objects.requireNonNull(trustValidator.getSubjectCertificateIssuerCertificate());
-        resilientOcspService.validateSubjectCertificateNotRevoked(subjectCertificate, issuerCertificate);
+        return resilientOcspService.validateSubjectCertificateNotRevoked(subjectCertificate, issuerCertificate);
     }
 }

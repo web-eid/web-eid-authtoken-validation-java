@@ -23,7 +23,6 @@
 package eu.webeid.security.validator.ocsp;
 
 import eu.webeid.security.certificate.CertificateValidator;
-import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.security.exceptions.UserCertificateRevokedException;
 import eu.webeid.security.exceptions.UserCertificateUnknownException;
@@ -216,9 +215,14 @@ class ResilientOcspServiceTest {
         try (var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
             mockDate("2021-09-17T18:25:24", mockedClock);
 
-            assertThatCode(() ->
-                resilientOcspService.validateSubjectCertificateNotRevoked(subjectCertificate, issuerCertificate)
-            ).doesNotThrowAnyException();
+            OcspValidationInfo validationInfo = resilientOcspService.validateSubjectCertificateNotRevoked(subjectCertificate, issuerCertificate);
+            assertThat(validationInfo).isNotNull();
+            assertThat(validationInfo).extracting(OcspValidationInfo::getSubjectCertificate)
+                .isEqualTo(subjectCertificate);
+            assertThat(validationInfo).extracting(OcspValidationInfo::getOcspResponderUri)
+                .isEqualTo(new URI("http://aia.demo.sk.ee/esteid2018"));
+            assertThat(validationInfo).extracting(OcspValidationInfo::getOcspResponse)
+                .isNotNull();
 
             verify(ocspClient, times(1)).request(eq(PRIMARY_OCSP_URL), any());
             verify(ocspClient, times(0)).request(eq(FALLBACK_OCSP_URL), any());
@@ -250,7 +254,12 @@ class ResilientOcspServiceTest {
             assertThatExceptionOfType(UserCertificateRevokedException.class)
                 .isThrownBy(() ->
                     resilientOcspService.validateSubjectCertificateNotRevoked(subjectCertificate, issuerCertificate))
-                .withMessage("User certificate has been revoked: Revocation reason: 0");
+                .withMessage("User certificate has been revoked: Revocation reason: 0")
+                .satisfies(e -> assertThat(e.getOcspValidationInfo()).isNotNull())
+                .satisfies(e -> assertThat(e.getOcspValidationInfo().getSubjectCertificate()).isNotNull())
+                .satisfies(e -> assertThat(e.getOcspValidationInfo().getOcspResponderUri()).isNotNull())
+                .satisfies(e -> assertThat(e.getOcspValidationInfo().getOcspResponderUri().toASCIIString()).isEqualTo("http://aia.demo.sk.ee/esteid2018"))
+                .satisfies(e -> assertThat(e.getOcspValidationInfo().getOcspResponse()).isNotNull());
 
             verify(ocspClient, times(1)).request(eq(PRIMARY_OCSP_URL), any());
             verify(ocspClient, times(0)).request(eq(FALLBACK_OCSP_URL), any());
@@ -282,7 +291,12 @@ class ResilientOcspServiceTest {
             assertThatExceptionOfType(UserCertificateRevokedException.class)
                 .isThrownBy(() ->
                     resilientOcspService.validateSubjectCertificateNotRevoked(subjectCertificate, issuerCertificate))
-                .withMessage("User certificate has been revoked: Unknown status");
+                .withMessage("User certificate has been revoked: Unknown status")
+                .satisfies(e -> assertThat(e.getOcspValidationInfo()).isNotNull())
+                .satisfies(e -> assertThat(e.getOcspValidationInfo().getSubjectCertificate()).isNotNull())
+                .satisfies(e -> assertThat(e.getOcspValidationInfo().getOcspResponderUri()).isNotNull())
+                .satisfies(e -> assertThat(e.getOcspValidationInfo().getOcspResponderUri().toASCIIString()).isEqualTo("http://aia.demo.sk.ee/esteid2018"))
+                .satisfies(e -> assertThat(e.getOcspValidationInfo().getOcspResponse()).isNotNull());
 
             verify(ocspClient, times(1)).request(eq(PRIMARY_OCSP_URL), any());
             verify(ocspClient, times(0)).request(eq(FALLBACK_OCSP_URL), any());
@@ -311,9 +325,14 @@ class ResilientOcspServiceTest {
         try (var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
             mockDate("2021-09-17T18:25:24", mockedClock);
 
-            assertThatCode(() ->
-                resilientOcspService.validateSubjectCertificateNotRevoked(subjectCertificate, issuerCertificate)
-            ).doesNotThrowAnyException();
+            OcspValidationInfo validationInfo = resilientOcspService.validateSubjectCertificateNotRevoked(subjectCertificate, issuerCertificate);
+            assertThat(validationInfo).isNotNull();
+            assertThat(validationInfo).extracting(OcspValidationInfo::getSubjectCertificate)
+                .isEqualTo(subjectCertificate);
+            assertThat(validationInfo).extracting(OcspValidationInfo::getOcspResponderUri)
+                .isEqualTo(new URI("http://fallback.demo.sk.ee/ocsp"));
+            assertThat(validationInfo).extracting(OcspValidationInfo::getOcspResponse)
+                .isNotNull();
 
             verify(ocspClient, times(1)).request(eq(PRIMARY_OCSP_URL), any());
             verify(ocspClient, times(1)).request(eq(FALLBACK_OCSP_URL), any());
@@ -351,7 +370,13 @@ class ResilientOcspServiceTest {
             assertThatExceptionOfType(UserCertificateUnknownException.class)
                 .isThrownBy(() ->
                     resilientOcspService.validateSubjectCertificateNotRevoked(subjectCertificate, issuerCertificate))
-                .withMessage("User certificate has been revoked: Unknown status");
+                .withMessage("Unknown status")
+                .satisfies(e -> assertThat(e.getOcspValidationInfo()).isNotNull())
+                .satisfies(e -> assertThat(e.getOcspValidationInfo().getSubjectCertificate()).isNotNull())
+                .satisfies(e -> assertThat(e.getOcspValidationInfo().getOcspResponderUri()).isNotNull())
+                .satisfies(e -> assertThat(e.getOcspValidationInfo().getOcspResponderUri().toASCIIString()).isEqualTo("http://fallback.demo.sk.ee/ocsp"))
+                .satisfies(e -> assertThat(e.getOcspValidationInfo().getOcspResponse()).isNotNull());
+
 
             verify(ocspClient, times(1)).request(eq(PRIMARY_OCSP_URL), any());
             verify(ocspClient, times(1)).request(eq(FALLBACK_OCSP_URL), any());
@@ -384,7 +409,10 @@ class ResilientOcspServiceTest {
                 .isThrownBy(() ->
                     resilientOcspService.validateSubjectCertificateNotRevoked(subjectCertificate, issuerCertificate))
                 .withMessage("User certificate revocation check has failed")
-                .withCause(new IOException("Mocked exception 2"));
+                .withCause(new IOException("Mocked exception 2"))
+                .satisfies(e -> assertThat(e.getOcspValidationInfo()).isNotNull())
+                .satisfies(e -> assertThat(e.getOcspValidationInfo().getSubjectCertificate()).isNotNull())
+                .satisfies(e -> assertThat(e.getOcspValidationInfo().getOcspResponse()).isNull());
 
             verify(ocspClient, times(1)).request(eq(PRIMARY_OCSP_URL), any());
             verify(ocspClient, times(1)).request(eq(FALLBACK_OCSP_URL), any());
@@ -409,9 +437,14 @@ class ResilientOcspServiceTest {
         try (var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
             mockDate("2021-09-17T18:25:24", mockedClock);
 
-            assertThatCode(() ->
-                resilientOcspService.validateSubjectCertificateNotRevoked(subjectCertificate, issuerCertificate)
-            ).isInstanceOf(AuthTokenException.class);
+            assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
+                .isThrownBy(() ->
+                    resilientOcspService.validateSubjectCertificateNotRevoked(subjectCertificate, issuerCertificate))
+                .withMessage("User certificate revocation check has failed")
+                .withCause(new IOException("Mocked exception"))
+                .satisfies(e -> assertThat(e.getOcspValidationInfo()).isNotNull())
+                .satisfies(e -> assertThat(e.getOcspValidationInfo().getSubjectCertificate()).isNotNull())
+                .satisfies(e -> assertThat(e.getOcspValidationInfo().getOcspResponse()).isNull());
         }
     }
 

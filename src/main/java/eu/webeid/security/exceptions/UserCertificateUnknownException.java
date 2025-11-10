@@ -22,12 +22,20 @@
 
 package eu.webeid.security.exceptions;
 
+import eu.webeid.security.validator.ocsp.OcspValidationInfo;
+
 /**
  * Thrown when the user certificate has been revoked.
  */
 public class UserCertificateUnknownException extends AuthTokenException {
+    private final OcspValidationInfo ocspValidationInfo;
 
-    public UserCertificateUnknownException(String msg) {
+    public UserCertificateUnknownException(String msg, OcspValidationInfo ocspValidationInfo) {
         super(msg);
+        this.ocspValidationInfo = ocspValidationInfo;
+    }
+
+    public OcspValidationInfo getOcspValidationInfo() {
+        return ocspValidationInfo;
     }
 }

@@ -259,9 +259,11 @@ class SubjectCertificateNotRevokedValidatorTest {
         );
         try (var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
             mockDate("2021-09-18T00:16:25", mockedClock);
-            assertThatExceptionOfType(CertificateNotTrustedException.class)
+            assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
                 .isThrownBy(() ->
                     validator.validateCertificateNotRevoked(estEid2018Cert))
+                .withCauseExactlyInstanceOf(CertificateNotTrustedException.class)
+                .havingCause()
                 .withMessage("Certificate EMAILADDRESS=pki@sk.ee, CN=TEST of SK OCSP RESPONDER 2020, OU=OCSP, O=AS Sertifitseerimiskeskus, C=EE is not trusted");
         }
     }
@@ -271,9 +273,11 @@ class SubjectCertificateNotRevokedValidatorTest {
         final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidatorWithAiaOcsp(
             getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_unknown.der"))
         );
-        assertThatExceptionOfType(CertificateExpiredException.class)
+        assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
                 validator.validateCertificateNotRevoked(estEid2018Cert))
+            .withCauseExactlyInstanceOf(CertificateExpiredException.class)
+            .havingCause()
             .withMessage("AIA OCSP responder certificate has expired");
     }
 

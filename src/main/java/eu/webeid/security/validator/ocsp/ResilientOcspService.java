@@ -34,21 +34,18 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.decorators.Decorators;
 import io.vavr.CheckedFunction0;
 import io.vavr.control.Try;
+import org.bouncycastle.asn1.ocsp.OCSPObjectIdentifiers;
 import org.bouncycastle.asn1.ocsp.OCSPResponseStatus;
-import org.bouncycastle.cert.X509CertificateHolder;
-import org.bouncycastle.cert.ocsp.BasicOCSPResp;
+import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.cert.ocsp.CertificateID;
 import org.bouncycastle.cert.ocsp.OCSPException;
 import org.bouncycastle.cert.ocsp.OCSPReq;
 import org.bouncycastle.cert.ocsp.OCSPResp;
-import org.bouncycastle.operator.DigestCalculator;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.math.BigInteger;
-import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
@@ -85,16 +82,16 @@ public class ResilientOcspService {
         }
     }
 
-    public OcspService validateSubjectCertificateNotRevoked(X509Certificate subjectCertificate, X509Certificate issuerCertificate) throws AuthTokenException {
+    public OcspValidationInfo validateSubjectCertificateNotRevoked(X509Certificate subjectCertificate, X509Certificate issuerCertificate) throws AuthTokenException {
         final OcspService ocspService = ocspServiceProvider.getService(subjectCertificate);
         final OcspService fallbackOcspService = ocspService.getFallbackService();
         if (fallbackOcspService != null) {
             CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(ocspService.getAccessLocation().toASCIIString());
-            CheckedFunction0<OcspService> primarySupplier = () -> request(ocspService, subjectCertificate, issuerCertificate);
-            CheckedFunction0<OcspService> fallbackSupplier = () -> request(ocspService.getFallbackService(), subjectCertificate, issuerCertificate);
-            CheckedFunction0<OcspService> decoratedSupplier = Decorators.ofCheckedSupplier(primarySupplier)
+            CheckedFunction0<OcspValidationInfo> primarySupplier = () -> request(ocspService, subjectCertificate, issuerCertificate);
+            CheckedFunction0<OcspValidationInfo> fallbackSupplier = () -> request(ocspService.getFallbackService(), subjectCertificate, issuerCertificate);
+            CheckedFunction0<OcspValidationInfo> decoratedSupplier = Decorators.ofCheckedSupplier(primarySupplier)
                 .withCircuitBreaker(circuitBreaker)
-                .withFallback(List.of(UserCertificateOCSPCheckFailedException.class, CallNotPermittedException.class, UserCertificateUnknownException.class), e -> fallbackSupplier.apply()) // TODO: Any other exceptions to trigger fallback? Resilience4j does not support Predicate<Exception> shouldFallback = e -> !(e instanceof UserCertificateRevokedException); in withFallback API.
+                .withFallback(List.of(UserCertificateOCSPCheckFailedException.class, CallNotPermittedException.class, UserCertificateUnknownException.class), e -> fallbackSupplier.apply())
                 .decorate();
 
             return Try.of(decoratedSupplier).getOrElseThrow(throwable -> {
@@ -108,10 +105,10 @@ public class ResilientOcspService {
         }
     }
 
-    private OcspService request(OcspService ocspService, X509Certificate subjectCertificate, X509Certificate issuerCertificate) throws AuthTokenException {
+    private OcspValidationInfo request(OcspService ocspService, X509Certificate subjectCertificate, X509Certificate issuerCertificate) throws AuthTokenException {
+        OCSPResp response = null;
         try {
-            final CertificateID certificateId = getCertificateId(subjectCertificate, issuerCertificate);
-
+            final CertificateID certificateId = OcspResponseValidator.getCertificateId(subjectCertificate, issuerCertificate);
             final OCSPReq request = new OcspRequestBuilder()
                 .withCertificateId(certificateId)
                 .enableOcspNonce(ocspService.doesSupportNonce())
@@ -122,33 +119,22 @@ public class ResilientOcspService {
             }
 
             LOG.debug("Sending OCSP request");
-            final OCSPResp response = Objects.requireNonNull(ocspClient.request(ocspService.getAccessLocation(), request)); // TODO: This should trigger fallback?
+            response = Objects.requireNonNull(ocspClient.request(ocspService.getAccessLocation(), request)); // TODO: This should trigger fallback?
             if (response.getStatus() != OCSPResponseStatus.SUCCESSFUL) {
-                throw new UserCertificateOCSPCheckFailedException("Response status: " + OcspResponseValidator.ocspStatusToString(response.getStatus()));
+                throw new UserCertificateOCSPCheckFailedException("Response status: " + OcspResponseValidator.ocspStatusToString(response.getStatus()),
+                    new OcspValidationInfo(subjectCertificate, ocspService.getAccessLocation(), response));
             }
 
-            final BasicOCSPResp basicResponse = (BasicOCSPResp) response.getResponseObject();
-            if (basicResponse == null) {
-                throw new UserCertificateOCSPCheckFailedException("Missing Basic OCSP Response");
-            }
-
-            OcspResponseValidator.validateOcspResponse(basicResponse, ocspService, allowedOcspResponseTimeSkew, maxOcspResponseThisUpdateAge, rejectUnknownOcspResponseStatus, certificateId);
+            final Extension requestNonce = request.getExtension(OCSPObjectIdentifiers.id_pkix_ocsp_nonce);
+            OcspValidationInfo ocspValidationInfo = OcspResponseValidator.validateOcspResponse(response, ocspService,
+                requestNonce, subjectCertificate, issuerCertificate, allowedOcspResponseTimeSkew,
+                maxOcspResponseThisUpdateAge, rejectUnknownOcspResponseStatus);
             LOG.debug("OCSP check result is GOOD");
 
-            if (ocspService.doesSupportNonce()) {
-                OcspResponseValidator.validateNonce(request, basicResponse);
-            }
-            return ocspService;
+            return ocspValidationInfo;
         } catch (OCSPException | CertificateException | OperatorCreationException | IOException e) {
-            throw new UserCertificateOCSPCheckFailedException(e);
+            throw new UserCertificateOCSPCheckFailedException(e, new OcspValidationInfo(subjectCertificate, ocspService.getAccessLocation(), response));
         }
-    }
-
-    private static CertificateID getCertificateId(X509Certificate subjectCertificate, X509Certificate issuerCertificate) throws CertificateEncodingException, IOException, OCSPException {
-        final BigInteger serial = subjectCertificate.getSerialNumber();
-        final DigestCalculator digestCalculator = DigestCalculatorImpl.sha1();
-        return new CertificateID(digestCalculator,
-            new X509CertificateHolder(issuerCertificate.getEncoded()), serial);
     }
 
     private static CircuitBreakerConfig getCircuitBreakerConfig(CircuitBreakerConfig circuitBreakerConfig) {
