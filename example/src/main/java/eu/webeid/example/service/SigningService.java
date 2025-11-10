@@ -74,8 +74,6 @@ public class SigningService {
         this.httpSessionFactory = httpSessionFactory;
         signingConfiguration = Configuration.of(yamlConfig.getUseDigiDoc4jProdConfiguration() ?
                 Configuration.Mode.PROD : Configuration.Mode.TEST);
-        // Use automatic AIA OCSP URL selection from certificate for signatures.
-        signingConfiguration.setPreferAiaOcsp(true);
     }
 
     private HttpSession currentSession() {
