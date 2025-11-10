@@ -191,7 +191,6 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", NEW_MOBILE_ID_CERT);
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
-            // FIXME: should be .isInstanceOf(UserCertificateDisallowedPolicyException.class);
             .isInstanceOf(UserCertificateMissingPurposeException.class);
     }
 
