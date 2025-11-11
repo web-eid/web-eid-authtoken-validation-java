@@ -163,7 +163,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         final X509Certificate subjectCertificate = CertificateLoader.decodeCertificateFromBase64(token.getUnverifiedCertificate());
 
         simpleSubjectCertificateValidators.executeFor(subjectCertificate);
-        OcspValidationInfo ocspValidationInfo = validateCertificateTrust(subjectCertificate);
+        final SubjectCertificateTrustedValidator certTrustedValidator = validateCertificateTrust(subjectCertificate);
 
         // It is guaranteed that if the signature verification succeeds, then the origin and challenge
         // have been implicitly and correctly verified without the need to implement any additional checks.
@@ -172,6 +172,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
             subjectCertificate.getPublicKey(),
             currentChallengeNonce);
 
+        final OcspValidationInfo ocspValidationInfo = validateCertificateRevocationStatus(certTrustedValidator, subjectCertificate);
         return new ValidationInfo(subjectCertificate, ocspValidationInfo);
     }
 
@@ -183,12 +184,16 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
      *
      * @return ocsp validation information if revocation check is performed, null otherwise
      */
-    private OcspValidationInfo validateCertificateTrust(X509Certificate subjectCertificate) throws AuthTokenException {
-        final SubjectCertificateTrustedValidator certTrustedValidator =
-            new SubjectCertificateTrustedValidator(trustedCACertificateAnchors, trustedCACertificateCertStore);
+    private SubjectCertificateTrustedValidator validateCertificateTrust(X509Certificate subjectCertificate) throws AuthTokenException {
+        SubjectCertificateTrustedValidator certTrustedValidator = new SubjectCertificateTrustedValidator(trustedCACertificateAnchors, trustedCACertificateCertStore);
         certTrustedValidator.validateCertificateTrusted(subjectCertificate);
-        return configuration.isUserCertificateRevocationCheckWithOcspEnabled() ? new SubjectCertificateNotRevokedValidator(resilientOcspService, certTrustedValidator)
-            .validateCertificateNotRevoked(subjectCertificate) : null;
+        return certTrustedValidator;
     }
 
+    private OcspValidationInfo validateCertificateRevocationStatus(SubjectCertificateTrustedValidator certTrustedValidator, X509Certificate subjectCertificate) throws AuthTokenException {
+        return configuration.isUserCertificateRevocationCheckWithOcspEnabled()
+            ? new SubjectCertificateNotRevokedValidator(resilientOcspService, certTrustedValidator)
+            .validateCertificateNotRevoked(subjectCertificate)
+            : null;
+    }
 }
