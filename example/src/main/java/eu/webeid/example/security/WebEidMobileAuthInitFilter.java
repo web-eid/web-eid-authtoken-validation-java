@@ -41,12 +41,14 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 public final class WebEidMobileAuthInitFilter extends OncePerRequestFilter {
+    private static final String WEB_EID_MOBILE_AUTH_PATH = "auth";
     private static final ObjectWriter OBJECT_WRITER = new ObjectMapper().writer();
     private final RequestMatcher requestMatcher;
     private final ChallengeNonceGenerator nonceGenerator;
@@ -79,10 +81,20 @@ public final class WebEidMobileAuthInitFilter extends OncePerRequestFilter {
                 webEidMobileProperties.requestSigningCert() ? Boolean.TRUE : null)
         );
         String encoded = Base64.getEncoder().encodeToString(payloadJson.getBytes(StandardCharsets.UTF_8));
-        String eidAuthUri = "web-eid-mobile://auth#" + encoded;
+        String authUri = getAuthUri(encoded);
 
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        OBJECT_WRITER.writeValue(response.getWriter(), new AuthUri(eidAuthUri));
+        OBJECT_WRITER.writeValue(response.getWriter(), new AuthUri(authUri));
+    }
+
+    private String getAuthUri(String encodedPayload) {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(webEidMobileProperties.baseRequestUri());
+        if (webEidMobileProperties.baseRequestUri().startsWith("http")) {
+            builder.pathSegment(WEB_EID_MOBILE_AUTH_PATH);
+        } else {
+            builder.host(WEB_EID_MOBILE_AUTH_PATH);
+        }
+        return builder.fragment(encodedPayload).toUriString();
     }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
