@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.security.cert.X509Certificate;
+import java.util.Objects;
 
 /**
  * Provides the default implementation of {@link AuthTokenValidator}.
@@ -72,6 +73,7 @@ final class AuthTokenValidatorManager implements AuthTokenValidator {
     @Override
     public X509Certificate validate(WebEidAuthToken authToken, String currentChallengeNonce) throws AuthTokenException {
         try {
+            Objects.requireNonNull(authToken, "authToken must not be null");
             LOG.info("Starting token validation");
             return tokenValidatorFactory
                 .getValidatorFor(authToken.getFormat())
