@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.security.cert.X509Certificate;
+import java.util.Objects;
 
 /**
  * Provides the default implementation of {@link AuthTokenValidator}.
@@ -46,10 +47,10 @@ final class AuthTokenValidatorManager implements AuthTokenValidator {
     private final AuthTokenVersionValidatorFactory tokenValidatorFactory;
 
     // Use human-readable meaningful names for token length limits.
-    private final int TOKEN_MIN_LENGTH = 100;
-    private final int TOKEN_MAX_LENGTH = 10000;
+    private static final int TOKEN_MIN_LENGTH = 100;
+    private static final int TOKEN_MAX_LENGTH = 10000;
 
-    private final ObjectReader TOKEN_READER = new ObjectMapper().readerFor(WebEidAuthToken.class);
+    private static final ObjectReader TOKEN_READER = new ObjectMapper().readerFor(WebEidAuthToken.class);
 
     AuthTokenValidatorManager(AuthTokenValidationConfiguration configuration, OcspClient ocspClient)
         throws JceException {
@@ -72,6 +73,7 @@ final class AuthTokenValidatorManager implements AuthTokenValidator {
     @Override
     public X509Certificate validate(WebEidAuthToken authToken, String currentChallengeNonce) throws AuthTokenException {
         try {
+            Objects.requireNonNull(authToken, "authToken must not be null");
             LOG.info("Starting token validation");
             return tokenValidatorFactory
                 .getValidatorFor(authToken.getFormat())
