@@ -73,10 +73,6 @@
             <exclusions>
                 <exclusion>
                     <groupId>io.github.resilience4j</groupId>
-                    <artifactId>resilience4j-retry</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>io.github.resilience4j</groupId>
                     <artifactId>resilience4j-bulkhead</artifactId>
                 </exclusion>
                 <exclusion>

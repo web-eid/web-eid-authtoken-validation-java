@@ -354,6 +354,7 @@ class SubjectCertificateNotRevokedValidatorTest {
     private SubjectCertificateNotRevokedValidator getSubjectCertificateNotRevokedValidator(OcspClient client, OcspServiceProvider ocspServiceProvider) {
         ResilientOcspService resilientOcspService = new ResilientOcspService(client, ocspServiceProvider,
             null,
+            null,
             CONFIGURATION.getAllowedOcspResponseTimeSkew(),
             CONFIGURATION.getMaxOcspResponseThisUpdateAge(),
             CONFIGURATION.isRejectUnknownOcspResponseStatus());

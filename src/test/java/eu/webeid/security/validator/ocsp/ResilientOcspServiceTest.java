@@ -32,6 +32,7 @@ import eu.webeid.security.validator.ocsp.service.FallbackOcspServiceConfiguratio
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.retry.RetryConfig;
 import org.bouncycastle.cert.ocsp.OCSPResp;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.junit.jupiter.api.BeforeAll;
@@ -121,6 +122,7 @@ class ResilientOcspServiceTest {
             ocspClient,
             ocspServiceProvider,
             circuitBreakerConfig,
+            null,
             ALLOWED_TIME_SKEW,
             MAX_THIS_UPDATE_AGE,
             false
@@ -206,6 +208,7 @@ class ResilientOcspServiceTest {
             ocspClient,
             ocspServiceProvider,
             null,
+            null,
             ALLOWED_TIME_SKEW,
             MAX_THIS_UPDATE_AGE,
             false
@@ -231,6 +234,45 @@ class ResilientOcspServiceTest {
     }
 
     @Test
+    void whenRetryEnabledAndRetrySucceeds_thenNoFallbackAndSucceeds() throws Exception {
+        final OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_OCSP_URL), any()))
+            .thenThrow(new IOException("Mocked exception 1"))
+            .thenThrow(new IOException("Mocked exception 2"))
+            .thenReturn(new OCSPResp(validOcspResponseBytes));
+        when(ocspClient.request(eq(FALLBACK_OCSP_URL), any()))
+            .thenReturn(new OCSPResp(validOcspResponseBytes));
+        OcspServiceProvider ocspServiceProvider = createOcspServiceProviderWithFallback();
+        ResilientOcspService resilientOcspService = new ResilientOcspService(
+            ocspClient,
+            ocspServiceProvider,
+            null,
+            RetryConfig.ofDefaults(), // Retry enabled
+            ALLOWED_TIME_SKEW,
+            MAX_THIS_UPDATE_AGE,
+            false
+        );
+        CircuitBreakerRegistry circuitBreakerRegistry = resilientOcspService.getCircuitBreakerRegistry();
+        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(PRIMARY_OCSP_URL.toASCIIString());
+        try (var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
+            mockDate("2021-09-17T18:25:24", mockedClock);
+
+            OcspValidationInfo validationInfo = resilientOcspService.validateSubjectCertificateNotRevoked(subjectCertificate, issuerCertificate);
+            assertThat(validationInfo).isNotNull();
+            assertThat(validationInfo).extracting(OcspValidationInfo::getSubjectCertificate)
+                .isEqualTo(subjectCertificate);
+            assertThat(validationInfo).extracting(OcspValidationInfo::getOcspResponderUri)
+                .isEqualTo(new URI("http://aia.demo.sk.ee/esteid2018"));
+            assertThat(validationInfo).extracting(OcspValidationInfo::getOcspResponse)
+                .isNotNull();
+
+            verify(ocspClient, times(3)).request(eq(PRIMARY_OCSP_URL), any());
+            verify(ocspClient, times(0)).request(eq(FALLBACK_OCSP_URL), any());
+            assertThat(circuitBreaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
+        }
+    }
+
+    @Test
     void whenOcspResponseRevoked_thenNoFallbackAndThrows() throws Exception {
         final OcspClient ocspClient = mock(OcspClient.class);
         when(ocspClient.request(eq(PRIMARY_OCSP_URL), any()))
@@ -241,6 +283,7 @@ class ResilientOcspServiceTest {
         ResilientOcspService resilientOcspService = new ResilientOcspService(
             ocspClient,
             ocspServiceProvider,
+            null,
             null,
             ALLOWED_TIME_SKEW,
             MAX_THIS_UPDATE_AGE,
@@ -279,6 +322,7 @@ class ResilientOcspServiceTest {
             ocspClient,
             ocspServiceProvider,
             null,
+            null,
             ALLOWED_TIME_SKEW,
             MAX_THIS_UPDATE_AGE,
             false
@@ -315,6 +359,7 @@ class ResilientOcspServiceTest {
         ResilientOcspService resilientOcspService = new ResilientOcspService(
             ocspClient,
             ocspServiceProvider,
+            null,
             null,
             ALLOWED_TIME_SKEW,
             MAX_THIS_UPDATE_AGE,
@@ -358,6 +403,7 @@ class ResilientOcspServiceTest {
             ocspClient,
             ocspServiceProvider,
             null,
+            null,
             ALLOWED_TIME_SKEW,
             MAX_THIS_UPDATE_AGE,
             true // rejectUnknownOcspResponseStatus
@@ -396,6 +442,7 @@ class ResilientOcspServiceTest {
             ocspClient,
             ocspServiceProvider,
             null,
+            null,
             ALLOWED_TIME_SKEW,
             MAX_THIS_UPDATE_AGE,
             false
@@ -429,6 +476,7 @@ class ResilientOcspServiceTest {
         ResilientOcspService resilientOcspService = new ResilientOcspService(
             ocspClient,
             ocspServiceProvider,
+            null,
             null,
             ALLOWED_TIME_SKEW,
             MAX_THIS_UPDATE_AGE,

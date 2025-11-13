@@ -32,6 +32,9 @@ import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.decorators.Decorators;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryConfig;
+import io.github.resilience4j.retry.RetryRegistry;
 import io.vavr.CheckedFunction0;
 import io.vavr.control.Try;
 import org.bouncycastle.asn1.ocsp.OCSPObjectIdentifiers;
@@ -61,8 +64,9 @@ public class ResilientOcspService {
     private final Duration maxOcspResponseThisUpdateAge;
     private final boolean rejectUnknownOcspResponseStatus;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
+    private final RetryRegistry retryRegistry;
 
-    public ResilientOcspService(OcspClient ocspClient, OcspServiceProvider ocspServiceProvider, CircuitBreakerConfig circuitBreakerConfig, Duration allowedOcspResponseTimeSkew, Duration maxOcspResponseThisUpdateAge, boolean rejectUnknownOcspResponseStatus) {
+    public ResilientOcspService(OcspClient ocspClient, OcspServiceProvider ocspServiceProvider, CircuitBreakerConfig circuitBreakerConfig, RetryConfig retryConfig, Duration allowedOcspResponseTimeSkew, Duration maxOcspResponseThisUpdateAge, boolean rejectUnknownOcspResponseStatus) {
         this.ocspClient = ocspClient;
         this.ocspServiceProvider = ocspServiceProvider;
         this.allowedOcspResponseTimeSkew = allowedOcspResponseTimeSkew;
@@ -71,6 +75,9 @@ public class ResilientOcspService {
         this.circuitBreakerRegistry = CircuitBreakerRegistry.custom()
             .withCircuitBreakerConfig(getCircuitBreakerConfig(circuitBreakerConfig))
             .build();
+        this.retryRegistry = retryConfig != null ? RetryRegistry.custom()
+            .withRetryConfig(getRetryConfigConfig(retryConfig))
+            .build() : null;
         if (LOG.isDebugEnabled()) {
             this.circuitBreakerRegistry.getEventPublisher()
                 .onEntryAdded(entryAddedEvent -> {
@@ -89,10 +96,15 @@ public class ResilientOcspService {
             CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(ocspService.getAccessLocation().toASCIIString());
             CheckedFunction0<OcspValidationInfo> primarySupplier = () -> request(ocspService, subjectCertificate, issuerCertificate);
             CheckedFunction0<OcspValidationInfo> fallbackSupplier = () -> request(ocspService.getFallbackService(), subjectCertificate, issuerCertificate);
-            CheckedFunction0<OcspValidationInfo> decoratedSupplier = Decorators.ofCheckedSupplier(primarySupplier)
-                .withCircuitBreaker(circuitBreaker)
-                .withFallback(List.of(UserCertificateOCSPCheckFailedException.class, CallNotPermittedException.class, UserCertificateUnknownException.class), e -> fallbackSupplier.apply())
-                .decorate();
+            Decorators.DecorateCheckedSupplier<OcspValidationInfo> decorateCheckedSupplier = Decorators.ofCheckedSupplier(primarySupplier);
+            if (retryRegistry != null) {
+                Retry retry = retryRegistry.retry(ocspService.getAccessLocation().toASCIIString());
+                decorateCheckedSupplier.withRetry(retry);
+            }
+            decorateCheckedSupplier.withCircuitBreaker(circuitBreaker)
+                .withFallback(List.of(UserCertificateOCSPCheckFailedException.class, CallNotPermittedException.class, UserCertificateUnknownException.class), e -> fallbackSupplier.apply());
+
+            CheckedFunction0<OcspValidationInfo> decoratedSupplier = decorateCheckedSupplier.decorate();
 
             return Try.of(decoratedSupplier).getOrElseThrow(throwable -> {
                 if (throwable instanceof AuthTokenException) {
@@ -154,6 +166,12 @@ public class ResilientOcspService {
         }
 
         return configurationBuilder.build();
+    }
+
+    private static RetryConfig getRetryConfigConfig(RetryConfig retryConfig) {
+        return RetryConfig.from(retryConfig)
+            .ignoreExceptions(UserCertificateRevokedException.class) // TODO: Revoked status is a valid response, not a failure and should be ignored. Any other exceptions to ignore?
+            .build();
     }
 
     CircuitBreakerRegistry getCircuitBreakerRegistry() {

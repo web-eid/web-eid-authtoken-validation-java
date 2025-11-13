@@ -29,6 +29,7 @@ import eu.webeid.security.validator.ocsp.service.DesignatedOcspServiceConfigurat
 import eu.webeid.security.validator.ocsp.service.FallbackOcspServiceConfiguration;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.core.IntervalFunction;
+import io.github.resilience4j.retry.RetryConfig;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -212,7 +213,6 @@ public class AuthTokenValidatorBuilder {
      * @param failureRateThreshold
      * @param permittedNumberOfCallsInHalfOpenState
      * @param waitDurationInOpenState
-     *
      * @return the builder instance for method chaining
      */
     public AuthTokenValidatorBuilder withCircuitBreakerConfig(int slidingWindowSize, int minimumNumberOfCalls, int failureRateThreshold, int permittedNumberOfCallsInHalfOpenState, Duration waitDurationInOpenState) { // TODO: What do we allow to configure? Use configuration builder.
@@ -224,6 +224,17 @@ public class AuthTokenValidatorBuilder {
             .waitIntervalFunctionInOpenState(IntervalFunction.of(waitDurationInOpenState))
             .build());
         LOG.debug("Using the OCSP circuit breaker configuration");
+        return this;
+    }
+
+    /**
+     * // TODO: Describe the configuration option
+     *
+     * @return the builder instance for method chaining
+     */
+    public AuthTokenValidatorBuilder withCircuitBreakerRetryConfig() { // TODO: What do we allow to configure? Use configuration builder.
+        configuration.setCircuitBreakerRetryConfig(RetryConfig.ofDefaults());
+        LOG.debug("Using the OCSP circuit breaker retry configuration");
         return this;
     }
 

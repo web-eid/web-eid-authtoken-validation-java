@@ -98,6 +98,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
                 configuration.getFallbackOcspServiceConfigurations());
             resilientOcspService = new ResilientOcspService(ocspClient, ocspServiceProvider,
                 configuration.getCircuitBreakerConfig(),
+                configuration.getCircuitBreakerRetryConfig(),
                 configuration.getAllowedOcspResponseTimeSkew(),
                 configuration.getMaxOcspResponseThisUpdateAge(),
                 configuration.isRejectUnknownOcspResponseStatus());
