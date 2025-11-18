@@ -178,46 +178,29 @@ Similarly, the `WebEidMobileAuthInitFilter` handles `/auth/mobile/init` requests
 See the full implementation [here](example/src/main/java/eu/webeid/example/security/WebEidMobileAuthInitFilter.java).
 
 ```java
-public final class WebEidMobileAuthInitFilter extends OncePerRequestFilter {
-    private static final ObjectWriter OBJECT_WRITER = new ObjectMapper().writer();
-    private final RequestMatcher requestMatcher;
-    private final ChallengeNonceGenerator nonceGenerator;
-    private final String loginPath;
-
-    public WebEidMobileAuthInitFilter(String path, String loginPath, ChallengeNonceGenerator nonceGenerator) {
-        this.requestMatcher = PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, path);
-        this.nonceGenerator = nonceGenerator;
-        this.loginPath = loginPath;
+@Override
+protected void doFilterInternal(@NonNull HttpServletRequest request,
+                                @NonNull HttpServletResponse response,
+                                @NonNull FilterChain chain) throws IOException, ServletException {
+    if (!requestMatcher.matches(request)) {
+        chain.doFilter(request, response);
+        return;
     }
 
-    @Override
-    protected void doFilterInternal(
-        @NonNull HttpServletRequest request,
-        @NonNull HttpServletResponse response,
-        @NonNull FilterChain chain
-    ) throws IOException, ServletException {
-        if (!requestMatcher.matches(request)) {
-            chain.doFilter(request, response);
-            return;
-        }
+    var challenge = nonceGenerator.generateAndStoreNonce();
 
-        var challenge = nonceGenerator.generateAndStoreNonce();
+    String loginUri = ServletUriComponentsBuilder.fromCurrentContextPath()
+        .path(mobileLoginPath).build().toUriString();
 
-        String loginUri = ServletUriComponentsBuilder.fromCurrentContextPath()
-            .path(loginPath).build().toUriString();
+    String payloadJson = OBJECT_WRITER.writeValueAsString(
+        new AuthPayload(challenge.getBase64EncodedNonce(), loginUri,
+            webEidMobileProperties.requestSigningCert() ? Boolean.TRUE : null)
+    );
+    String encoded = Base64.getEncoder().encodeToString(payloadJson.getBytes(StandardCharsets.UTF_8));
+    String authUri = getAuthUri(encoded);
 
-        String payloadJson = OBJECT_WRITER.writeValueAsString(
-            new AuthPayload(challenge.getBase64EncodedNonce(), loginUri)
-        );
-        String encoded = Base64.getEncoder().encodeToString(payloadJson.getBytes(StandardCharsets.UTF_8));
-        String eidAuthUri = "web-eid-mobile://auth#" + encoded;
-
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        OBJECT_WRITER.writeValue(response.getWriter(), new AuthUri(eidAuthUri));
-    }
-
-    record AuthPayload(String challenge, @JsonProperty("login_uri") String loginUri) {}
-    record AuthUri(@JsonProperty("auth_uri") String authUri) {}
+    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+    OBJECT_WRITER.writeValue(response.getWriter(), new AuthUri(authUri));
 }
 ```
 
@@ -225,10 +208,10 @@ Both filters are registered in the Spring Security filter chain in ApplicationCo
 See the full implementation [here](example/src/main/java/eu/webeid/example/config/ApplicationConfiguration.java):
 ```java
 http
-  .addFilterBefore(new WebEidMobileAuthInitFilter("/auth/mobile/init", "/auth/mobile/login", challengeNonceGenerator),
-      UsernamePasswordAuthenticationFilter.class)
-  .addFilterBefore(new WebEidChallengeNonceFilter("/auth/challenge", challengeNonceGenerator),
-      UsernamePasswordAuthenticationFilter.class);
+    .addFilterBefore(new WebEidMobileAuthInitFilter("/auth/mobile/init", "/auth/mobile/login", challengeNonceGenerator, webEidMobileProperties), 
+        UsernamePasswordAuthenticationFilter.class)
+    .addFilterBefore(new WebEidChallengeNonceFilter("/auth/challenge", challengeNonceGenerator), 
+        UsernamePasswordAuthenticationFilter.class)
 ```
 
 Also, see general guidelines for implementing secure authentication services [here](https://github.com/SK-EID/smart-id-documentation/wiki/Secure-Implementation-Guide).
