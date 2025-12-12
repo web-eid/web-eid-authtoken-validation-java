@@ -23,18 +23,15 @@
 package eu.webeid.security.validator;
 
 import eu.webeid.security.exceptions.JceException;
-import eu.webeid.security.validator.ocsp.OcspClient;
-import eu.webeid.security.validator.ocsp.OcspClientImpl;
-import eu.webeid.security.validator.ocsp.service.DesignatedOcspServiceConfiguration;
+import eu.webeid.security.validator.revocationcheck.CertificateRevocationChecker;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
+import java.security.cert.PKIXRevocationChecker;
 import java.security.cert.X509Certificate;
-import java.time.Duration;
 import java.util.Collections;
-import java.util.stream.Collectors;
 
 /**
  * Builder for constructing {@link AuthTokenValidator} instances.
@@ -44,7 +41,6 @@ public class AuthTokenValidatorBuilder {
     private static final Logger LOG = LoggerFactory.getLogger(AuthTokenValidatorBuilder.class);
 
     private final AuthTokenValidationConfiguration configuration = new AuthTokenValidationConfiguration();
-    private OcspClient ocspClient;
 
     /**
      * Sets the expected site origin, i.e. the domain that the application is running on.
@@ -78,7 +74,7 @@ public class AuthTokenValidatorBuilder {
             LOG.debug("Trusted intermediate certificate authorities set to {}",
                 configuration.getTrustedCACertificates().stream()
                     .map(X509Certificate::getSubjectX500Principal)
-                    .collect(Collectors.toList()));
+                    .toList());
         }
         return this;
     }
@@ -98,105 +94,50 @@ public class AuthTokenValidatorBuilder {
     }
 
     /**
-     * Turns off user certificate revocation check with OCSP.
+     * Turns off user certificate revocation check (with OCSP and/or CRL).
      * <p>
-     * <b>Turning off user certificate revocation check with OCSP is dangerous and should be
-     * used only in exceptional circumstances.</b>
+     * <b>Turning off user certificate revocation check is dangerous and should be used only in
+     * exceptional circumstances.</b>
      * By default, the revocation check is turned on.
      *
      * @return the builder instance for method chaining.
      */
-    public AuthTokenValidatorBuilder withoutUserCertificateRevocationCheckWithOcsp() {
-        configuration.setUserCertificateRevocationCheckWithOcspDisabled();
-        LOG.warn("User certificate revocation check with OCSP is disabled, " +
+    public AuthTokenValidatorBuilder withoutUserCertificateRevocationCheck() {
+        configuration.setUserCertificateRevocationCheckDisabled();
+        LOG.warn("User certificate revocation check is disabled, " +
             "you should turn off the revocation check only in exceptional circumstances");
         return this;
     }
 
     /**
-     * Sets both the connection and response timeout of user certificate revocation check OCSP requests.
+     * Configures a custom certificate revocation checker for validating user certificate revocation status.
      * <p>
-     * This is an optional configuration parameter, the default is 5 seconds.
+     * When set, the platform (provider default) revocation mechanism is disabled and revocation checking is
+     * delegated to the given {@link CertificateRevocationChecker}. This option is mutually exclusive with
+     * {@link #withPKIXRevocationChecker(PKIXRevocationChecker)} and {@link #withoutUserCertificateRevocationCheck()}.
      *
-     * @param ocspRequestTimeout the duration of OCSP request connection and response timeout
-     * @return the builder instance for method chaining.
-     */
-    public AuthTokenValidatorBuilder withOcspRequestTimeout(Duration ocspRequestTimeout) {
-        configuration.setOcspRequestTimeout(ocspRequestTimeout);
-        LOG.debug("OCSP request timeout set to {}", ocspRequestTimeout);
-        return this;
-    }
-
-    /**
-     * Sets the allowed time skew for OCSP response's thisUpdate and nextUpdate times.
-     * This parameter is used to allow discrepancies between the system clock and the OCSP responder's clock,
-     * which may occur due to clock drift, network delays or revocation updates that are not published in real time.
-     * <p>
-     * This is an optional configuration parameter, the default is 15 minutes.
-     * The relatively long default is specifically chosen to account for one particular OCSP responder that used
-     * CRLs for authoritative revocation info, these CRLs were updated every 15 minutes.
-     *
-     * @param allowedTimeSkew the allowed time skew
-     * @return the builder instance for method chaining.
-     */
-    public AuthTokenValidatorBuilder withAllowedOcspResponseTimeSkew(Duration allowedTimeSkew) {
-        configuration.setAllowedOcspResponseTimeSkew(allowedTimeSkew);
-        LOG.debug("Allowed OCSP response time skew set to {}", allowedTimeSkew);
-        return this;
-    }
-
-    /**
-     * Sets the maximum age of the OCSP response's thisUpdate time before it is considered too old.
-     * <p>
-     * This is an optional configuration parameter, the default is 2 minutes.
-     *
-     * @param maxThisUpdateAge the maximum age of the OCSP response's thisUpdate time
-     * @return the builder instance for method chaining.
-     */
-    public AuthTokenValidatorBuilder withMaxOcspResponseThisUpdateAge(Duration maxThisUpdateAge) {
-        configuration.setMaxOcspResponseThisUpdateAge(maxThisUpdateAge);
-        LOG.debug("Maximum OCSP response thisUpdate age set to {}", maxThisUpdateAge);
-        return this;
-    }
-
-    /**
-     * Adds the given URLs to the list of OCSP URLs for which the nonce protocol extension will be disabled.
-     * The OCSP URL is extracted from the user certificate and some OCSP services don't support the nonce extension.
-     *
-     * @param urls OCSP URLs for which the nonce protocol extension will be disabled
+     * @param customChecker custom certificate revocation checker implementation
      * @return the builder instance for method chaining
      */
-    public AuthTokenValidatorBuilder withNonceDisabledOcspUrls(URI... urls) {
-        Collections.addAll(configuration.getNonceDisabledOcspUrls(), urls);
-        LOG.debug("OCSP URLs for which the nonce protocol extension is disabled set to {}", configuration.getNonceDisabledOcspUrls());
+    public AuthTokenValidatorBuilder withCertificateRevocationChecker(CertificateRevocationChecker customChecker) {
+        configuration.setCertificateRevocationChecker(customChecker);
         return this;
     }
 
     /**
-     * Activates the provided designated OCSP service for user certificate revocation check with OCSP.
-     * The designated service is only used for checking the status of the certificates whose issuers are
-     * supported by the service, falling back to the default OCSP service access location from
-     * the certificate's AIA extension if not.
+     * Configures a custom {@link PKIXRevocationChecker} to be used as the revocation mechanism during user certificate
+     * validation with platform PKIX.
+     * <p>
+     * When set, this checker replaces the platform (provider default) {@link PKIXRevocationChecker}. This option is
+     * mutually exclusive with {@link #withCertificateRevocationChecker(CertificateRevocationChecker)}
+     * and {@link #withoutUserCertificateRevocationCheck()}.
      *
-     * @param serviceConfiguration configuration of the designated OCSP service
+     * @param customChecker custom PKIX revocation checker
      * @return the builder instance for method chaining
+     * @throws NullPointerException if {@code customChecker} is null
      */
-    public AuthTokenValidatorBuilder withDesignatedOcspServiceConfiguration(DesignatedOcspServiceConfiguration serviceConfiguration) {
-        configuration.setDesignatedOcspServiceConfiguration(serviceConfiguration);
-        LOG.debug("Using designated OCSP service configuration");
-        return this;
-    }
-
-    /**
-     * Uses the provided OCSP client instance during user certificate revocation check with OCSP.
-     * The provided client instance must be thread-safe.
-     *
-     * @param ocspClient OCSP client instance
-     * @return the builder instance for method chaining
-     */
-    public AuthTokenValidatorBuilder withOcspClient(OcspClient ocspClient) {
-        this.ocspClient = ocspClient;
-        LOG.debug("Using the OCSP client provided by API consumer");
+    public AuthTokenValidatorBuilder withPKIXRevocationChecker(PKIXRevocationChecker customChecker) {
+        configuration.setPkixRevocationChecker(customChecker);
         return this;
     }
 
@@ -205,16 +146,12 @@ public class AuthTokenValidatorBuilder {
      * The returned {@link AuthTokenValidator} object is immutable/thread-safe.
      *
      * @return the configured authentication token validator object
-     * @throws NullPointerException     when required parameters are null
      * @throws IllegalArgumentException when any parameter is invalid
-     * @throws RuntimeException         when JCE configuration is invalid
+     * @throws JceException             when JCE configuration is invalid
      */
-    public AuthTokenValidator build() throws NullPointerException, IllegalArgumentException, JceException {
+    public AuthTokenValidator build() throws IllegalArgumentException, JceException {
         configuration.validate();
-        if (configuration.isUserCertificateRevocationCheckWithOcspEnabled() && ocspClient == null) {
-            ocspClient = OcspClientImpl.build(configuration.getOcspRequestTimeout());
-        }
-        return new AuthTokenValidatorImpl(configuration, ocspClient);
+        return new AuthTokenValidatorImpl(configuration);
     }
 
 }

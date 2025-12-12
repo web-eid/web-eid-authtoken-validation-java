@@ -20,48 +20,24 @@
  * SOFTWARE.
  */
 
-package eu.webeid.security.util;
+package eu.webeid.ocsp.exceptions;
 
-import io.jsonwebtoken.Clock;
+import eu.webeid.security.exceptions.AuthTokenException;
 
-import java.time.Duration;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
-import java.util.Date;
-import java.util.Objects;
+import java.net.URI;
 
-public final class DateAndTime {
+import static eu.webeid.ocsp.exceptions.OcspResponderUriMessage.withResponderUri;
 
-    public static ZonedDateTime utcNow() {
-        return ZonedDateTime.now(ZoneOffset.UTC);
+/**
+ * Thrown when the user certificate has been revoked.
+ */
+public class UserCertificateRevokedException extends AuthTokenException {
+
+    public UserCertificateRevokedException(URI ocspResponderUri) {
+        super(withResponderUri("User certificate has been revoked", ocspResponderUri));
     }
 
-    public static Duration requirePositiveDuration(Duration duration, String fieldName) {
-        Objects.requireNonNull(duration, fieldName + " must not be null");
-        if (duration.isNegative() || duration.isZero()) {
-            throw new IllegalArgumentException(fieldName + " must be greater than zero");
-        }
-        return duration;
+    public UserCertificateRevokedException(String msg, URI ocspResponderUri) {
+        super(withResponderUri("User certificate has been revoked: " + msg, ocspResponderUri));
     }
-
-    public static class DefaultClock implements Clock {
-
-        // Allows mocking of time-dependent behavior with Mockito.mockStatic() in tests.
-        private static final Clock instance = new DefaultClock();
-
-        public static Clock getInstance() {
-            return instance;
-        }
-
-        @Override
-        public Date now() {
-            return new Date();
-        }
-
-    }
-
-    private DateAndTime() {
-        throw new IllegalStateException("Utility class");
-    }
-
 }

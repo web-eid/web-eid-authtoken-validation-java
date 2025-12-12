@@ -23,21 +23,18 @@
 package eu.webeid.security.validator;
 
 import eu.webeid.security.certificate.SubjectCertificatePolicies;
-import eu.webeid.security.validator.ocsp.service.DesignatedOcspServiceConfiguration;
+import eu.webeid.security.validator.revocationcheck.CertificateRevocationChecker;
+import eu.webeid.security.validator.revocationcheck.RevocationMode;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.cert.PKIXRevocationChecker;
 import java.security.cert.X509Certificate;
-import java.time.Duration;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Objects;
 import java.util.Set;
-
-import static eu.webeid.security.util.Collections.newHashSet;
-import static eu.webeid.security.util.DateAndTime.requirePositiveDuration;
 
 /**
  * Stores configuration parameters for {@link AuthTokenValidatorImpl}.
@@ -46,19 +43,17 @@ public final class AuthTokenValidationConfiguration {
 
     private URI siteOrigin;
     private Collection<X509Certificate> trustedCACertificates = new HashSet<>();
-    private boolean isUserCertificateRevocationCheckWithOcspEnabled = true;
-    private Duration ocspRequestTimeout = Duration.ofSeconds(5);
-    private Duration allowedOcspResponseTimeSkew = Duration.ofMinutes(15);
-    private Duration maxOcspResponseThisUpdateAge = Duration.ofMinutes(2);
-    private DesignatedOcspServiceConfiguration designatedOcspServiceConfiguration;
     // Don't allow Estonian Mobile-ID policy by default.
-    private Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies = newHashSet(
+    private Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies = new HashSet<>(Set.of(
         SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V1,
         SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V2,
         SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V3,
         SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY
-    );
-    private Collection<URI> nonceDisabledOcspUrls = new HashSet<>();
+    ));
+    private boolean isUserCertificateRevocationCheckEnabled = true;
+    private CertificateRevocationChecker certificateRevocationChecker;
+    private PKIXRevocationChecker pkixRevocationChecker;
+    private RevocationMode revocationMode = RevocationMode.PLATFORM_OCSP;
 
     AuthTokenValidationConfiguration() {
     }
@@ -66,13 +61,11 @@ public final class AuthTokenValidationConfiguration {
     private AuthTokenValidationConfiguration(AuthTokenValidationConfiguration other) {
         this.siteOrigin = other.siteOrigin;
         this.trustedCACertificates = Set.copyOf(other.trustedCACertificates);
-        this.isUserCertificateRevocationCheckWithOcspEnabled = other.isUserCertificateRevocationCheckWithOcspEnabled;
-        this.ocspRequestTimeout = other.ocspRequestTimeout;
-        this.allowedOcspResponseTimeSkew = other.allowedOcspResponseTimeSkew;
-        this.maxOcspResponseThisUpdateAge = other.maxOcspResponseThisUpdateAge;
-        this.designatedOcspServiceConfiguration = other.designatedOcspServiceConfiguration;
         this.disallowedSubjectCertificatePolicies = Set.copyOf(other.disallowedSubjectCertificatePolicies);
-        this.nonceDisabledOcspUrls = Set.copyOf(other.nonceDisabledOcspUrls);
+        this.isUserCertificateRevocationCheckEnabled = other.isUserCertificateRevocationCheckEnabled;
+        this.certificateRevocationChecker = other.certificateRevocationChecker;
+        this.pkixRevocationChecker = other.pkixRevocationChecker;
+        this.revocationMode = other.revocationMode;
     }
 
     void setSiteOrigin(URI siteOrigin) {
@@ -87,69 +80,49 @@ public final class AuthTokenValidationConfiguration {
         return trustedCACertificates;
     }
 
-    boolean isUserCertificateRevocationCheckWithOcspEnabled() {
-        return isUserCertificateRevocationCheckWithOcspEnabled;
-    }
-
-    void setUserCertificateRevocationCheckWithOcspDisabled() {
-        isUserCertificateRevocationCheckWithOcspEnabled = false;
-    }
-
-    public Duration getOcspRequestTimeout() {
-        return ocspRequestTimeout;
-    }
-
-    void setOcspRequestTimeout(Duration ocspRequestTimeout) {
-        this.ocspRequestTimeout = ocspRequestTimeout;
-    }
-
-    public Duration getAllowedOcspResponseTimeSkew() {
-        return allowedOcspResponseTimeSkew;
-    }
-
-    public void setAllowedOcspResponseTimeSkew(Duration allowedOcspResponseTimeSkew) {
-        this.allowedOcspResponseTimeSkew = allowedOcspResponseTimeSkew;
-    }
-
-    public Duration getMaxOcspResponseThisUpdateAge() {
-        return maxOcspResponseThisUpdateAge;
-    }
-
-    public void setMaxOcspResponseThisUpdateAge(Duration maxOcspResponseThisUpdateAge) {
-        this.maxOcspResponseThisUpdateAge = maxOcspResponseThisUpdateAge;
-    }
-
-    public DesignatedOcspServiceConfiguration getDesignatedOcspServiceConfiguration() {
-        return designatedOcspServiceConfiguration;
-    }
-
-    public void setDesignatedOcspServiceConfiguration(DesignatedOcspServiceConfiguration designatedOcspServiceConfiguration) {
-        this.designatedOcspServiceConfiguration = designatedOcspServiceConfiguration;
-    }
-
     public Collection<ASN1ObjectIdentifier> getDisallowedSubjectCertificatePolicies() {
         return disallowedSubjectCertificatePolicies;
     }
 
-    public Collection<URI> getNonceDisabledOcspUrls() {
-        return nonceDisabledOcspUrls;
+    boolean isUserCertificateRevocationCheckEnabled() {
+        return isUserCertificateRevocationCheckEnabled;
+    }
+
+    void setUserCertificateRevocationCheckDisabled() {
+        isUserCertificateRevocationCheckEnabled = false;
+    }
+
+    public void setCertificateRevocationChecker(CertificateRevocationChecker certificateRevocationChecker) {
+        this.certificateRevocationChecker = certificateRevocationChecker;
+    }
+
+    public CertificateRevocationChecker getCertificateRevocationChecker() {
+        return certificateRevocationChecker;
+    }
+
+    public void setPkixRevocationChecker(PKIXRevocationChecker pkixRevocationChecker) {
+        this.pkixRevocationChecker = pkixRevocationChecker;
+    }
+
+    public PKIXRevocationChecker getPkixRevocationChecker() {
+        return pkixRevocationChecker;
+    }
+
+    public RevocationMode getRevocationMode() {
+        return revocationMode;
     }
 
     /**
      * Checks that the configuration parameters are valid.
      *
-     * @throws NullPointerException     when required parameters are null
      * @throws IllegalArgumentException when any parameter is invalid
      */
     void validate() {
-        Objects.requireNonNull(siteOrigin, "Origin URI must not be null");
         validateIsOriginURL(siteOrigin);
         if (trustedCACertificates.isEmpty()) {
             throw new IllegalArgumentException("At least one trusted certificate authority must be provided");
         }
-        requirePositiveDuration(ocspRequestTimeout, "OCSP request timeout");
-        requirePositiveDuration(allowedOcspResponseTimeSkew, "Allowed OCSP response time-skew");
-        requirePositiveDuration(maxOcspResponseThisUpdateAge, "Max OCSP response thisUpdate age");
+        validateRevocationConfiguration();
     }
 
     AuthTokenValidationConfiguration copy() {
@@ -165,6 +138,9 @@ public final class AuthTokenValidationConfiguration {
      */
     public static void validateIsOriginURL(URI uri) throws IllegalArgumentException {
         try {
+            if (uri == null) {
+                throw new IllegalArgumentException("Origin URI must not be null");
+            }
             // 1. Verify that the URI can be converted to absolute URL.
             uri.toURL();
             // 2. Verify that the URI contains only HTTPS scheme, host and optional port components.
@@ -179,4 +155,42 @@ public final class AuthTokenValidationConfiguration {
         }
     }
 
+    /**
+     * Validates that the revocation check configuration is consistent and derives the {@link RevocationMode} from it.
+     * <p>
+     * Configuration is inconsistent if revocation checking is disabled but a checker is configured or if both
+     * checkers are configured simultaneously.
+     *
+     * @throws IllegalArgumentException if configuration is inconsistent
+     */
+    private void validateRevocationConfiguration() {
+        final boolean hasCustomChecker = certificateRevocationChecker != null;
+        final boolean hasPkixChecker = pkixRevocationChecker != null;
+
+        if (!isUserCertificateRevocationCheckEnabled) {
+            if (hasCustomChecker || hasPkixChecker) {
+                throw new IllegalArgumentException(
+                        "User certificate revocation check is disabled, but a revocation checker was configured. " +
+                                "Do not combine withoutUserCertificateRevocationCheck() with withOcspCertificateRevocationChecker(...) " +
+                                "or withPKIXRevocationChecker(...)."
+                );
+            }
+            revocationMode = RevocationMode.DISABLED;
+        } else {
+            // Revocation check enabled, at most one checker allowed, if no checker provided, use default PKIX revocation checker in OCSP mode.
+            if (hasCustomChecker && hasPkixChecker) {
+                throw new IllegalArgumentException(
+                        "Only one of OcspCertificateRevocationChecker or PKIXRevocationChecker may be configured. " +
+                                "Do not combine withOcspCertificateRevocationChecker(...) with withPKIXRevocationChecker(...)."
+                );
+            }
+            if (hasCustomChecker) {
+                revocationMode = RevocationMode.CUSTOM_CHECKER;
+            } else if (hasPkixChecker) {
+                revocationMode = RevocationMode.CUSTOM_PKIX;
+            } else {
+                revocationMode = RevocationMode.PLATFORM_OCSP;
+            }
+        }
+    }
 }
