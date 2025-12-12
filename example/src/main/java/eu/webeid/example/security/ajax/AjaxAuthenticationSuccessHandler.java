@@ -3,7 +3,6 @@
 
 package eu.webeid.example.security.ajax;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
@@ -42,19 +41,11 @@ public class AjaxAuthenticationSuccessHandler extends SimpleUrlAuthenticationSuc
         response.getWriter().write(AuthSuccessDTO.asJson(authentication));
     }
 
-    public static class AuthSuccessDTO {
+    public record AuthSuccessDTO(String sub, String auth) {
         private static final ObjectWriter OBJECT_WRITER = new ObjectMapper().writerFor(AuthSuccessDTO.class);
 
-        @JsonProperty("sub")
-        private String sub;
-
-        @JsonProperty("auth")
-        private String auth;
-
         public static String asJson(Authentication authentication) throws JsonProcessingException {
-            final AuthSuccessDTO dto = new AuthSuccessDTO();
-            dto.sub = authentication.getName();
-            dto.auth = authentication.getAuthorities().toString();
+            final AuthSuccessDTO dto = new AuthSuccessDTO(authentication.getName(), authentication.getAuthorities().toString());
             return OBJECT_WRITER.writeValueAsString(dto);
         }
     }

@@ -5,6 +5,7 @@ package eu.webeid.security.validator;
 
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.certificate.CertificateData;
+import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.AuthTokenSignatureValidationException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
 import eu.webeid.security.testutil.AuthTokenValidators;
@@ -39,6 +40,13 @@ class AuthTokenSignatureTest extends AbstractTestWithValidator {
         mockedClock = mockStatic(DateAndTime.DefaultClock.class);
         // Ensure that the certificates do not expire.
         mockDate("2021-07-23", mockedClock);
+        // The deliberately wrong certificate above and the refreshed token have no overlapping validity period,
+        // so this fixture family stays on the older authentication token.
+        try {
+            validAuthToken = validator.parse(LEGACY_AUTH_TOKEN_2021);
+        } catch (AuthTokenException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @AfterEach
@@ -48,7 +56,7 @@ class AuthTokenSignatureTest extends AbstractTestWithValidator {
 
     @Test
     void whenValidTokenAndNonce_thenValidationSucceeds() throws Exception {
-        final X509Certificate result = validator.validate(validAuthToken, VALID_CHALLENGE_NONCE);
+        final X509Certificate result = validator.validate(validAuthToken, VALID_CHALLENGE_NONCE).subjectCertificate();
 
         assertThat(CertificateData.getSubjectCN(result).orElseThrow())
             .isEqualTo("JÕEORG\\,JAAK-KRISTJAN\\,38001085718");

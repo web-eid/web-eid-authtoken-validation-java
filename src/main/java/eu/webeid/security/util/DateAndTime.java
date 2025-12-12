@@ -17,11 +17,12 @@ public final class DateAndTime {
         return ZonedDateTime.now(ZoneOffset.UTC);
     }
 
-    public static void requirePositiveDuration(Duration duration, String fieldName) {
+    public static Duration requirePositiveDuration(Duration duration, String fieldName) {
         Objects.requireNonNull(duration, fieldName + " must not be null");
         if (duration.isNegative() || duration.isZero()) {
             throw new IllegalArgumentException(fieldName + " must be greater than zero");
         }
+        return duration;
     }
 
     public static class DefaultClock implements Clock {

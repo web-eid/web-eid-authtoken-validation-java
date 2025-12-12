@@ -30,7 +30,7 @@ public final class CertificateLoader {
             }
         }
 
-        return caCertificates.toArray(new X509Certificate[0]);
+        return caCertificates.toArray(X509Certificate[]::new);
     }
 
     public static X509Certificate decodeCertificateFromBase64(String certificateInBase64) throws CertificateDecodingException {

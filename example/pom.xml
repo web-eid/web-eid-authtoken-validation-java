@@ -12,7 +12,7 @@
 	</parent>
 	<groupId>eu.webeid.example</groupId>
 	<artifactId>web-eid-springboot-example</artifactId>
-	<version>3.2.3</version>
+	<version>4.0.0-SNAPSHOT</version>
 	<name>web-eid-springboot-example</name>
 	<description>Example Spring Boot application that demonstrates how to use Web eID for authentication and digital
 		signing
@@ -21,10 +21,9 @@
 	<properties>
 		<java.version>17</java.version>
 		<maven-surefire-plugin.version>3.6.0</maven-surefire-plugin.version>
-		<webeid.version>3.2.2</webeid.version>
+		<webeid.version>4.0.0-SNAPSHOT</webeid.version>
 		<digidoc4j.version>6.2.0</digidoc4j.version>
 		<bouncycastle.version>1.86</bouncycastle.version> <!-- The explicit bcutil dependency can be removed once DigiDoc4j supports BC 1.86. -->
-		<jmockit.version>1.44</jmockit.version> <!-- Keep version 1.44, otherwise mocking will fail. -->
 		<jib.version>3.5.2</jib.version>
 		<maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
 	</properties>
@@ -83,12 +82,6 @@
 			<artifactId>spring-security-test</artifactId>
 			<scope>test</scope>
 		</dependency>
-		<dependency>
-			<groupId>org.jmockit</groupId>
-			<artifactId>jmockit</artifactId>
-			<version>${jmockit.version}</version>
-			<scope>test</scope>
-		</dependency>
 
 	</dependencies>
 
@@ -102,9 +95,6 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>${maven-surefire-plugin.version}</version>
 				<configuration>
-					<argLine>
-						-javaagent:${settings.localRepository}/org/jmockit/jmockit/${jmockit.version}/jmockit-${jmockit.version}.jar
-					</argLine>
 					<disableXmlReport>true</disableXmlReport>
 				</configuration>
 			</plugin>

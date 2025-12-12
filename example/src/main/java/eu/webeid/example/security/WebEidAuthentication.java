@@ -49,9 +49,9 @@ public class WebEidAuthentication extends PreAuthenticatedAuthenticationToken im
 
     @Override
     public boolean equals(Object o) {
-        if (!super.equals(o)) return false;
-        WebEidAuthentication that = (WebEidAuthentication) o;
-        return Objects.equals(idCode, that.idCode);
+        return o instanceof WebEidAuthentication that
+                && super.equals(that)
+                && Objects.equals(idCode, that.idCode);
     }
 
     @Override

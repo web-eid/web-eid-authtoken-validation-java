@@ -12,4 +12,8 @@ public class AuthTokenSignatureValidationException extends AuthTokenException {
         super("Token signature validation has failed. Check that the origin and nonce are correct.");
     }
 
+    public AuthTokenSignatureValidationException(Throwable cause) {
+        super("Token signature validation has failed", cause);
+    }
+
 }
