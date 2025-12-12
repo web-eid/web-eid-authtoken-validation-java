@@ -47,9 +47,7 @@ public class ObjectMother {
     public static final String VALID_CHALLENGE_NONCE = "12345678123456781234567812345678912356789123";
 
     public static AuthTokenDTO mockAuthToken() {
-        AuthTokenDTO authToken = new AuthTokenDTO();
-        authToken.setToken(VALID_AUTH_TOKEN);
-        return authToken;
+        return new AuthTokenDTO(VALID_AUTH_TOKEN);
     }
 
     public static String toJson(Object object) throws JsonProcessingException {
@@ -86,9 +84,7 @@ public class ObjectMother {
     }
 
     public static SignatureDTO mockSignRequest(String digestToSign) {
-        SignatureDTO signatureDTO = new SignatureDTO();
-        signatureDTO.setBase64Signature(mockSignatureInBase64(digestToSign));
-        return signatureDTO;
+        return new SignatureDTO(mockSignatureInBase64(digestToSign));
     }
 
     private static X509Certificate getSigningCert() {

@@ -22,10 +22,7 @@ public class AjaxAuthenticationFailureHandler extends SimpleUrlAuthenticationFai
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
                                         AuthenticationException exception) throws IOException {
         final String message = AUTHENTICATION_FAILED + exception.getMessage();
-        LOG.warn("onAuthenticationFailure(): exception {}, returning {} {}",
-                exception,
-                HttpServletResponse.SC_UNAUTHORIZED,
-                message);
+        LOG.warn("Authentication failed; returning HTTP 401", exception);
         final HttpSession session = request.getSession(false);
         if (session != null) {
             LOG.info("Invalidating session");

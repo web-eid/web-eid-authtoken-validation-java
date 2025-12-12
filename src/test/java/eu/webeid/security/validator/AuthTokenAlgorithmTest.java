@@ -26,7 +26,7 @@ class AuthTokenAlgorithmTest extends AbstractTestWithValidator {
         super.setup();
         mockedClock = mockStatic(DateAndTime.DefaultClock.class);
         // Ensure that the certificates do not expire.
-        mockDate("2021-07-23", mockedClock);
+        mockDate(VALID_AUTH_TOKEN_TEST_DATE, mockedClock);
     }
 
     @AfterEach

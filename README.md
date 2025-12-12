@@ -10,7 +10,7 @@ More information about the Web eID project is available on the project [website]
 
 Complete the steps below to add support for secure authentication with eID cards to your Java web application back end. Instructions for the front end are available [here](https://github.com/web-eid/web-eid.js).
 
-A Java web application that uses Maven or Gradle to manage packages is needed for running this quickstart. Examples are for Maven, but they are straightforward to translate to Gradle.
+A Java 17 or newer web application that uses Maven or Gradle to manage packages is needed for running this quickstart. Examples are for Maven, but they are straightforward to translate to Gradle.
 
 In the following example we are using the [Spring Framework](https://spring.io/), but the examples can be easily ported to other Java web application frameworks.
 
@@ -48,7 +48,7 @@ Implement the session-backed challenge nonce store as follows:
 import org.springframework.beans.factory.ObjectFactory;
 import eu.webeid.security.challenge.ChallengeNonce;
 import eu.webeid.security.challenge.ChallengeNonceStore;
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpSession;
 
 public class SessionBackedChallengeNonceStore implements ChallengeNonceStore {
 
@@ -99,16 +99,18 @@ import eu.webeid.security.challenge.ChallengeNonceStore;
 
 ## 4. Add trusted certificate authority certificates
 
-You must explicitly specify which **intermediate** certificate authorities (CAs) are trusted to issue the eID authentication and OCSP responder certificates. CA certificates can be loaded from either the truststore file, resources or any stream source. We use the [`CertificateLoader`](https://github.com/web-eid/web-eid-authtoken-validation-java/blob/main/src/main/java/eu/webeid/security/certificate/CertificateLoader.java) helper class to load CA certificates from resources here, but consider using [the truststore file](./blob/example/main/src/main/java/eu/webeid/example/config/ValidationConfiguration.java#L104-L123) instead.
+You must explicitly specify which **intermediate** certificate authorities (CAs) are trusted to issue the eID authentication and OCSP responder certificates. CA certificates can be loaded from either the truststore file, resources or any stream source. We use the [`CertificateLoader`](src/main/java/eu/webeid/security/certificate/CertificateLoader.java) helper class to load CA certificates from resources here, but consider using [the truststore file](example/src/main/java/eu/webeid/example/config/ValidationConfiguration.java) instead.
 
 First, copy the trusted certificates, for example `ESTEID2018.cer`, to `resources/cacerts/`, then load the certificates as follows:
 
 ```java
+import java.io.IOException;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import eu.webeid.security.certificate.CertificateLoader;
 
 ...
-    private X509Certificate[] trustedIntermediateCACertificates() {
+    private X509Certificate[] trustedIntermediateCACertificates() throws CertificateException, IOException {
          return CertificateLoader.loadCertificatesFromResources("cacerts/ESTEID2018.cer");
     }
 ...
@@ -120,14 +122,20 @@ Once the prerequisites have been met, the authentication token validator itself 
 The mandatory parameters are the website origin (the URL serving the web application, see section [_Basic usage_](#basic-usage) below) and trusted certificate authorities.
 The authentication token validator will be used in the login processing component of your web application authentication framework; it is thread-safe and should be scoped as a singleton.
 
+Certificate revocation checking is enabled automatically using the platform OCSP implementation. No additional OCSP configuration is needed for normal use.
+
 ```java
+import java.io.IOException;
+import java.net.URI;
+import java.security.cert.CertificateException;
+import eu.webeid.security.exceptions.JceException;
 import eu.webeid.security.validator.AuthTokenValidator;
 import eu.webeid.security.validator.AuthTokenValidatorBuilder;
 
 ...
-    public AuthTokenValidator tokenValidator() throws JceException {
+    public AuthTokenValidator tokenValidator() throws JceException, CertificateException, IOException {
         return new AuthTokenValidatorBuilder()
-                .withSiteOrigin("https://example.org")
+                .withSiteOrigin(URI.create("https://example.org"))
                 .withTrustedCertificateAuthorities(trustedIntermediateCACertificates())
                 .build();
     }
@@ -146,7 +154,7 @@ For internationalized domain names, configure the Punycode form, for example
 
 A REST endpoint that issues challenge nonces is required for authentication. The endpoint must support `GET` requests.
 
-In the following example, we are using the [Spring RESTful Web Services framework](https://spring.io/guides/gs/rest-service/) to implement the endpoint, see also the full implementation [here](example/blob/main/src/main/java/eu/webeid/example/web/rest/ChallengeController.java).
+In the following example, we are using the [Spring RESTful Web Services framework](https://spring.io/guides/gs/rest-service/) to implement the endpoint, see also the full implementation [here](example/src/main/java/eu/webeid/example/web/rest/ChallengeController.java).
 
 ```java
 import org.springframework.web.bind.annotation.GetMapping;
@@ -180,19 +188,22 @@ Authentication consists of calling the `validate()` method of the authentication
 
 When using [Spring Security](https://spring.io/guides/topicals/spring-security-architecture) with standard cookie-based authentication,
 
-- implement a custom authentication provider that uses the authentication token validator for authentication as shown [here](example/blob/main/src/main/java/eu/webeid/example/security/AuthTokenDTOAuthenticationProvider.java),
-- implement an AJAX authentication processing filter that extracts the authentication token and passes it to the authentication manager as shown [here](example/blob/main/src/main/java/eu/webeid/example/security/WebEidAjaxLoginProcessingFilter.java),
-- configure the authentication provider and authentication processing filter in the application configuration as shown [here](example/blob/main/src/main/java/eu/webeid/example/config/ApplicationConfiguration.java).
+- implement a custom authentication provider that uses the authentication token validator for authentication as shown [here](example/src/main/java/eu/webeid/example/security/AuthTokenDTOAuthenticationProvider.java),
+- implement an AJAX authentication processing filter that extracts the authentication token and passes it to the authentication manager as shown [here](example/src/main/java/eu/webeid/example/security/WebEidAjaxLoginProcessingFilter.java),
+- configure the authentication provider and authentication processing filter in the application configuration as shown [here](example/src/main/java/eu/webeid/example/config/ApplicationConfiguration.java).
 
-The gist of the validation is [in the `authenticate()` method](example/blob/main/src/main/java/eu/webeid/example/security/AuthTokenDTOAuthenticationProvider.java#L74-L76) of the authentication provider:
+The gist of the validation is [in the `authenticate()` method](example/src/main/java/eu/webeid/example/security/AuthTokenDTOAuthenticationProvider.java) of the authentication provider:
 
 ```java
 try {
   String nonce = challengeNonceStore.getAndRemove().getBase64EncodedNonce();
-  X509Certificate userCertificate = tokenValidator.validate(authToken, nonce);
-  return WebEidAuthentication.fromCertificate(userCertificate, authorities);
+  ValidationInfo validationInfo = tokenValidator.validate(authToken, nonce);
+  return WebEidAuthentication.fromCertificate(validationInfo.subjectCertificate(), authorities);
 } catch (AuthTokenException e) {
-  ...
+  throw new AuthenticationServiceException("Web eID token validation failed", e);
+} catch (CertificateEncodingException e) {
+  throw new AuthenticationServiceException("Invalid certificate subject fields", e);
+}
 ```
 
 # Table of contents
@@ -203,7 +214,7 @@ try {
 - [Authentication token validation](#authentication-token-validation)
   - [Basic usage](#basic-usage)
   - [Extended configuration](#extended-configuration)
-    - [Certificates' <em>Authority Information Access</em> (AIA) extension](#certificates-authority-information-access-aia-extension)
+    - [Advanced OCSP configuration](src/main/java/eu/webeid/ocsp/README.md)
   - [Possible validation errors](#possible-validation-errors)
   - [Stateful and stateless authentication](#stateful-and-stateless-authentication)
 - [Challenge nonce generation](#challenge-nonce-generation)
@@ -281,13 +292,18 @@ The authentication token validator configuration and construction is described i
 ```java  
 String challengeNonce = challengeNonceStore.getAndRemove().getBase64EncodedNonce();
 WebEidAuthToken token = tokenValidator.parse(tokenString);
-X509Certificate userCertificate = tokenValidator.validate(token, challengeNonce);
+ValidationInfo validationInfo = tokenValidator.validate(token, challengeNonce);
+X509Certificate userCertificate = validationInfo.subjectCertificate();
 ```
 
-The `validate()` method returns the validated user certificate object if validation is successful or throws an exception as described in section *[Possible validation errors](#possible-validation-errors)* below if validation fails. The `CertificateData` and `TitleCase` classes can be used for extracting user information from the user certificate object:
+The `validate()` method returns a `ValidationInfo` object on success. Use `subjectCertificate()` to obtain the validated certificate. Validation failures throw an exception, as described in [Possible validation errors](#possible-validation-errors).
+
+Additional revocation information is available to custom integrations through `revocationInfoList()`; see the [OCSP guide](src/main/java/eu/webeid/ocsp/README.md#revocation-information).
+
+The `CertificateData` and `Strings` classes provide helpers for extracting and formatting user information:
 
 ```java  
-import eu.webeid.security.certificate;
+import eu.webeid.security.certificate.CertificateData;
 import static eu.webeid.security.util.Strings.toTitleCase;
 
 ...
@@ -300,42 +316,19 @@ toTitleCase(CertificateData.getSubjectGivenName(userCertificate).orElseThrow());
 toTitleCase(CertificateData.getSubjectSurname(userCertificate).orElseThrow()); // "Jõeorg"
 ```
 
-## Extended configuration  
+## Extended configuration
 
-The following additional configuration options are available in `AuthTokenValidatorBuilder`:  
+The default validator uses the platform OCSP implementation to check certificate revocation. A revoked certificate or an unsuccessful revocation check causes authentication to fail.
 
-- `withoutUserCertificateRevocationCheckWithOcsp()` – turns off user certificate revocation check with OCSP. OCSP check is enabled by default and the OCSP responder access location URL is extracted from the user certificate AIA extension unless a designated OCSP service is activated.
-- `withDesignatedOcspServiceConfiguration(DesignatedOcspServiceConfiguration serviceConfiguration)` – activates the provided designated OCSP responder service configuration for user certificate revocation check with OCSP. The designated service is only used for checking the status of the certificates whose issuers are supported by the service, for other certificates the default AIA extension service access location will be used. See configuration examples in `testutil.OcspServiceMaker.getDesignatedOcspServiceConfiguration()`.
-- `withOcspClient(OcspClient ocspClient)` - uses the provided OCSP client instance during user certificate revocation check with OCSP. The provided client instance must be thread-safe. This gives the possibility to configure the request timeouts, proxies etc of the `HttpClient` instance or provide an implementation that uses an altogether different HTTP client. See examples in `OcspClientOverrideTest`.
-- `withOcspRequestTimeout(Duration ocspRequestTimeout)` – sets both the connection and response timeout of user certificate revocation check OCSP requests. Default is 5 seconds.
-- `withDisallowedCertificatePolicies(ASN1ObjectIdentifier... policies)` – adds the given policies to the list of disallowed user certificate policies. In order for the user certificate to be considered valid, it must not contain any policies present in this list. Contains the Estonian Mobile-ID policies by default as it must not be possible to authenticate with a Mobile-ID certificate when an eID smart card is expected.
-- `withNonceDisabledOcspUrls(URI... urls)` – adds the given URLs to the list of OCSP responder access location URLs for which the nonce protocol extension will be disabled. Some OCSP responders don't support the nonce extension.
-- `withAllowedOcspResponseTimeSkew(Duration allowedTimeSkew)` – sets the allowed time skew for OCSP response's `thisUpdate` and `nextUpdate` times to allow discrepancies between the system clock and the OCSP responder's clock or revocation updates that are not published in real time. The default allowed time skew is 15 minutes. The relatively long default is specifically chosen to account for one particular OCSP responder that used CRLs for authoritative revocation info, these CRLs were updated every 15 minutes.
-- `withMaxOcspResponseThisUpdateAge(Duration maxThisUpdateAge)` – sets the maximum age for the OCSP response's `thisUpdate` time before it is considered too old to rely on. The default maximum age is 2 minutes.
+Use `withDisallowedCertificatePolicies(ASN1ObjectIdentifier... policies)` to add disallowed certificate policies. Estonian Mobile-ID policies are disallowed by default because smart-card authentication must not accept Mobile-ID certificates.
 
-Extended configuration example:  
+For more advanced revocation requirements, supply a `CertificateRevocationChecker` with `withCertificateRevocationChecker(...)`. The [OCSP configuration guide](src/main/java/eu/webeid/ocsp/README.md) covers custom implementations, the bundled OCSP checker, custom PKIX checkers, responder selection, HTTP settings, and nonce policies.
 
-```java  
-AuthTokenValidator validator = new AuthTokenValidatorBuilder()
-    .withSiteOrigin("https://example.org")
-    .withTrustedCertificateAuthorities(trustedCertificateAuthorities())
-    .withoutUserCertificateRevocationCheckWithOcsp()
-    .withDisallowedCertificatePolicies(new ASN1ObjectIdentifier("1.2.3"))
-    .withNonceDisabledOcspUrls(URI.create("http://aia.example.org/cert"))
-    .withAllowedOcspResponseTimeSkew(Duration.ofMinutes(10))
-    .withMaxOcspResponseThisUpdateAge(Duration.ofMinutes(5))
-    .build();
-```
+## Possible validation errors
 
-### Certificates' *Authority Information Access* (AIA) extension
+Certificate and token validation failures are reported through `AuthTokenException` subclasses. `CertificateRevokedException` means the certificate is revoked; `CertificateRevocationCheckFailedException` means its status could not be established. Other failures are documented in the [exception classes](src/main/java/eu/webeid/security/exceptions/).
 
-Unless a designated OCSP responder service is in use, it is required that the AIA extension that contains the certificate’s OCSP responder access location is present in the user certificate. The AIA OCSP URL will be used to check the certificate revocation status with OCSP.
-
-Note that there may be limitations to using AIA URLs as the services behind these URLs provide different security and SLA guarantees than dedicated OCSP responder services. In case you need a SLA guarantee, use a designated OCSP responder service.
-
-## Possible validation errors  
-
-The `validate()` method of `AuthTokenValidator` returns the validated user certificate object if validation is successful or throws an exception if validation fails. All exceptions that can occur during validation derive from `AuthTokenException`, the list of available exceptions is available [here](src/main/java/eu/webeid/security/exceptions/). Each exception file contains a documentation comment that describes under which conditions the exception is thrown.
+Log the exception itself, for example `LOG.warn("Web eID authentication failed", e)`, to preserve its cause chain. When wrapping it, retain the cause as shown in the authentication example above. Return a generic authentication failure to the client; keep diagnostic details in server logs. See the [OCSP diagnostics guide](src/main/java/eu/webeid/ocsp/README.md#errors-and-diagnostics) for revocation-specific details.
 
 ## Stateful and stateless authentication
 
@@ -348,7 +341,11 @@ A common alternative to stateful authentication is stateless authentication with
 
 The authentication protocol requires support for generating challenge nonces, large random numbers that can be used only once, and storing them for later use during token validation. The validation library uses the *java.security.SecureRandom* API as the secure random source and the `ChallengeNonceStore` interface for storing issued challenge nonces. 
 
-The `-Djava.security.egd=file:/dev/./urandom` command line argument is added to `pom.xml` to avoid the risk of having the code execution blocked unexpectedly during random generation. Without this, the JVM uses `/dev/random`, which can block, to seed the `SecureRandom` class.
+No additional JVM configuration is normally required. The selected random-number generator and its entropy source depend on the JDK, operating system and security-provider configuration; some implementations may block while gathering entropy. See the [JDK's `SecureRandom` documentation](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/security/SecureRandom.html).
+
+If nonce generation stalls, inspect the application's thread dump and selected `SecureRandom` implementation before changing its configuration. On Linux with the OpenJDK SUN provider, `-Djava.security.egd=file:/dev/urandom` can be supplied when starting the application to select `/dev/urandom` as the entropy source for implementations that honor this property. This setting affects the whole JVM. Alternatively, configure the challenge nonce generator with a suitable `SecureRandom` instance using `withSecureRandom(...)`.
+
+This repository's `pom.xml` supplies `-Djava.security.egd=file:/dev/urandom` to the test JVM. That test setting is not automatically applied to applications using the library.
 
 The authentication protocol requires a REST endpoint that issues challenge nonces as described in section *[6. Add a REST endpoint for issuing challenge nonces](#6-add-a-rest-endpoint-for-issuing-challenge-nonces)*.
 
@@ -356,11 +353,11 @@ Nonce usage is described in more detail in the [Web eID system architecture docu
 
 ## Basic usage
 
-As described in section *[3. Configure the nonce generator](#3-configure-the-nonce-generator)*, the only mandatory configuration parameter of the challenge nonce generator is the challenge nonce store.
+As described in section *[3. Configure the challenge nonce generator](#3-configure-the-challenge-nonce-generator)*, the only mandatory configuration parameter of the challenge nonce generator is the challenge nonce store.
 
 The challenge nonce store is used to save the nonce value along with the nonce expiry time. It must be possible to look up the challenge nonce data structure from the store using an identifier specific to the browser session. The values from the store are used by the token validator as described in the section *[Authentication token validation > Basic usage](#basic-usage)* that also contains recommendations for store usage and configuration.
 
-The nonce generator configuration and construction is described in more detail in section *[3. Configure the nonce generator](#3-configure-the-nonce-generator)*. Once the generator object has been constructed, it can be used for generating nonces as follows:
+The nonce generator configuration and construction is described in more detail in section *[3. Configure the challenge nonce generator](#3-configure-the-challenge-nonce-generator)*. Once the generator object has been constructed, it can be used for generating nonces as follows:
 
 ```java  
 ChallengeNonce challengeNonce = nonceGenerator.generateAndStoreNonce();  
@@ -370,14 +367,14 @@ The `generateAndStoreNonce()` method both generates the nonce and saves it in th
 
 ## Extended configuration  
 
-The following additional configuration options are available in `NonceGeneratorBuilder`:
+The following additional configuration options are available in `ChallengeNonceGeneratorBuilder`:
 
 - `withNonceTtl(Duration duration)` – overrides the default challenge nonce time-to-live duration. When the time-to-live passes, the nonce is considered to be expired. Default challenge nonce time-to-live is 5 minutes.
 - `withSecureRandom(SecureRandom)` - allows to specify a custom `SecureRandom` instance.
 
 Extended configuration example:  
 ```java  
-NonceGenerator generator = new NonceGeneratorBuilder()  
+ChallengeNonceGenerator generator = new ChallengeNonceGeneratorBuilder()
         .withChallengeNonceStore(store)
         .withNonceTtl(Duration.ofMinutes(5))
         .withSecureRandom(customSecureRandom)  

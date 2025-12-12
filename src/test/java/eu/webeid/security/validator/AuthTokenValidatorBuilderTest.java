@@ -3,13 +3,28 @@
 
 package eu.webeid.security.validator;
 
+import eu.webeid.security.certificate.CertificateValidator;
 import eu.webeid.security.testutil.AuthTokenValidators;
+import eu.webeid.security.validator.revocationcheck.CertificateRevocationChecker;
+import eu.webeid.security.validator.revocationcheck.RevocationMode;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 import java.net.URI;
-import java.time.Duration;
+import java.security.cert.PKIXRevocationChecker;
+import java.util.List;
 
+import static eu.webeid.security.testutil.AbstractTestWithValidator.VALID_AUTH_TOKEN;
+import static eu.webeid.security.testutil.AbstractTestWithValidator.VALID_CHALLENGE_NONCE;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
 
 public class AuthTokenValidatorBuilderTest {
 
@@ -22,7 +37,7 @@ public class AuthTokenValidatorBuilderTest {
     @Test
     void testOriginMissing() {
         assertThatThrownBy(builder::build)
-            .isInstanceOf(NullPointerException.class)
+            .isInstanceOf(IllegalArgumentException.class)
             .hasMessageStartingWith("Origin URI must not be null");
     }
 
@@ -68,29 +83,62 @@ public class AuthTokenValidatorBuilderTest {
     }
 
     @Test
-    void testInvalidOcspResponseTimeSkew() throws Exception {
-        final AuthTokenValidatorBuilder builderWithInvalidOcspResponseTimeSkew = AuthTokenValidators.getDefaultAuthTokenValidatorBuilder()
-            .withAllowedOcspResponseTimeSkew(Duration.ofMinutes(-1));
-        assertThatThrownBy(builderWithInvalidOcspResponseTimeSkew::build)
+    void whenRevocationCheckDisabledAndCustomCheckerConfigured_thenBuildFails() throws Exception {
+        final AuthTokenValidatorBuilder builderWithRevocationDisabled = AuthTokenValidators.getDefaultAuthTokenValidatorBuilder()
+            .withoutUserCertificateRevocationCheck()
+            .withCertificateRevocationChecker(getNoopChecker());
+        assertThatThrownBy(builderWithRevocationDisabled::build)
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageStartingWith("Allowed OCSP response time-skew must be greater than zero");
+            .hasMessageStartingWith("User certificate revocation check is disabled, but a revocation checker was configured");
     }
 
     @Test
-    void testInvalidMaxOcspResponseThisUpdateAge() throws Exception {
-        final AuthTokenValidatorBuilder builderWithInvalidOcspResponseTimeSkew = AuthTokenValidators.getDefaultAuthTokenValidatorBuilder()
-            .withMaxOcspResponseThisUpdateAge(Duration.ZERO);
-        assertThatThrownBy(builderWithInvalidOcspResponseTimeSkew::build)
+    void whenRevocationCheckDisabledAndPkixCheckerConfigured_thenBuildFails() throws Exception {
+        final AuthTokenValidatorBuilder builderWithRevocationDisabled = AuthTokenValidators.getDefaultAuthTokenValidatorBuilder()
+            .withoutUserCertificateRevocationCheck()
+            .withPKIXRevocationChecker(mock(PKIXRevocationChecker.class));
+        assertThatThrownBy(builderWithRevocationDisabled::build)
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageStartingWith("Max OCSP response thisUpdate age must be greater than zero");
+            .hasMessageStartingWith("User certificate revocation check is disabled, but a revocation checker was configured");
     }
 
     @Test
-    void testInvalidOcspRequestTimeout() throws Exception {
-        final AuthTokenValidatorBuilder builderWithInvalidOcspResponseTimeSkew = AuthTokenValidators.getDefaultAuthTokenValidatorBuilder()
-            .withOcspRequestTimeout(Duration.ofMinutes(-1));
-        assertThatThrownBy(builderWithInvalidOcspResponseTimeSkew::build)
+    void whenCustomCheckerAndPkixCheckerConfigured_thenBuildFails() throws Exception {
+        final AuthTokenValidatorBuilder builderWithConflictingCheckers = AuthTokenValidators.getDefaultAuthTokenValidatorBuilder()
+            .withCertificateRevocationChecker(getNoopChecker())
+            .withPKIXRevocationChecker(mock(PKIXRevocationChecker.class));
+        assertThatThrownBy(builderWithConflictingCheckers::build)
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageStartingWith("OCSP request timeout must be greater than zero");
+            .hasMessageStartingWith("Only one of OcspCertificateRevocationChecker or PKIXRevocationChecker may be configured");
     }
+
+    @Test
+    void whenPlatformOcspNonceSettingChanges_thenBuiltValidatorsRetainTheirSetting() throws Exception {
+        final AuthTokenValidatorBuilder configurableBuilder = AuthTokenValidators.getDefaultAuthTokenValidatorBuilder();
+        final AuthTokenValidator defaultValidator = configurableBuilder.build();
+        final AuthTokenValidator nonceDisabledValidator = configurableBuilder.withPlatformOcspNonceEnabled(false).build();
+        final AuthTokenValidator nonceEnabledValidator = configurableBuilder.withPlatformOcspNonceEnabled(true).build();
+
+        try (MockedStatic<CertificateValidator> certificateValidator = mockStatic(CertificateValidator.class)) {
+            certificateValidator.when(() -> CertificateValidator.validateCertificateTrustAndRevocation(
+                    any(), anySet(), any(), any(), eq(RevocationMode.PLATFORM_OCSP), isNull(), isNull(), anyBoolean()
+            )).thenReturn(List.of());
+
+            for (AuthTokenValidator validator : List.of(defaultValidator, nonceDisabledValidator, nonceEnabledValidator)) {
+                validator.validate(validator.parse(VALID_AUTH_TOKEN), VALID_CHALLENGE_NONCE);
+            }
+
+            certificateValidator.verify(() -> CertificateValidator.validateCertificateTrustAndRevocation(
+                    any(), anySet(), any(), any(), eq(RevocationMode.PLATFORM_OCSP), isNull(), isNull(), eq(true)
+            ), times(2));
+            certificateValidator.verify(() -> CertificateValidator.validateCertificateTrustAndRevocation(
+                    any(), anySet(), any(), any(), eq(RevocationMode.PLATFORM_OCSP), isNull(), isNull(), eq(false)
+            ));
+        }
+    }
+
+    private static CertificateRevocationChecker getNoopChecker() {
+        return (subjectCertificate, issuerCertificate) -> List.of();
+    }
+
 }

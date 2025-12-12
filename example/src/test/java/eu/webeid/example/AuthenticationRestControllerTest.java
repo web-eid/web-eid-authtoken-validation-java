@@ -19,7 +19,7 @@ class AuthenticationRestControllerTest {
 
     @Test
     void testChallengeNonceLength() {
-        assertThat(authRestController.challenge().getNonce().length())
+        assertThat(authRestController.challenge().nonce().length())
                 .isEqualTo(nonceGeneratorNonceBase64Length());
     }
 

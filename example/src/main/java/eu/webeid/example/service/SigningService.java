@@ -108,11 +108,7 @@ public class SigningService {
         final byte[] digest = signatureDigestAlgorithm.getDssDigestAlgorithm().getMessageDigest()
                 .digest(dataToSign.getDataToSign());
 
-        final DigestDTO digestDTO = new DigestDTO();
-        digestDTO.setHash(DatatypeConverter.printBase64Binary(digest));
-        digestDTO.setHashFunction(digestAlgorithmName);
-
-        return digestDTO;
+        return new DigestDTO(DatatypeConverter.printBase64Binary(digest), digestAlgorithmName);
     }
 
     /**
@@ -127,7 +123,7 @@ public class SigningService {
         Container containerToSign = (Container) Objects.requireNonNull(currentSession().getAttribute(SESSION_ATTR_CONTAINER));
         DataToSign dataToSign = (DataToSign) Objects.requireNonNull(currentSession().getAttribute(SESSION_ATTR_DATA));
 
-        byte[] signatureBytes = DatatypeConverter.parseBase64Binary(signatureDTO.getBase64Signature());
+        byte[] signatureBytes = DatatypeConverter.parseBase64Binary(signatureDTO.base64Signature());
         Signature signature = dataToSign.finalize(signatureBytes);
         containerToSign.addSignature(signature);
         currentSession().setAttribute(SESSION_ATTR_CONTAINER, containerToSign);
