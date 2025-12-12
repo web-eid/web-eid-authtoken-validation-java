@@ -20,48 +20,23 @@
  * SOFTWARE.
  */
 
-package eu.webeid.security.util;
+package eu.webeid.ocsp.exceptions;
 
-import io.jsonwebtoken.Clock;
+import java.net.URI;
 
-import java.time.Duration;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
-import java.util.Date;
-import java.util.Objects;
+/**
+ * Helper class for adding OCSP responder URL to messages.
+ */
+final class OcspResponderUriMessage {
 
-public final class DateAndTime {
-
-    public static ZonedDateTime utcNow() {
-        return ZonedDateTime.now(ZoneOffset.UTC);
+    static String withResponderUri(String message, URI ocspResponderUri) {
+        if (ocspResponderUri == null) {
+            return message;
+        }
+        return message + " (OCSP responder: " + ocspResponderUri + ")";
     }
 
-    public static Duration requirePositiveDuration(Duration duration, String fieldName) {
-        Objects.requireNonNull(duration, fieldName + " must not be null");
-        if (duration.isNegative() || duration.isZero()) {
-            throw new IllegalArgumentException(fieldName + " must be greater than zero");
-        }
-        return duration;
-    }
-
-    public static class DefaultClock implements Clock {
-
-        // Allows mocking of time-dependent behavior with Mockito.mockStatic() in tests.
-        private static final Clock instance = new DefaultClock();
-
-        public static Clock getInstance() {
-            return instance;
-        }
-
-        @Override
-        public Date now() {
-            return new Date();
-        }
-
-    }
-
-    private DateAndTime() {
+    private OcspResponderUriMessage() {
         throw new IllegalStateException("Utility class");
     }
-
 }

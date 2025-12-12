@@ -1,0 +1,103 @@
+/*
+ * Copyright (c) 2020-2025 Estonian Information System Authority
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+package eu.webeid.ocsp.service;
+
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.junit.jupiter.api.Test;
+import eu.webeid.ocsp.exceptions.OCSPCertificateException;
+
+import java.net.URI;
+import java.util.Date;
+
+import static eu.webeid.ocsp.service.OcspServiceMaker.getAiaOcspServiceProvider;
+import static eu.webeid.ocsp.service.OcspServiceMaker.getDesignatedOcspServiceProvider;
+import static eu.webeid.security.testutil.Certificates.getJaakKristjanEsteid2018Cert;
+import static eu.webeid.security.testutil.Certificates.getMariliisEsteid2015Cert;
+import static eu.webeid.security.testutil.Certificates.getTestEsteid2015CA;
+import static eu.webeid.security.testutil.Certificates.getTestEsteid2018CA;
+import static eu.webeid.security.testutil.Certificates.getTestSkOcspResponder2020;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+
+class OcspServiceProviderTest {
+
+    @Test
+    void whenDesignatedOcspServiceConfigurationProvided_thenCreatesDesignatedOcspService() throws Exception {
+        final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider();
+        final OcspService service = ocspServiceProvider.getService(getJaakKristjanEsteid2018Cert());
+        assertThat(service.getAccessLocation()).isEqualTo(new URI("http://demo.sk.ee/ocsp"));
+        assertThat(service.doesSupportNonce()).isTrue();
+        assertThatCode(() ->
+            service.validateResponderCertificate(new X509CertificateHolder(getTestSkOcspResponder2020().getEncoded()), new Date(1630000000000L)))
+            .doesNotThrowAnyException();
+        assertThatCode(() ->
+            service.validateResponderCertificate(new X509CertificateHolder(getTestEsteid2018CA().getEncoded()), new Date(1630000000000L)))
+            .isInstanceOf(OCSPCertificateException.class)
+            .hasMessage("Responder certificate from the OCSP response is not equal to the configured designated OCSP responder certificate");
+    }
+
+    @Test
+    void whenAiaOcspServiceConfigurationProvided_thenCreatesAiaOcspService() throws Exception {
+        final OcspServiceProvider ocspServiceProvider = getAiaOcspServiceProvider();
+        final OcspService service2018 = ocspServiceProvider.getService(getJaakKristjanEsteid2018Cert());
+        assertThat(service2018.getAccessLocation()).isEqualTo(new URI("http://aia.demo.sk.ee/esteid2018"));
+        assertThat(service2018.doesSupportNonce()).isTrue();
+        assertThatCode(() ->
+            // Use the CA certificate instead of responder certificate for convenience.
+            service2018.validateResponderCertificate(new X509CertificateHolder(getTestEsteid2018CA().getEncoded()), new Date(1630000000000L)))
+            .doesNotThrowAnyException();
+
+        final OcspService service2015 = ocspServiceProvider.getService(getMariliisEsteid2015Cert());
+        assertThat(service2015.getAccessLocation()).isEqualTo(new URI("http://aia.demo.sk.ee/esteid2015"));
+        assertThat(service2015.doesSupportNonce()).isFalse();
+        assertThatCode(() ->
+            // Use the CA certificate instead of responder certificate for convenience.
+            service2015.validateResponderCertificate(new X509CertificateHolder(getTestEsteid2015CA().getEncoded()), new Date(1630000000000L)))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenAiaOcspServiceConfigurationDoesNotHaveResponderCertTrustedCA_thenThrows() throws Exception {
+        final OcspServiceProvider ocspServiceProvider = getAiaOcspServiceProvider();
+        final OcspService service2018 = ocspServiceProvider.getService(getJaakKristjanEsteid2018Cert());
+        final X509CertificateHolder wrongResponderCert = new X509CertificateHolder(getMariliisEsteid2015Cert().getEncoded());
+        assertThatExceptionOfType(OCSPCertificateException.class)
+            .isThrownBy(() ->
+                service2018.validateResponderCertificate(wrongResponderCert, new Date(1630000000000L)));
+    }
+
+}
+
+// Old disabled example AuthTokenValidator test with designated OCSP check.
+//
+//    @Test
+//    @Disabled("A new designated test OCSP responder certificate was issued whose validity period no longer overlaps with the revoked certificate")
+//    void whenCertificateIsRevoked_thenOcspCheckWithDesignatedOcspServiceFails() throws Exception {
+//        mockDate("2020-01-01", mockedClock);
+//        final AuthTokenValidator validatorWithOcspCheck = AuthTokenValidators.getAuthTokenValidatorWithDesignatedOcspCheck();
+//        final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", REVOKED_CERT);
+//        assertThatThrownBy(() -> validatorWithOcspCheck
+//            .validate(token, VALID_CHALLENGE_NONCE))
+//            .isInstanceOf(UserCertificateRevokedException.class);
+//    }

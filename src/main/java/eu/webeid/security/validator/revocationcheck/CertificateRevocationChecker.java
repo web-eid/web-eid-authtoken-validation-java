@@ -19,16 +19,16 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+package eu.webeid.security.validator.revocationcheck;
 
-package eu.webeid.security.authtoken;
+import eu.webeid.security.exceptions.AuthTokenException;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.security.cert.X509Certificate;
+import java.util.List;
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-public record WebEidAuthToken(
-        String unverifiedCertificate,
-        String signature,
-        String algorithm,
-        String format
-) {
+public interface CertificateRevocationChecker {
+
+    List<RevocationInfo> validateCertificateNotRevoked(X509Certificate subjectCertificate,
+                                                       X509Certificate issuerCertificate) throws AuthTokenException;
+
 }
