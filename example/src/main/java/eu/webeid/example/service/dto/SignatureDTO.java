@@ -7,16 +7,5 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class SignatureDTO {
-
-    @JsonProperty("signature")
-    private String base64Signature;
-
-    public String getBase64Signature() {
-        return base64Signature;
-    }
-
-    public void setBase64Signature(String base64Signature) {
-        this.base64Signature = base64Signature;
-    }
+public record SignatureDTO(@JsonProperty("signature") String base64Signature) {
 }

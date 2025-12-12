@@ -21,8 +21,6 @@ public class ChallengeController {
 
     @GetMapping("challenge")
     public ChallengeDTO challenge() {
-        final ChallengeDTO challenge = new ChallengeDTO();
-        challenge.setNonce(challengeNonceGenerator.generateAndStoreNonce().getBase64EncodedNonce());
-        return challenge;
+        return new ChallengeDTO(challengeNonceGenerator.generateAndStoreNonce().getBase64EncodedNonce());
     }
 }

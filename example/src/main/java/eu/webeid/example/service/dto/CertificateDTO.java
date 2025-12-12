@@ -3,15 +3,15 @@
 
 package eu.webeid.example.service.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class CertificateDTO {
 
@@ -41,11 +41,12 @@ public class CertificateDTO {
         return (X509Certificate) cf.generateCertificate(inStream);
     }
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     public List<String> getSupportedHashFunctionNames() {
-        return supportedSignatureAlgorithms == null ? new ArrayList<>() : supportedSignatureAlgorithms
+        return supportedSignatureAlgorithms == null ? List.of() : supportedSignatureAlgorithms
                 .stream()
                 .map(SignatureAlgorithmDTO::getHashFunction)
                 .distinct()
-                .collect(Collectors.toList());
+                .toList();
     }
 }

@@ -65,7 +65,6 @@ public class ValidationConfiguration {
                 .withSiteOrigin(URI.create(yamlConfig.getLocalOrigin()))
                 .withTrustedCertificateAuthorities(loadTrustedCACertificatesFromCerFiles())
                 .withTrustedCertificateAuthorities(loadTrustedCACertificatesFromTrustStore(yamlConfig))
-                .withOcspRequestTimeout(yamlConfig.getOcspRequestTimeout())
                 .build();
         } catch (JceException e) {
             throw new RuntimeException("Error building the Web eID auth token validator.", e);
@@ -77,7 +76,7 @@ public class ValidationConfiguration {
         return new YAMLConfig();
     }
 
-    private X509Certificate[] loadTrustedCACertificatesFromCerFiles() {
+    X509Certificate[] loadTrustedCACertificatesFromCerFiles() {
         List<X509Certificate> caCertificates = new ArrayList<>();
 
         try {
@@ -87,18 +86,19 @@ public class ValidationConfiguration {
             Resource[] resources = resolver.getResources(CERTS_RESOURCE_PATH + activeProfile + "/*.cer");
 
             for (Resource resource : resources) {
-                X509Certificate caCertificate = (X509Certificate) certFactory.generateCertificate(resource.getInputStream());
-                caCertificates.add(caCertificate);
+                try (InputStream stream = resource.getInputStream()) {
+                    caCertificates.add((X509Certificate) certFactory.generateCertificate(stream));
+                }
             }
 
         } catch (CertificateException | IOException e) {
             throw new RuntimeException("Error initializing trusted CA certificates.", e);
         }
 
-        return caCertificates.toArray(new X509Certificate[0]);
+        return caCertificates.toArray(X509Certificate[]::new);
     }
 
-    private X509Certificate[] loadTrustedCACertificatesFromTrustStore(YAMLConfig yamlConfig) {
+    X509Certificate[] loadTrustedCACertificatesFromTrustStore(YAMLConfig yamlConfig) {
         List<X509Certificate> caCertificates = new ArrayList<>();
 
         try (InputStream is = ValidationConfiguration.class.getResourceAsStream(CERTS_RESOURCE_PATH + activeProfile + "/" + TRUSTED_CERTIFICATES_JKS)) {
@@ -118,7 +118,7 @@ public class ValidationConfiguration {
             throw new RuntimeException("Error initializing trusted CA certificates from trust store.", e);
         }
 
-        return caCertificates.toArray(new X509Certificate[0]);
+        return caCertificates.toArray(X509Certificate[]::new);
     }
 
 

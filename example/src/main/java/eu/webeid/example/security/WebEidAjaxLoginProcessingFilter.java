@@ -3,6 +3,7 @@
 
 package eu.webeid.example.security;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import eu.webeid.example.security.ajax.AjaxAuthenticationFailureHandler;
@@ -30,7 +31,7 @@ import java.io.IOException;
 
 public class WebEidAjaxLoginProcessingFilter extends AbstractAuthenticationProcessingFilter {
     private static final Logger LOG = LoggerFactory.getLogger(WebEidAjaxLoginProcessingFilter.class);
-    private final ObjectReader OBJECT_READER = new ObjectMapper().readerFor(AuthTokenDTO.class);
+    private static final ObjectReader OBJECT_READER = new ObjectMapper().readerFor(AuthTokenDTO.class);
     private final SecurityContextRepository securityContextRepository;
 
     public WebEidAjaxLoginProcessingFilter(
@@ -59,7 +60,15 @@ public class WebEidAjaxLoginProcessingFilter extends AbstractAuthenticationProce
         }
 
         LOG.info("attemptAuthentication(): Reading request body");
-        final AuthTokenDTO authTokenDTO = OBJECT_READER.readValue(request.getReader());
+        final AuthTokenDTO authTokenDTO;
+        try {
+            authTokenDTO = OBJECT_READER.readValue(request.getReader());
+        } catch (JsonProcessingException e) {
+            throw new AuthenticationServiceException("Invalid authentication request", e);
+        }
+        if (authTokenDTO == null || authTokenDTO.token() == null) {
+            throw new AuthenticationServiceException("Authentication token is missing");
+        }
         LOG.info("attemptAuthentication(): Creating token");
         final PreAuthenticatedAuthenticationToken token = new PreAuthenticatedAuthenticationToken(null, authTokenDTO);
         LOG.info("attemptAuthentication(): Calling authentication manager");

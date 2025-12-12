@@ -7,7 +7,6 @@ import eu.webeid.security.exceptions.AuthTokenException;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x509.CertificatePolicies;
 import org.bouncycastle.asn1.x509.Extension;
-import org.bouncycastle.asn1.x509.PolicyInformation;
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
 import eu.webeid.security.exceptions.UserCertificateDisallowedPolicyException;
 import eu.webeid.security.exceptions.UserCertificateParseException;
@@ -18,7 +17,6 @@ import java.io.IOException;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Optional;
 
 public final class SubjectCertificatePolicyValidator {
 
@@ -31,12 +29,12 @@ public final class SubjectCertificatePolicyValidator {
     }
 
     /**
-     * Validates that the user certificate policies match the configured policies.
+     * Rejects any configured disallowed policy present in the certificate policies extension.
      * A certificate without the certificate policies extension does not contain disallowed policies and passes validation.
      *
      * @param subjectCertificate user certificate to be validated
-     * @throws UserCertificateDisallowedPolicyException when user certificate policy does not match the configured policies.
-     * @throws UserCertificateParseException when user certificate policy is invalid.
+     * @throws UserCertificateDisallowedPolicyException when a disallowed policy is present.
+     * @throws UserCertificateParseException when the certificate policies extension is invalid.
      */
     public void validateCertificatePolicies(X509Certificate subjectCertificate) throws AuthTokenException {
         final byte[] extensionValue = subjectCertificate.getExtensionValue(Extension.certificatePolicies.getId());
@@ -48,14 +46,15 @@ public final class SubjectCertificatePolicyValidator {
             final CertificatePolicies policies = CertificatePolicies.getInstance(
                 JcaX509ExtensionUtils.parseExtensionValue(extensionValue)
             );
-            final Optional<PolicyInformation> disallowedPolicy = Arrays.stream(policies.getPolicyInformation())
-                .filter(policyInformation ->
-                    disallowedSubjectCertificatePolicies.contains(policyInformation.getPolicyIdentifier()))
-                .findFirst();
-            if (disallowedPolicy.isPresent()) {
+            if (policies == null) {
+                throw new IllegalArgumentException("Certificate policies extension is empty");
+            }
+            if (Arrays.stream(policies.getPolicyInformation())
+                    .anyMatch(policyInformation ->
+                            disallowedSubjectCertificatePolicies.contains(policyInformation.getPolicyIdentifier()))) {
                 throw new UserCertificateDisallowedPolicyException();
             }
-        } catch (IOException e) {
+        } catch (IOException | IllegalArgumentException e) {
             throw new UserCertificateParseException(e);
         }
         LOG.debug("User certificate does not contain disallowed policies.");

@@ -3,14 +3,8 @@
 
 package eu.webeid.example.testutil;
 
-import eu.europa.esig.dss.model.BLevelParameters;
-import eu.webeid.security.util.DateAndTime;
-import mockit.Mock;
-import mockit.MockUp;
-
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.Date;
 
 public final class Dates {
 
@@ -25,21 +19,4 @@ public final class Dates {
                 ZoneId.of("UTC"));
     }
 
-    public static void setMockedSignatureDate(ZonedDateTime mockedDateTime) {
-        new MockUp<BLevelParameters>() {
-            @Mock
-            public Date getSigningDate() {
-                return Date.from(mockedDateTime.toInstant());
-            }
-        };
-    }
-
-    public static void setMockedAuthTokenValidationDate(ZonedDateTime mockedDateTime) {
-        new MockUp<DateAndTime.DefaultClock>() {
-            @Mock
-            public Date now() {
-                return Date.from(mockedDateTime.toInstant());
-            }
-        };
-    }
 }

@@ -18,5 +18,6 @@ server:
 logging:
   level:
     eu.webeid.security: DEBUG
+    eu.webeid.ocsp: DEBUG
     eu.webeid.example: DEBUG
     org.springframework.security.web.csrf.CsrfFilter: DEBUG
