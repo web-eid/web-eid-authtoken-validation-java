@@ -30,14 +30,11 @@ import eu.webeid.security.certificate.CertificateValidator;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.AuthTokenParseException;
 import eu.webeid.security.exceptions.JceException;
-import eu.webeid.security.validator.certvalidators.SubjectCertificateNotRevokedValidator;
+import eu.webeid.security.util.DateAndTime;
 import eu.webeid.security.validator.certvalidators.SubjectCertificatePolicyValidator;
 import eu.webeid.security.validator.certvalidators.SubjectCertificatePurposeValidator;
-import eu.webeid.security.validator.certvalidators.SubjectCertificateTrustedValidator;
-import eu.webeid.security.validator.certvalidators.SubjectCertificateValidatorBatch;
-import eu.webeid.security.validator.ocsp.OcspClient;
-import eu.webeid.security.validator.ocsp.OcspServiceProvider;
-import eu.webeid.security.validator.ocsp.service.AiaOcspServiceConfiguration;
+import eu.webeid.ocsp.service.OcspServiceProvider;
+import eu.webeid.security.validator.revocationcheck.RevocationInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +42,8 @@ import java.io.IOException;
 import java.security.cert.CertStore;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
-import java.util.Objects;
+import java.util.Date;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -60,20 +58,18 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
     private static final ObjectReader OBJECT_READER = new ObjectMapper().readerFor(WebEidAuthToken.class);
 
     private final AuthTokenValidationConfiguration configuration;
-    private final SubjectCertificateValidatorBatch simpleSubjectCertificateValidators;
     private final Set<TrustAnchor> trustedCACertificateAnchors;
     private final CertStore trustedCACertificateCertStore;
     // OcspClient uses built-in HttpClient internally by default.
     // A single HttpClient instance is reused for all HTTP calls to utilize connection and thread pools.
-    private OcspClient ocspClient;
     private OcspServiceProvider ocspServiceProvider;
     private final AuthTokenSignatureValidator authTokenSignatureValidator;
+    private final SubjectCertificatePolicyValidator subjectCertificatePolicyValidator;
 
     /**
      * @param configuration configuration parameters for the token validator
-     * @param ocspClient    client for communicating with the OCSP service
      */
-    AuthTokenValidatorImpl(AuthTokenValidationConfiguration configuration, OcspClient ocspClient) throws JceException {
+    AuthTokenValidatorImpl(AuthTokenValidationConfiguration configuration) throws JceException {
         // Copy the configuration object to make AuthTokenValidatorImpl immutable and thread-safe.
         this.configuration = configuration.copy();
 
@@ -81,20 +77,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         trustedCACertificateAnchors = CertificateValidator.buildTrustAnchorsFromCertificates(configuration.getTrustedCACertificates());
         trustedCACertificateCertStore = CertificateValidator.buildCertStoreFromCertificates(configuration.getTrustedCACertificates());
 
-        simpleSubjectCertificateValidators = SubjectCertificateValidatorBatch.createFrom(
-            SubjectCertificatePurposeValidator::validateCertificatePurpose,
-            new SubjectCertificatePolicyValidator(configuration.getDisallowedSubjectCertificatePolicies())::validateCertificatePolicies
-        );
-
-        if (configuration.isUserCertificateRevocationCheckWithOcspEnabled()) {
-            // The OCSP client may be provided by the API consumer.
-            this.ocspClient = Objects.requireNonNull(ocspClient, "OCSP client must not be null when OCSP check is enabled");
-            ocspServiceProvider = new OcspServiceProvider(
-                configuration.getDesignatedOcspServiceConfiguration(),
-                new AiaOcspServiceConfiguration(configuration.getNonceDisabledOcspUrls(),
-                    trustedCACertificateAnchors,
-                    trustedCACertificateCertStore));
-        }
+        subjectCertificatePolicyValidator = new SubjectCertificatePolicyValidator(configuration.getDisallowedSubjectCertificatePolicies());
 
         authTokenSignatureValidator = new AuthTokenSignatureValidator(configuration.getSiteOrigin());
     }
@@ -113,7 +96,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
     }
 
     @Override
-    public X509Certificate validate(WebEidAuthToken authToken, String currentChallengeNonce) throws AuthTokenException {
+    public ValidationInfo validate(WebEidAuthToken authToken, String currentChallengeNonce) throws AuthTokenException {
         try {
             LOG.info("Starting token validation");
             return validateToken(authToken, currentChallengeNonce);
@@ -145,49 +128,42 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         }
     }
 
-    private X509Certificate validateToken(WebEidAuthToken token, String currentChallengeNonce) throws AuthTokenException {
-        if (token.getFormat() == null || !token.getFormat().startsWith(CURRENT_TOKEN_FORMAT_VERSION)) {
+    private ValidationInfo validateToken(WebEidAuthToken token, String currentChallengeNonce) throws AuthTokenException {
+        if (token.format() == null || !token.format().startsWith(CURRENT_TOKEN_FORMAT_VERSION)) {
             throw new AuthTokenParseException("Only token format version '" + CURRENT_TOKEN_FORMAT_VERSION +
                 "' is currently supported");
         }
-        if (token.getUnverifiedCertificate() == null || token.getUnverifiedCertificate().isEmpty()) {
+        if (token.unverifiedCertificate() == null || token.unverifiedCertificate().isEmpty()) {
             throw new AuthTokenParseException("'unverifiedCertificate' field is missing, null or empty");
         }
-        final X509Certificate subjectCertificate = CertificateLoader.decodeCertificateFromBase64(token.getUnverifiedCertificate());
+        final X509Certificate subjectCertificate = CertificateLoader.decodeCertificateFromBase64(token.unverifiedCertificate());
 
-        simpleSubjectCertificateValidators.executeFor(subjectCertificate);
-        getCertTrustValidators().executeFor(subjectCertificate);
+        SubjectCertificatePurposeValidator.validateCertificatePurpose(subjectCertificate);
+        subjectCertificatePolicyValidator.validateCertificatePolicies(subjectCertificate);
+
+        // Use the clock instance so that the date can be mocked in tests.
+        final Date now = DateAndTime.DefaultClock.getInstance().now();
+
+        final List<RevocationInfo> revocationInfoList = CertificateValidator.validateCertificateTrustAndRevocation(
+                subjectCertificate,
+                trustedCACertificateAnchors,
+                trustedCACertificateCertStore,
+                now,
+                configuration.getRevocationMode(),
+                configuration.getCertificateRevocationChecker(),
+                configuration.getPkixRevocationChecker()
+        );
+        LOG.debug("Subject certificate is valid and signed by a trusted CA");
 
         // It is guaranteed that if the signature verification succeeds, then the origin and challenge
         // have been implicitly and correctly verified without the need to implement any additional checks.
-        authTokenSignatureValidator.validate(token.getAlgorithm(),
-            token.getSignature(),
+        authTokenSignatureValidator.validate(token.algorithm(),
+            token.signature(),
             subjectCertificate.getPublicKey(),
-            currentChallengeNonce);
-
-        return subjectCertificate;
-    }
-
-    /**
-     * Creates the certificate trust validators batch.
-     * As SubjectCertificateTrustedValidator has mutable state that SubjectCertificateNotRevokedValidator depends on,
-     * they cannot be reused/cached in an instance variable in a multi-threaded environment. Hence, they are
-     * re-created for each validation run for thread safety.
-     *
-     * @return certificate trust validator batch
-     */
-    private SubjectCertificateValidatorBatch getCertTrustValidators() {
-        final SubjectCertificateTrustedValidator certTrustedValidator =
-            new SubjectCertificateTrustedValidator(trustedCACertificateAnchors, trustedCACertificateCertStore);
-        return SubjectCertificateValidatorBatch.createFrom(
-            certTrustedValidator::validateCertificateTrusted
-        ).addOptional(configuration.isUserCertificateRevocationCheckWithOcspEnabled(),
-            new SubjectCertificateNotRevokedValidator(certTrustedValidator,
-                ocspClient, ocspServiceProvider,
-                configuration.getAllowedOcspResponseTimeSkew(),
-                configuration.getMaxOcspResponseThisUpdateAge()
-            )::validateCertificateNotRevoked
+            currentChallengeNonce
         );
+
+        return new ValidationInfo(subjectCertificate, revocationInfoList);
     }
 
 }

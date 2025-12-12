@@ -24,19 +24,14 @@ package eu.webeid.security.testutil;
 
 import eu.webeid.security.certificate.CertificateLoader;
 import eu.webeid.security.exceptions.JceException;
-import eu.webeid.security.exceptions.OCSPCertificateException;
 import eu.webeid.security.validator.AuthTokenValidator;
 import eu.webeid.security.validator.AuthTokenValidatorBuilder;
-import eu.webeid.security.validator.ocsp.OcspClient;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 
 import java.io.IOException;
 import java.net.URI;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.time.Duration;
-
-import static eu.webeid.security.testutil.OcspServiceMaker.getDesignatedOcspServiceConfiguration;
 
 public final class AuthTokenValidators {
 
@@ -53,27 +48,12 @@ public final class AuthTokenValidators {
 
     public static AuthTokenValidator getAuthTokenValidator(String url, X509Certificate... certificates) throws JceException {
         return getAuthTokenValidatorBuilder(url, certificates)
-            // Assure that all builder methods are covered with tests.
-            .withOcspRequestTimeout(Duration.ofSeconds(1))
-            .withNonceDisabledOcspUrls(URI.create("http://example.org"))
-            .withoutUserCertificateRevocationCheckWithOcsp()
-            .build();
-    }
-
-    public static AuthTokenValidator getAuthTokenValidatorWithOverriddenOcspClient(OcspClient ocspClient) throws CertificateException, JceException, IOException {
-        return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, getCACertificates())
-            .withOcspClient(ocspClient)
+            .withoutUserCertificateRevocationCheck()
             .build();
     }
 
     public static AuthTokenValidator getAuthTokenValidatorWithOcspCheck() throws CertificateException, JceException, IOException {
         return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, getCACertificates())
-            .build();
-    }
-
-    public static AuthTokenValidator getAuthTokenValidatorWithDesignatedOcspCheck() throws CertificateException, JceException, IOException, OCSPCertificateException {
-        return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, getCACertificates())
-            .withDesignatedOcspServiceConfiguration(getDesignatedOcspServiceConfiguration())
             .build();
     }
 
@@ -90,7 +70,7 @@ public final class AuthTokenValidators {
     public static AuthTokenValidator getAuthTokenValidatorWithDisallowedESTEIDPolicy() throws CertificateException, JceException, IOException {
         return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, getCACertificates())
             .withDisallowedCertificatePolicies(EST_IDEMIA_POLICY)
-            .withoutUserCertificateRevocationCheckWithOcsp()
+            .withoutUserCertificateRevocationCheck()
             .build();
     }
 

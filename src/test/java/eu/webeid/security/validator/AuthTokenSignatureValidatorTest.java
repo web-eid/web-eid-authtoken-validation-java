@@ -51,10 +51,10 @@ class AuthTokenSignatureValidatorTest {
             new AuthTokenSignatureValidator(URI.create("https://ria.ee"));
 
         final WebEidAuthToken authToken = OBJECT_READER.readValue(VALID_AUTH_TOKEN);
-        final X509Certificate x509Certificate = CertificateLoader.decodeCertificateFromBase64(authToken.getUnverifiedCertificate());
+        final X509Certificate x509Certificate = CertificateLoader.decodeCertificateFromBase64(authToken.unverifiedCertificate());
 
         assertThatCode(() -> signatureValidator
-            .validate("ES384", authToken.getSignature(), x509Certificate.getPublicKey(), VALID_CHALLENGE_NONCE))
+            .validate("ES384", authToken.signature(), x509Certificate.getPublicKey(), VALID_CHALLENGE_NONCE))
             .doesNotThrowAnyException();
     }
 
@@ -64,10 +64,10 @@ class AuthTokenSignatureValidatorTest {
             new AuthTokenSignatureValidator(URI.create("https://ria.ee"));
 
         final WebEidAuthToken authToken = OBJECT_READER.readValue(VALID_RS256_AUTH_TOKEN);
-        final X509Certificate x509Certificate = CertificateLoader.decodeCertificateFromBase64(authToken.getUnverifiedCertificate());
+        final X509Certificate x509Certificate = CertificateLoader.decodeCertificateFromBase64(authToken.unverifiedCertificate());
 
         assertThatCode(() -> signatureValidator
-            .validate("RS256", authToken.getSignature(), x509Certificate.getPublicKey(), VALID_CHALLENGE_NONCE))
+            .validate("RS256", authToken.signature(), x509Certificate.getPublicKey(), VALID_CHALLENGE_NONCE))
             .doesNotThrowAnyException();
     }
 
