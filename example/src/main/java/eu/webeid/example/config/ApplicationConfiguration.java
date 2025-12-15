@@ -28,6 +28,7 @@ import eu.webeid.example.security.WebEidChallengeNonceFilter;
 import eu.webeid.example.security.WebEidMobileAuthInitFilter;
 import eu.webeid.example.security.ui.WebEidLoginPageGeneratingFilter;
 import eu.webeid.security.challenge.ChallengeNonceGenerator;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -48,7 +49,8 @@ import org.thymeleaf.ITemplateEngine;
 public class ApplicationConfiguration {
 
     @Bean
-    public SecurityFilterChain filterChain(
+    @ConditionalOnBooleanProperty(name = "web-eid-mobile.enabled", matchIfMissing = true)
+    public SecurityFilterChain webEidPluginAndMobileSecurityFilterChain(
         HttpSecurity http,
         WebEidAuthenticationProvider webEidAuthenticationProvider,
         AuthenticationConfiguration authConfig,
@@ -71,4 +73,27 @@ public class ApplicationConfiguration {
             .headers(h -> h.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin))
             .build();
     }
+
+    @Bean
+    @ConditionalOnBooleanProperty(name = "web-eid-mobile.enabled", havingValue = false)
+    public SecurityFilterChain webEidPluginOnlySecurityFilterChain(
+        HttpSecurity http,
+        WebEidAuthenticationProvider webEidAuthenticationProvider,
+        AuthenticationConfiguration authConfig,
+        ChallengeNonceGenerator challengeNonceGenerator
+    ) throws Exception {
+        return http
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/css/**", "/files/**", "/img/**", "/js/**", "/scripts/**").permitAll()
+                .requestMatchers("/").permitAll()
+                .anyRequest().authenticated()
+            )
+            .authenticationProvider(webEidAuthenticationProvider)
+            .addFilterBefore(new WebEidChallengeNonceFilter("/auth/challenge", challengeNonceGenerator), UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(new WebEidAjaxLoginProcessingFilter("/auth/login", authConfig.getAuthenticationManager()), UsernamePasswordAuthenticationFilter.class)
+            .logout(l -> l.logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler()))
+            .headers(h -> h.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin))
+            .build();
+    }
+
 }
