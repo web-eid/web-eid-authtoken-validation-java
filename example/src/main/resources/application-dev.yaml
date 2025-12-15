@@ -3,5 +3,6 @@ web-eid-auth-token:
     use-digi-doc4j-prod-configuration: false
     local-origin: "https://test.web-eid.eu"
 web-eid-mobile:
+  enabled: true
   base-request-uri: "web-eid-mobile://"
   request-signing-cert: false
