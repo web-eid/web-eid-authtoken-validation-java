@@ -27,6 +27,7 @@ import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.challenge.ChallengeNonceStore;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.validator.AuthTokenValidator;
+import eu.webeid.security.validator.ValidationInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -72,7 +73,8 @@ public class AuthTokenDTOAuthenticationProvider implements AuthenticationProvide
 
         try {
             final String nonce = challengeNonceStore.getAndRemove().getBase64EncodedNonce();
-            final X509Certificate userCertificate = tokenValidator.validate(authToken, nonce);
+            final ValidationInfo validationInfo = tokenValidator.validate(authToken, nonce);
+            final X509Certificate userCertificate = validationInfo.getSubjectCertificate();
             return WebEidAuthentication.fromCertificate(userCertificate, authorities);
         } catch (AuthTokenException e) {
             throw new AuthenticationServiceException("Web eID token validation failed", e);

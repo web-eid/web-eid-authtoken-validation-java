@@ -22,15 +22,33 @@
 
 package eu.webeid.security.exceptions;
 
+import eu.webeid.security.validator.ocsp.OcspValidationInfo;
+
 /**
  * Thrown when user certificate revocation check with OCSP fails.
  */
 public class UserCertificateOCSPCheckFailedException extends AuthTokenException {
+    private final OcspValidationInfo ocspValidationInfo;
+
     public UserCertificateOCSPCheckFailedException(Throwable cause) {
-        super("User certificate revocation check has failed", cause);
+        this(cause, null);
     }
 
     public UserCertificateOCSPCheckFailedException(String message) {
+        this(message, null);
+    }
+
+    public UserCertificateOCSPCheckFailedException(Throwable cause, OcspValidationInfo ocspValidationInfo) {
+        super("User certificate revocation check has failed", cause);
+        this.ocspValidationInfo = ocspValidationInfo;
+    }
+
+    public UserCertificateOCSPCheckFailedException(String message, OcspValidationInfo ocspValidationInfo) {
         super("User certificate revocation check has failed: " + message);
+        this.ocspValidationInfo = ocspValidationInfo;
+    }
+
+    public OcspValidationInfo getOcspValidationInfo() {
+        return ocspValidationInfo;
     }
 }

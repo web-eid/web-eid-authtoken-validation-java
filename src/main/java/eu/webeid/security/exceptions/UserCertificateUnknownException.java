@@ -27,16 +27,11 @@ import eu.webeid.security.validator.ocsp.OcspValidationInfo;
 /**
  * Thrown when the user certificate has been revoked.
  */
-public class UserCertificateRevokedException extends AuthTokenException {
+public class UserCertificateUnknownException extends AuthTokenException {
     private final OcspValidationInfo ocspValidationInfo;
 
-    public UserCertificateRevokedException(OcspValidationInfo ocspValidationInfo) {
-        super("User certificate has been revoked");
-        this.ocspValidationInfo = ocspValidationInfo;
-    }
-
-    public UserCertificateRevokedException(String msg, OcspValidationInfo ocspValidationInfo) {
-        super("User certificate has been revoked: " + msg);
+    public UserCertificateUnknownException(String msg, OcspValidationInfo ocspValidationInfo) {
+        super(msg);
         this.ocspValidationInfo = ocspValidationInfo;
     }
 

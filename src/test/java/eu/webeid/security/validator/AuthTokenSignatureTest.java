@@ -48,8 +48,8 @@ class AuthTokenSignatureTest extends AbstractTestWithValidator {
 
     @Test
     void whenValidTokenAndNonce_thenValidationSucceeds() throws Exception {
-        final X509Certificate result = validator.validate(validAuthToken, VALID_CHALLENGE_NONCE);
-
+        final ValidationInfo validationInfo = validator.validate(validAuthToken, VALID_CHALLENGE_NONCE);
+        final X509Certificate result = validationInfo.getSubjectCertificate();
         assertThat(CertificateData.getSubjectCN(result).orElseThrow())
             .isEqualTo("JÕEORG\\,JAAK-KRISTJAN\\,38001085718");
         assertThat(toTitleCase(CertificateData.getSubjectGivenName(result).orElseThrow()))

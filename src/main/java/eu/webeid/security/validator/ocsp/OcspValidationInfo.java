@@ -20,27 +20,33 @@
  * SOFTWARE.
  */
 
-package eu.webeid.security.exceptions;
+package eu.webeid.security.validator.ocsp;
 
-import eu.webeid.security.validator.ocsp.OcspValidationInfo;
+import org.bouncycastle.cert.ocsp.OCSPResp;
 
-/**
- * Thrown when the user certificate has been revoked.
- */
-public class UserCertificateRevokedException extends AuthTokenException {
-    private final OcspValidationInfo ocspValidationInfo;
+import java.net.URI;
+import java.security.cert.X509Certificate;
 
-    public UserCertificateRevokedException(OcspValidationInfo ocspValidationInfo) {
-        super("User certificate has been revoked");
-        this.ocspValidationInfo = ocspValidationInfo;
+public class OcspValidationInfo {
+    private final X509Certificate subjectCertificate;
+    private final URI ocspResponderUri;
+    private final OCSPResp ocspResponse;
+
+    public OcspValidationInfo(X509Certificate subjectCertificate, URI ocspResponderUri, OCSPResp ocspResponse) {
+        this.subjectCertificate = subjectCertificate;
+        this.ocspResponderUri = ocspResponderUri;
+        this.ocspResponse = ocspResponse;
     }
 
-    public UserCertificateRevokedException(String msg, OcspValidationInfo ocspValidationInfo) {
-        super("User certificate has been revoked: " + msg);
-        this.ocspValidationInfo = ocspValidationInfo;
+    public X509Certificate getSubjectCertificate() {
+        return subjectCertificate;
     }
 
-    public OcspValidationInfo getOcspValidationInfo() {
-        return ocspValidationInfo;
+    public URI getOcspResponderUri() {
+        return ocspResponderUri;
+    }
+
+    public OCSPResp getOcspResponse() {
+        return ocspResponse;
     }
 }

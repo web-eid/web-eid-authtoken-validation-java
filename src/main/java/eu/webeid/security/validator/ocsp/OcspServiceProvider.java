@@ -23,26 +23,42 @@
 package eu.webeid.security.validator.ocsp;
 
 import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.security.validator.ocsp.service.AiaOcspService;
 import eu.webeid.security.validator.ocsp.service.AiaOcspServiceConfiguration;
 import eu.webeid.security.validator.ocsp.service.DesignatedOcspService;
 import eu.webeid.security.validator.ocsp.service.DesignatedOcspServiceConfiguration;
+import eu.webeid.security.validator.ocsp.service.FallbackOcspService;
+import eu.webeid.security.validator.ocsp.service.FallbackOcspServiceConfiguration;
 import eu.webeid.security.validator.ocsp.service.OcspService;
 
-import java.security.cert.CertificateEncodingException;
+import java.net.URI;
 import java.security.cert.X509Certificate;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
+
+import static eu.webeid.security.validator.ocsp.OcspUrl.getOcspUri;
 
 public class OcspServiceProvider {
 
     private final DesignatedOcspService designatedOcspService;
     private final AiaOcspServiceConfiguration aiaOcspServiceConfiguration;
+    private final Map<URI, FallbackOcspService> fallbackOcspServiceMap;
 
     public OcspServiceProvider(DesignatedOcspServiceConfiguration designatedOcspServiceConfiguration, AiaOcspServiceConfiguration aiaOcspServiceConfiguration) {
+        this(designatedOcspServiceConfiguration, aiaOcspServiceConfiguration, null);
+    }
+
+    public OcspServiceProvider(DesignatedOcspServiceConfiguration designatedOcspServiceConfiguration, AiaOcspServiceConfiguration aiaOcspServiceConfiguration, Collection<FallbackOcspServiceConfiguration> fallbackOcspServiceConfigurations) {
         designatedOcspService = designatedOcspServiceConfiguration != null ?
             new DesignatedOcspService(designatedOcspServiceConfiguration)
             : null;
         this.aiaOcspServiceConfiguration = Objects.requireNonNull(aiaOcspServiceConfiguration, "aiaOcspServiceConfiguration");
+        this.fallbackOcspServiceMap = fallbackOcspServiceConfigurations != null ? fallbackOcspServiceConfigurations.stream()
+            .collect(Collectors.toMap(FallbackOcspServiceConfiguration::getOcspServiceAccessLocation, FallbackOcspService::new))
+            : Map.of();
     }
 
     /**
@@ -51,14 +67,17 @@ public class OcspServiceProvider {
      *
      * @param certificate subject certificate that is to be checked with OCSP
      * @return either the designated or AIA OCSP service instance
-     * @throws AuthTokenException when AIA URL is not found in certificate
-     * @throws CertificateEncodingException when certificate is invalid
+     * @throws AuthTokenException       when AIA URL is not found in certificate
+     * @throws IllegalArgumentException when certificate is invalid
      */
-    public OcspService getService(X509Certificate certificate) throws AuthTokenException, CertificateEncodingException {
+    public OcspService getService(X509Certificate certificate) throws AuthTokenException {
         if (designatedOcspService != null && designatedOcspService.supportsIssuerOf(certificate)) {
             return designatedOcspService;
         }
-        return new AiaOcspService(aiaOcspServiceConfiguration, certificate);
+        URI ocspServiceUri = getOcspUri(certificate).orElseThrow(() ->
+            new UserCertificateOCSPCheckFailedException("Getting the AIA OCSP responder field from the certificate failed"));
+        FallbackOcspService fallbackOcspService = fallbackOcspServiceMap.get(ocspServiceUri);
+        return new AiaOcspService(aiaOcspServiceConfiguration, certificate, fallbackOcspService);
     }
 
 }
