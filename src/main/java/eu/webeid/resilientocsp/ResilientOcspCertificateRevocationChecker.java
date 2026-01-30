@@ -26,6 +26,7 @@ import eu.webeid.ocsp.OcspCertificateRevocationChecker;
 import eu.webeid.ocsp.client.OcspClient;
 import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
+import eu.webeid.ocsp.exceptions.UserCertificateUnknownException;
 import eu.webeid.ocsp.protocol.OcspRequestBuilder;
 import eu.webeid.ocsp.service.OcspService;
 import eu.webeid.ocsp.service.OcspServiceProvider;
@@ -67,14 +68,17 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
 
     private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final RetryRegistry retryRegistry;
+    private final boolean rejectUnknownOcspResponseStatus;
 
     public ResilientOcspCertificateRevocationChecker(OcspClient ocspClient,
                                                      OcspServiceProvider ocspServiceProvider,
                                                      CircuitBreakerConfig circuitBreakerConfig,
                                                      RetryConfig retryConfig,
                                                      Duration allowedOcspResponseTimeSkew,
-                                                     Duration maxOcspResponseThisUpdateAge) {
+                                                     Duration maxOcspResponseThisUpdateAge,
+                                                     boolean rejectUnknownOcspResponseStatus) {
         super(ocspClient, ocspServiceProvider, allowedOcspResponseTimeSkew, maxOcspResponseThisUpdateAge);
+        this.rejectUnknownOcspResponseStatus = rejectUnknownOcspResponseStatus;
         this.circuitBreakerRegistry = CircuitBreakerRegistry.custom()
             .withCircuitBreakerConfig(getCircuitBreakerConfig(circuitBreakerConfig))
             .build();
@@ -115,7 +119,7 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
             decorateCheckedSupplier.withRetry(retry);
         }
         decorateCheckedSupplier.withCircuitBreaker(circuitBreaker)
-            .withFallback(List.of(UserCertificateOCSPCheckFailedException.class, CallNotPermittedException.class), e -> fallbackSupplier.apply());
+            .withFallback(List.of(UserCertificateOCSPCheckFailedException.class, CallNotPermittedException.class, UserCertificateUnknownException.class), e -> fallbackSupplier.apply());
 
         CheckedFunction0<RevocationInfo> decoratedSupplier = decorateCheckedSupplier.decorate();
 
@@ -155,7 +159,7 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
             }
             LOG.debug("OCSP response received successfully");
 
-            verifyOcspResponse(basicResponse, ocspService, certificateId);
+            verifyOcspResponse(basicResponse, ocspService, certificateId, rejectUnknownOcspResponseStatus);
             if (ocspService.doesSupportNonce()) {
                 checkNonce(request, basicResponse, ocspResponderUri);
             }
