@@ -76,4 +76,7 @@ public class OcspServiceProvider {
         return new AiaOcspService(aiaOcspServiceConfiguration, certificate, fallbackOcspService);
     }
 
+    public FallbackOcspService getFallbackService(URI ocspServiceUri) {
+        return fallbackOcspServiceMap.get(ocspServiceUri);
+    }
 }
