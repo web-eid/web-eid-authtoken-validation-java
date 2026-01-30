@@ -120,6 +120,13 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         Decorators.DecorateCheckedSupplier<RevocationInfo> decorateCheckedSupplier = Decorators.ofCheckedSupplier(primarySupplier);
         if (retryRegistry != null) {
             Retry retry = retryRegistry.retry(ocspService.getAccessLocation().toASCIIString());
+            retry.getEventPublisher().onError(event -> {
+                Throwable throwable = event.getLastThrowable();
+                if (throwable == null) {
+                    return;
+                }
+                createAndAddRevocationInfoToList(throwable, revocationInfoList);
+            });
             decorateCheckedSupplier.withRetry(retry);
         }
         decorateCheckedSupplier.withCircuitBreaker(circuitBreaker)
