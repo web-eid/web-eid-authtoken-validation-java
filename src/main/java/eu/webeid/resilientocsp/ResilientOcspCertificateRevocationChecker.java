@@ -24,13 +24,15 @@ package eu.webeid.resilientocsp;
 
 import eu.webeid.ocsp.OcspCertificateRevocationChecker;
 import eu.webeid.ocsp.client.OcspClient;
-import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
+import eu.webeid.ocsp.exceptions.OCSPClientException;
 import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
-import eu.webeid.ocsp.exceptions.UserCertificateUnknownException;
 import eu.webeid.ocsp.protocol.OcspRequestBuilder;
 import eu.webeid.ocsp.service.OcspService;
 import eu.webeid.ocsp.service.OcspServiceProvider;
+import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateOCSPCheckFailedException;
+import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateRevokedException;
 import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.validator.ValidationInfo;
 import eu.webeid.security.validator.revocationcheck.RevocationInfo;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -45,18 +47,17 @@ import io.vavr.control.Try;
 import org.bouncycastle.asn1.ocsp.OCSPResponseStatus;
 import org.bouncycastle.cert.ocsp.BasicOCSPResp;
 import org.bouncycastle.cert.ocsp.CertificateID;
-import org.bouncycastle.cert.ocsp.OCSPException;
 import org.bouncycastle.cert.ocsp.OCSPReq;
 import org.bouncycastle.cert.ocsp.OCSPResp;
-import org.bouncycastle.operator.OperatorCreationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.net.URI;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -103,7 +104,7 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         try {
             ocspService = getOcspServiceProvider().getService(subjectCertificate);
         } catch (CertificateException e) {
-            throw new UserCertificateOCSPCheckFailedException(e, null);
+            throw new ResilientUserCertificateOCSPCheckFailedException(new ValidationInfo(subjectCertificate, List.of()));
         }
         final OcspService fallbackOcspService = ocspService.getFallbackService();
         if (fallbackOcspService == null) {
@@ -111,6 +112,9 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         }
 
         CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(ocspService.getAccessLocation().toASCIIString());
+
+        List<RevocationInfo> revocationInfoList = new ArrayList<>();
+
         CheckedFunction0<RevocationInfo> primarySupplier = () -> request(ocspService, subjectCertificate, issuerCertificate, false);
         CheckedFunction0<RevocationInfo> fallbackSupplier = () -> request(ocspService.getFallbackService(), subjectCertificate, issuerCertificate, true);
         Decorators.DecorateCheckedSupplier<RevocationInfo> decorateCheckedSupplier = Decorators.ofCheckedSupplier(primarySupplier);
@@ -119,26 +123,53 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
             decorateCheckedSupplier.withRetry(retry);
         }
         decorateCheckedSupplier.withCircuitBreaker(circuitBreaker)
-            .withFallback(List.of(UserCertificateOCSPCheckFailedException.class, CallNotPermittedException.class, UserCertificateUnknownException.class), e -> fallbackSupplier.apply());
+            .withFallback(List.of(ResilientUserCertificateOCSPCheckFailedException.class, CallNotPermittedException.class), e -> {
+                createAndAddRevocationInfoToList(e, revocationInfoList);
+                return fallbackSupplier.apply();
+            });
 
         CheckedFunction0<RevocationInfo> decoratedSupplier = decorateCheckedSupplier.decorate();
 
-        // TODO Collect the intermediate results
-        return List.of(Try.of(decoratedSupplier).getOrElseThrow(throwable -> {
-            if (throwable instanceof AuthTokenException) {
-                return (AuthTokenException) throwable;
+        Try<RevocationInfo> result = Try.of(decoratedSupplier);
+
+        RevocationInfo revocationInfo = result.getOrElseThrow(throwable -> {
+            if (throwable instanceof ResilientUserCertificateOCSPCheckFailedException exception) {
+                revocationInfoList.addAll(exception.getValidationInfo().revocationInfoList());
+                exception.setValidationInfo(new ValidationInfo(subjectCertificate, revocationInfoList));
+                return exception;
             }
-            return new UserCertificateOCSPCheckFailedException(throwable, null);
-        }));
+            if (throwable instanceof ResilientUserCertificateRevokedException exception) {
+                revocationInfoList.addAll(exception.getValidationInfo().revocationInfoList());
+                exception.setValidationInfo(new ValidationInfo(subjectCertificate, revocationInfoList));
+                return exception;
+            }
+            // TODO This should always be TaraUserCertificateOCSPCheckFailedException when reached?
+            return new ResilientUserCertificateOCSPCheckFailedException(new ValidationInfo(subjectCertificate, revocationInfoList));
+        });
+
+        revocationInfoList.add(revocationInfo);
+        return revocationInfoList;
     }
 
-    private RevocationInfo request(OcspService ocspService, X509Certificate subjectCertificate, X509Certificate issuerCertificate, boolean allowThisUpdateInPast) throws AuthTokenException {
+    private void createAndAddRevocationInfoToList(Throwable throwable, List<RevocationInfo> revocationInfoList) {
+        if (throwable instanceof ResilientUserCertificateOCSPCheckFailedException exception) {
+            revocationInfoList.addAll((exception.getValidationInfo().revocationInfoList()));
+            return;
+        }
+        revocationInfoList.add(new RevocationInfo(null, Map.ofEntries(
+            Map.entry(RevocationInfo.KEY_OCSP_ERROR, throwable)
+        )));
+    }
+
+    private RevocationInfo request(OcspService ocspService, X509Certificate subjectCertificate, X509Certificate issuerCertificate, boolean allowThisUpdateInPast) throws ResilientUserCertificateOCSPCheckFailedException, ResilientUserCertificateRevokedException {
         URI ocspResponderUri = null;
+        OCSPResp response = null;
+        OCSPReq request = null;
         try {
             ocspResponderUri = requireNonNull(ocspService.getAccessLocation(), "ocspResponderUri");
 
             final CertificateID certificateId = getCertificateId(subjectCertificate, issuerCertificate);
-            final OCSPReq request = new OcspRequestBuilder()
+            request = new OcspRequestBuilder()
                 .withCertificateId(certificateId)
                 .enableOcspNonce(ocspService.doesSupportNonce())
                 .build();
@@ -148,14 +179,28 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
             }
 
             LOG.debug("Sending OCSP request");
-            OCSPResp response = requireNonNull(getOcspClient().request(ocspResponderUri, request)); // TODO: This should trigger fallback?
+            response = requireNonNull(getOcspClient().request(ocspResponderUri, request)); // TODO: This should trigger fallback?
             if (response.getStatus() != OCSPResponseStatus.SUCCESSFUL) {
-                throw new UserCertificateOCSPCheckFailedException("Response status: " + ocspStatusToString(response.getStatus()), ocspResponderUri);
+                ResilientUserCertificateOCSPCheckFailedException exception = new ResilientUserCertificateOCSPCheckFailedException("Response status: " + ocspStatusToString(response.getStatus()));
+                RevocationInfo revocationInfo = new RevocationInfo(ocspService.getAccessLocation(), Map.ofEntries(
+                    Map.entry(RevocationInfo.KEY_OCSP_ERROR, exception),
+                    Map.entry(RevocationInfo.KEY_OCSP_REQUEST, request),
+                    Map.entry(RevocationInfo.KEY_OCSP_RESPONSE, response)
+                ));
+                exception.setValidationInfo(new ValidationInfo(subjectCertificate, List.of(revocationInfo)));
+                throw exception;
             }
 
             final BasicOCSPResp basicResponse = (BasicOCSPResp) response.getResponseObject();
             if (basicResponse == null) {
-                throw new UserCertificateOCSPCheckFailedException("Missing Basic OCSP Response", ocspResponderUri);
+                ResilientUserCertificateOCSPCheckFailedException exception = new ResilientUserCertificateOCSPCheckFailedException("Missing Basic OCSP Response");
+                RevocationInfo revocationInfo = new RevocationInfo(ocspService.getAccessLocation(), Map.ofEntries(
+                    Map.entry(RevocationInfo.KEY_OCSP_ERROR, exception),
+                    Map.entry(RevocationInfo.KEY_OCSP_REQUEST, request),
+                    Map.entry(RevocationInfo.KEY_OCSP_RESPONSE, response)
+                ));
+                exception.setValidationInfo(new ValidationInfo(subjectCertificate, List.of(revocationInfo)));
+                throw exception;
             }
             LOG.debug("OCSP response received successfully");
 
@@ -169,16 +214,43 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
                 Map.entry(RevocationInfo.KEY_OCSP_REQUEST, request),
                 Map.entry(RevocationInfo.KEY_OCSP_RESPONSE, response)
             ));
-        } catch (OCSPException | CertificateException | OperatorCreationException | IOException e) {
-            throw new UserCertificateOCSPCheckFailedException(e, ocspResponderUri);
+        } catch (UserCertificateRevokedException e) {
+            // NOTE: UserCertificateRevokedException covers both actual revocation and unknown status
+            // when rejectUnknownOcspResponseStatus=false (see OcspResponseValidator.validateSubjectCertificateStatus).
+            // When rejectUnknownOcspResponseStatus=true, unknown status throws UserCertificateUnknownException
+            // instead, which falls through to the generic catch (Exception) block below, gets wrapped as
+            // ResilientUserCertificateOCSPCheckFailedException, and triggers the circuit breaker fallback.
+            // Here, wrapping as ResilientUserCertificateRevokedException ensures the circuit breaker ignores it
+            // (a definitive OCSP answer, not a transient failure) and no fallback is attempted.
+            RevocationInfo revocationInfo = getRevocationInfo(ocspResponderUri, e, request, response);
+            throw new ResilientUserCertificateRevokedException(new ValidationInfo(subjectCertificate, List.of(revocationInfo)));
+        } catch (OCSPClientException e) {
+            RevocationInfo revocationInfo = getRevocationInfo(ocspResponderUri, e, request, response);
+            revocationInfo.ocspResponseAttributes().put(RevocationInfo.KEY_OCSP_RESPONSE, e.getResponseBody());
+            revocationInfo.ocspResponseAttributes().put(RevocationInfo.KEY_HTTP_STATUS_CODE, e.getStatusCode());
+            throw new ResilientUserCertificateOCSPCheckFailedException(new ValidationInfo(subjectCertificate, List.of(revocationInfo)));
+        } catch (Exception e) {
+            RevocationInfo revocationInfo = getRevocationInfo(ocspResponderUri, e, request, response);
+            throw new ResilientUserCertificateOCSPCheckFailedException(new ValidationInfo(subjectCertificate, List.of(revocationInfo)));
         }
+    }
+
+    private RevocationInfo getRevocationInfo(URI ocspResponderUri, Exception e, OCSPReq request, OCSPResp response) {
+        RevocationInfo revocationInfo = new RevocationInfo(ocspResponderUri, new HashMap<>(Map.of(RevocationInfo.KEY_OCSP_ERROR, e)));
+        if (request != null) {
+            revocationInfo.ocspResponseAttributes().put(RevocationInfo.KEY_OCSP_REQUEST, request);
+        }
+        if (response != null) {
+            revocationInfo.ocspResponseAttributes().put(RevocationInfo.KEY_OCSP_RESPONSE, response);
+        }
+        return revocationInfo;
     }
 
     private static CircuitBreakerConfig getCircuitBreakerConfig(CircuitBreakerConfig circuitBreakerConfig) {
         return CircuitBreakerConfig.from(circuitBreakerConfig)
             // Users must not be able to modify these three values.
             .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
-            .ignoreExceptions(UserCertificateRevokedException.class)
+            .ignoreExceptions(ResilientUserCertificateRevokedException.class)
             .automaticTransitionFromOpenToHalfOpenEnabled(true)
             .build();
     }
@@ -186,7 +258,7 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
     private static RetryConfig getRetryConfig(RetryConfig retryConfig) {
         return RetryConfig.from(retryConfig)
             // Users must not be able to modify this value.
-            .ignoreExceptions(UserCertificateRevokedException.class)
+            .ignoreExceptions(ResilientUserCertificateRevokedException.class)
             .build();
     }
 }
