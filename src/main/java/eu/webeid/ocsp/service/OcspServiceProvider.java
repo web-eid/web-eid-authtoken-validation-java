@@ -4,20 +4,34 @@
 package eu.webeid.ocsp.service;
 
 import eu.webeid.security.exceptions.AuthTokenException;
+import org.bouncycastle.asn1.x500.X500Name;
 
 import java.security.cert.X509Certificate;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 public class OcspServiceProvider {
 
     private final DesignatedOcspService designatedOcspService;
     private final AiaOcspServiceConfiguration aiaOcspServiceConfiguration;
+    private final Map<X500Name, FallbackOcspService> fallbackOcspServiceMap = new HashMap<>();
 
     public OcspServiceProvider(DesignatedOcspServiceConfiguration designatedOcspServiceConfiguration, AiaOcspServiceConfiguration aiaOcspServiceConfiguration) {
+        this(designatedOcspServiceConfiguration, aiaOcspServiceConfiguration, null);
+    }
+
+    public OcspServiceProvider(DesignatedOcspServiceConfiguration designatedOcspServiceConfiguration, AiaOcspServiceConfiguration aiaOcspServiceConfiguration, Collection<FallbackOcspServiceConfiguration> fallbackOcspServiceConfigurations) {
         designatedOcspService = designatedOcspServiceConfiguration != null ?
             new DesignatedOcspService(designatedOcspServiceConfiguration)
             : null;
         this.aiaOcspServiceConfiguration = Objects.requireNonNull(aiaOcspServiceConfiguration, "aiaOcspServiceConfiguration");
+        if (fallbackOcspServiceConfigurations != null) {
+            for (FallbackOcspServiceConfiguration configuration : fallbackOcspServiceConfigurations) {
+                fallbackOcspServiceMap.put(configuration.getIssuerDN(), new FallbackOcspService(configuration));
+            }
+        }
     }
 
     /**
@@ -33,7 +47,8 @@ public class OcspServiceProvider {
         if (designatedOcspService != null && designatedOcspService.supportsIssuer(issuerCertificate)) {
             return designatedOcspService;
         }
-        return new AiaOcspService(aiaOcspServiceConfiguration, certificate);
+        final X500Name issuerDistinguishedName = X500Name.getInstance(issuerCertificate.getSubjectX500Principal().getEncoded());
+        final FallbackOcspService fallbackOcspService = fallbackOcspServiceMap.get(issuerDistinguishedName);
+        return new AiaOcspService(aiaOcspServiceConfiguration, certificate, fallbackOcspService);
     }
-
 }
