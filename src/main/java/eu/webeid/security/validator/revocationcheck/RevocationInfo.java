@@ -26,6 +26,7 @@ import java.util.Map;
 
 public record RevocationInfo(URI ocspResponderUri, Map<String, Object> ocspResponseAttributes) {
 
+    public static final String KEY_OCSP_REQUEST = "OCSP_REQUEST";
     public static final String KEY_OCSP_RESPONSE = "OCSP_RESPONSE";
     public static final String KEY_OCSP_ERROR = "OCSP_ERROR";
 

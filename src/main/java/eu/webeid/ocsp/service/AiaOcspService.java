@@ -22,6 +22,7 @@
 
 package eu.webeid.ocsp.service;
 
+import eu.webeid.resilientocsp.service.FallbackOcspService;
 import eu.webeid.security.certificate.CertificateValidator;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.ocsp.exceptions.OCSPCertificateException;
@@ -52,13 +53,15 @@ public class AiaOcspService implements OcspService {
     private final CertStore trustedCACertificateCertStore;
     private final URI url;
     private final boolean supportsNonce;
+    private final FallbackOcspService fallbackOcspService;
 
-    public AiaOcspService(AiaOcspServiceConfiguration configuration, X509Certificate certificate) throws AuthTokenException {
+    public AiaOcspService(AiaOcspServiceConfiguration configuration, X509Certificate certificate, FallbackOcspService fallbackOcspService) throws AuthTokenException {
         Objects.requireNonNull(configuration);
         this.trustedCACertificateAnchors = configuration.getTrustedCACertificateAnchors();
         this.trustedCACertificateCertStore = configuration.getTrustedCACertificateCertStore();
         this.url = getOcspAiaUrlFromCertificate(Objects.requireNonNull(certificate));
         this.supportsNonce = !configuration.getNonceDisabledOcspUrls().contains(this.url);
+        this.fallbackOcspService = fallbackOcspService;
     }
 
     @Override
@@ -69,6 +72,11 @@ public class AiaOcspService implements OcspService {
     @Override
     public URI getAccessLocation() {
         return url;
+    }
+
+    @Override
+    public FallbackOcspService getFallbackService() {
+        return fallbackOcspService;
     }
 
     @Override
