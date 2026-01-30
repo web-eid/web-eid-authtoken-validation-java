@@ -118,7 +118,29 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         circuitBreaker.getEventPublisher().onError(event -> createAndAddRevocationInfoToList(event.getThrowable(), revocationInfoList));
 
         CheckedFunction0<RevocationInfo> primarySupplier = () -> request(ocspService, subjectCertificate, issuerCertificate, false);
-        CheckedFunction0<RevocationInfo> fallbackSupplier = () -> request(ocspService.getFallbackService(), subjectCertificate, issuerCertificate, true);
+        OcspService firstFallbackService = ocspService.getFallbackService();
+        CheckedFunction0<RevocationInfo> firstFallbackSupplier = () -> request(ocspService.getFallbackService(), subjectCertificate, issuerCertificate, true);
+        OcspService secondFallbackService = getOcspServiceProvider().getFallbackService(firstFallbackService.getAccessLocation());
+        CheckedFunction0<RevocationInfo> fallbackSupplier;
+        if (secondFallbackService == null) {
+            fallbackSupplier = firstFallbackSupplier;
+        } else {
+            CheckedFunction0<RevocationInfo> secondFallbackSupplier = () -> request(secondFallbackService, subjectCertificate, issuerCertificate, true);
+            fallbackSupplier = () -> {
+                try {
+                    return firstFallbackSupplier.apply();
+                } catch (Exception e) {
+                    if (e instanceof ResilientUserCertificateOCSPCheckFailedException exception) {
+                        revocationInfoList.addAll((exception.getValidationInfo().revocationInfoList()));
+                    } else {
+                        revocationInfoList.add(new RevocationInfo(null, Map.ofEntries(
+                            Map.entry(RevocationInfo.KEY_OCSP_ERROR, e)
+                        )));
+                    }
+                    return secondFallbackSupplier.apply();
+                }
+            };
+        }
         Decorators.DecorateCheckedSupplier<RevocationInfo> decorateCheckedSupplier = Decorators.ofCheckedSupplier(primarySupplier);
         if (retryRegistry != null) {
             Retry retry = retryRegistry.retry(ocspService.getAccessLocation().toASCIIString());
