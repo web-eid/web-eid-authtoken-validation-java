@@ -20,16 +20,40 @@
  * SOFTWARE.
  */
 
-package eu.webeid.ocsp.client;
+package eu.webeid.ocsp.exceptions;
 
-import eu.webeid.ocsp.exceptions.OCSPClientException;
-import org.bouncycastle.cert.ocsp.OCSPReq;
-import org.bouncycastle.cert.ocsp.OCSPResp;
+public class OCSPClientException extends RuntimeException {
 
-import java.net.URI;
+    private byte[] responseBody;
 
-public interface OcspClient {
+    private Integer statusCode;
 
-    OCSPResp request(URI url, OCSPReq request) throws OCSPClientException;
+    public OCSPClientException() {
+    }
 
+    public OCSPClientException(String message) {
+        super(message);
+    }
+
+    public OCSPClientException(Throwable cause) {
+        super(cause);
+    }
+
+    public OCSPClientException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+    public OCSPClientException(String message, byte[] responseBody, int statusCode) {
+        super(message);
+        this.responseBody = responseBody;
+        this.statusCode = statusCode;
+    }
+
+    public byte[] getResponseBody() {
+        return responseBody;
+    }
+
+    public Integer getStatusCode() {
+        return statusCode;
+    }
 }
