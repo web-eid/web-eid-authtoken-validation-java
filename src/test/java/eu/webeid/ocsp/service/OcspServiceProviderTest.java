@@ -5,6 +5,8 @@ package eu.webeid.ocsp.service;
 
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import eu.webeid.ocsp.exceptions.OCSPCertificateException;
 import eu.webeid.security.certificate.CertificateValidator;
 import eu.webeid.security.testutil.LocalOcspResponder;
@@ -83,6 +85,80 @@ class OcspServiceProviderTest {
             assertThat(first.issuer()).isNotEqualTo(second.issuer());
             assertThat(provider.getService(first.subject(), first.issuer())).isInstanceOf(DesignatedOcspService.class);
             assertThat(provider.getService(second.subject(), second.issuer())).isInstanceOf(AiaOcspService.class);
+        }
+    }
+
+    @Test
+    void whenDifferentIssuersHaveSameName_thenFallbackServiceAppliesOnlyToConfiguredCertificate() throws Exception {
+        try (LocalOcspResponder first = new LocalOcspResponder();
+             LocalOcspResponder second = new LocalOcspResponder()) {
+            first.start();
+            second.start();
+            final var authorities = List.of(first.issuer(), second.issuer());
+            final var aia = new AiaOcspServiceConfiguration(Set.of(),
+                    CertificateValidator.buildTrustAnchorsFromCertificates(authorities),
+                    CertificateValidator.buildCertStoreFromCertificates(authorities));
+            final var fallback = new FallbackOcspServiceConfiguration(
+                    first.designatedUri(),
+                    first.responderCertificate(),
+                    true,
+                    null,
+                    first.issuer(),
+                    CertificateValidator.buildTrustAnchorsFromCertificates(List.of(first.issuer())),
+                    CertificateValidator.buildCertStoreFromCertificates(List.of(first.issuer())));
+            final var provider = new OcspServiceProvider(null, aia, List.of(fallback));
+
+            assertThat(first.issuer().getSubjectX500Principal()).isEqualTo(second.issuer().getSubjectX500Principal());
+            assertThat(first.issuer()).isNotEqualTo(second.issuer());
+            assertThat(provider.getService(first.subject(), first.issuer()).getFallbackService()).isPresent();
+            assertThat(provider.getService(second.subject(), second.issuer()).getFallbackService()).isEmpty();
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void whenFallbackResponderIsDelegatedByAnotherTrustedCa_thenThrows(boolean sameIssuerName) throws Exception {
+        try (LocalOcspResponder responder = new LocalOcspResponder()) {
+            responder.start();
+            responder.replaceResponderCertificateFromDifferentIssuer(sameIssuerName);
+            final var configuration = new FallbackOcspServiceConfiguration(
+                    responder.designatedUri(),
+                    null,
+                    true,
+                    null,
+                    responder.issuer(),
+                    CertificateValidator.buildTrustAnchorsFromCertificates(List.of(responder.issuer(), responder.otherIssuer())),
+                    CertificateValidator.buildCertStoreFromCertificates(List.of(responder.issuer(), responder.otherIssuer())));
+            final var service = new FallbackOcspService(configuration);
+            final var responderCertificate = new X509CertificateHolder(responder.responderCertificate().getEncoded());
+
+            assertThatExceptionOfType(OCSPCertificateException.class)
+                    .isThrownBy(() -> service.validateResponderCertificate(
+                            responderCertificate, responder.issuer(), Date.from(responder.now())));
+        }
+    }
+
+    @Test
+    void whenFallbackServiceIsUsedForDifferentIssuer_thenThrows() throws Exception {
+        try (LocalOcspResponder first = new LocalOcspResponder();
+             LocalOcspResponder second = new LocalOcspResponder()) {
+            first.start();
+            second.start();
+            final var configuration = new FallbackOcspServiceConfiguration(
+                    first.designatedUri(),
+                    first.responderCertificate(),
+                    true,
+                    null,
+                    first.issuer(),
+                    CertificateValidator.buildTrustAnchorsFromCertificates(List.of(first.issuer())),
+                    CertificateValidator.buildCertStoreFromCertificates(List.of(first.issuer())));
+            final var service = new FallbackOcspService(configuration);
+            final var responderCertificate = new X509CertificateHolder(first.responderCertificate().getEncoded());
+
+            assertThatExceptionOfType(OCSPCertificateException.class)
+                    .isThrownBy(() -> service.validateResponderCertificate(
+                            responderCertificate, second.issuer(), Date.from(first.now())))
+                    .withMessage("Fallback OCSP service is not configured for the subject certificate's issuer");
         }
     }
 

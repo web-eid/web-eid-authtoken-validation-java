@@ -33,6 +33,10 @@ import static eu.webeid.ocsp.exceptions.OcspResponderUriMessageAppender.appendRe
  */
 public class UserCertificateRevokedException extends CertificateRevokedException {
 
+    public UserCertificateRevokedException() {
+        super("User certificate has been revoked");
+    }
+
     public UserCertificateRevokedException(URI ocspResponderUri) {
         super(appendResponderUri("User certificate has been revoked", ocspResponderUri));
     }
