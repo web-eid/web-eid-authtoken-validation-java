@@ -25,6 +25,8 @@ package eu.webeid.ocsp.protocol;
 import eu.webeid.ocsp.exceptions.OCSPCertificateException;
 import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
+import eu.webeid.ocsp.exceptions.UserCertificateUnknownException;
+import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.util.DateAndTime;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.ocsp.BasicOCSPResp;
@@ -118,7 +120,7 @@ public final class OcspResponseValidator {
         }
     }
 
-    public static void validateSubjectCertificateStatus(SingleResp certStatusResponse, URI ocspResponderUri) throws UserCertificateRevokedException {
+    public static void validateSubjectCertificateStatus(SingleResp certStatusResponse, URI ocspResponderUri, boolean rejectUnknownOcspResponseStatus) throws AuthTokenException {
         final CertificateStatus status = certStatusResponse.getCertStatus();
         if (status == null) {
             return;
@@ -128,9 +130,11 @@ public final class OcspResponseValidator {
                 new UserCertificateRevokedException("Revocation reason: " + revokedStatus.getRevocationReason(), ocspResponderUri) :
                 new UserCertificateRevokedException(ocspResponderUri));
         } else if (status instanceof UnknownStatus) {
-            throw new UserCertificateRevokedException("Unknown status", ocspResponderUri);
+            throw rejectUnknownOcspResponseStatus ? new UserCertificateUnknownException("Unknown status", ocspResponderUri)
+                : new UserCertificateRevokedException("Unknown status", ocspResponderUri);
         } else {
-            throw new UserCertificateRevokedException("Status is neither good, revoked nor unknown", ocspResponderUri);
+            throw rejectUnknownOcspResponseStatus ? new UserCertificateUnknownException("Status is neither good, revoked nor unknown", ocspResponderUri)
+                : new UserCertificateRevokedException("Status is neither good, revoked nor unknown", ocspResponderUri);
         }
     }
 
