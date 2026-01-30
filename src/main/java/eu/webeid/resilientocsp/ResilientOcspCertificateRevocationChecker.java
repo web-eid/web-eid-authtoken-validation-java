@@ -115,22 +115,20 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(ocspService.getAccessLocation().toASCIIString());
 
         List<RevocationInfo> revocationInfoList = new ArrayList<>();
-        circuitBreaker.getEventPublisher().onError(event -> {
-            Throwable throwable = event.getThrowable();
-            if (throwable instanceof ResilientUserCertificateOCSPCheckFailedException e) {
-                revocationInfoList.addAll(e.getValidationInfo().revocationInfoList());
-                return;
-            }
-            revocationInfoList.add(new RevocationInfo(null, Map.ofEntries(
-                Map.entry(RevocationInfo.KEY_OCSP_ERROR, throwable)
-            )));
-        });
+        circuitBreaker.getEventPublisher().onError(event -> createAndAddRevocationInfoToList(event.getThrowable(), revocationInfoList));
 
         CheckedFunction0<RevocationInfo> primarySupplier = () -> request(ocspService, subjectCertificate, issuerCertificate, false);
         CheckedFunction0<RevocationInfo> fallbackSupplier = () -> request(ocspService.getFallbackService(), subjectCertificate, issuerCertificate, true);
         Decorators.DecorateCheckedSupplier<RevocationInfo> decorateCheckedSupplier = Decorators.ofCheckedSupplier(primarySupplier);
         if (retryRegistry != null) {
             Retry retry = retryRegistry.retry(ocspService.getAccessLocation().toASCIIString());
+            retry.getEventPublisher().onError(event -> {
+                Throwable throwable = event.getLastThrowable();
+                if (throwable == null) {
+                    return;
+                }
+                createAndAddRevocationInfoToList(throwable, revocationInfoList);
+            });
             decorateCheckedSupplier.withRetry(retry);
         }
         decorateCheckedSupplier.withCircuitBreaker(circuitBreaker)
@@ -157,6 +155,16 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
 
         revocationInfoList.add(revocationInfo);
         return revocationInfoList;
+    }
+
+    private void createAndAddRevocationInfoToList(Throwable throwable, List<RevocationInfo> revocationInfoList) {
+        if (throwable instanceof ResilientUserCertificateOCSPCheckFailedException exception) {
+            revocationInfoList.addAll((exception.getValidationInfo().revocationInfoList()));
+            return;
+        }
+        revocationInfoList.add(new RevocationInfo(null, Map.ofEntries(
+            Map.entry(RevocationInfo.KEY_OCSP_ERROR, throwable)
+        )));
     }
 
     private RevocationInfo request(OcspService ocspService, X509Certificate subjectCertificate, X509Certificate issuerCertificate, boolean allowThisUpdateInPast) throws ResilientUserCertificateOCSPCheckFailedException, ResilientUserCertificateRevokedException {
