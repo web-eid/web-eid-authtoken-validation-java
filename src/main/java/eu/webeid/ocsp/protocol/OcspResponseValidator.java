@@ -79,7 +79,7 @@ public final class OcspResponseValidator {
         }
     }
 
-    public static void validateCertificateStatusUpdateTime(SingleResp certStatusResponse, Duration allowedTimeSkew, Duration maxThisupdateAge, URI ocspResponderUri) throws UserCertificateOCSPCheckFailedException {
+    public static void validateCertificateStatusUpdateTime(SingleResp certStatusResponse, Duration allowedTimeSkew, Duration maxThisupdateAge, URI ocspResponderUri, boolean allowThisUpdateInPast) throws UserCertificateOCSPCheckFailedException {
         // From RFC 2560, https://www.ietf.org/rfc/rfc2560.txt:
         // 4.2.2.  Notes on OCSP Responses
         // 4.2.2.1.  Time
@@ -100,7 +100,7 @@ public final class OcspResponseValidator {
                 "thisUpdate '" + thisUpdate + "' is too far in the future, " +
                 "latest allowed: '" + latestAcceptableTimeSkew + "'", ocspResponderUri);
         }
-        if (thisUpdate.isBefore(minimumValidThisUpdateTime)) {
+        if (!allowThisUpdateInPast && thisUpdate.isBefore(minimumValidThisUpdateTime)) {
             throw new UserCertificateOCSPCheckFailedException(ERROR_PREFIX +
                 "thisUpdate '" + thisUpdate + "' is too old, " +
                 "minimum time allowed: '" + minimumValidThisUpdateTime + "'", ocspResponderUri);
