@@ -116,7 +116,34 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         List<RevocationInfo> revocationInfoList = new ArrayList<>();
 
         CheckedFunction0<RevocationInfo> primarySupplier = () -> request(ocspService, subjectCertificate, issuerCertificate, false);
-        CheckedFunction0<RevocationInfo> fallbackSupplier = () -> request(ocspService.getFallbackService(), subjectCertificate, issuerCertificate, true);
+        OcspService firstFallbackService = ocspService.getFallbackService();
+        CheckedFunction0<RevocationInfo> firstFallbackSupplier = () -> request(firstFallbackService, subjectCertificate, issuerCertificate, true);
+        OcspService secondFallbackService = getOcspServiceProvider().getFallbackService(firstFallbackService.getAccessLocation());
+        CheckedFunction0<RevocationInfo> fallbackSupplier;
+        if (secondFallbackService == null) {
+            fallbackSupplier = firstFallbackSupplier;
+        } else {
+            CheckedFunction0<RevocationInfo> secondFallbackSupplier = () -> request(secondFallbackService, subjectCertificate, issuerCertificate, true);
+            fallbackSupplier = () -> {
+                try {
+                    return firstFallbackSupplier.apply();
+                } catch (ResilientUserCertificateRevokedException e) {
+                    // NOTE: ResilientUserCertificateRevokedException must be re-thrown before the generic
+                    // catch (Exception) block. Without this, a "revoked" verdict from the first fallback would
+                    // be swallowed, and the second fallback could silently override it with a "good" response.
+                    throw e;
+                } catch (Exception e) {
+                    if (e instanceof ResilientUserCertificateOCSPCheckFailedException exception) {
+                        revocationInfoList.addAll((exception.getValidationInfo().revocationInfoList()));
+                    } else {
+                        revocationInfoList.add(new RevocationInfo(null, Map.ofEntries(
+                            Map.entry(RevocationInfo.KEY_OCSP_ERROR, e)
+                        )));
+                    }
+                    return secondFallbackSupplier.apply();
+                }
+            };
+        }
         Decorators.DecorateCheckedSupplier<RevocationInfo> decorateCheckedSupplier = Decorators.ofCheckedSupplier(primarySupplier);
         if (retryRegistry != null) {
             Retry retry = retryRegistry.retry(ocspService.getAccessLocation().toASCIIString());
