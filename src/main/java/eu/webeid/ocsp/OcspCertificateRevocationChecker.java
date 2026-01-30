@@ -131,7 +131,7 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
             }
             LOG.debug("OCSP response received successfully");
 
-            verifyOcspResponse(basicResponse, ocspService, certificateId);
+            verifyOcspResponse(basicResponse, ocspService, certificateId, false);
             if (ocspService.doesSupportNonce()) {
                 checkNonce(request, basicResponse, ocspResponderUri);
             }
@@ -144,7 +144,7 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
         }
     }
 
-    protected void verifyOcspResponse(BasicOCSPResp basicResponse, OcspService ocspService, CertificateID requestCertificateId) throws AuthTokenException, OCSPException, CertificateException, OperatorCreationException {
+    protected void verifyOcspResponse(BasicOCSPResp basicResponse, OcspService ocspService, CertificateID requestCertificateId, boolean rejectUnknownOcspResponseStatus) throws AuthTokenException, OCSPException, CertificateException, OperatorCreationException {
         // The verification algorithm follows RFC 2560, https://www.ietf.org/rfc/rfc2560.txt.
         //
         // 3.2.  Signed Response Acceptance Requirements
@@ -198,7 +198,7 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
         OcspResponseValidator.validateCertificateStatusUpdateTime(certStatusResponse, allowedOcspResponseTimeSkew, maxOcspResponseThisUpdateAge, ocspService.getAccessLocation());
 
         // Now we can accept the signed response as valid and validate the certificate status.
-        OcspResponseValidator.validateSubjectCertificateStatus(certStatusResponse, ocspService.getAccessLocation());
+        OcspResponseValidator.validateSubjectCertificateStatus(certStatusResponse, ocspService.getAccessLocation(), rejectUnknownOcspResponseStatus);
         LOG.debug("OCSP check result is GOOD");
     }
 
