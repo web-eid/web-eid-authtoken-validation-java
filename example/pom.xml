@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.5.3</version>
+		<version>3.5.10</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>eu.webeid.example</groupId>
@@ -22,7 +22,7 @@
 		<webeid.version>3.2.0</webeid.version>
 		<digidoc4j.version>6.1.0</digidoc4j.version>
 		<jmockit.version>1.44</jmockit.version> <!-- Keep version 1.44, otherwise mocking will fail. -->
-		<jib.version>3.4.6</jib.version>
+		<jib.version>3.5.1</jib.version>
 	</properties>
 
 	<dependencies>
