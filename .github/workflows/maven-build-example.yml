@@ -10,10 +10,6 @@ on:
       - 'example/**'
       - '.github/workflows/*example*'
 
-defaults:
-  run:
-    working-directory: ./example
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -33,9 +29,9 @@ jobs:
           key: ${{ runner.os }}-m2-v17-${{ secrets.CACHE_VERSION }}-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2-v17-${{ secrets.CACHE_VERSION }}
 
-      - name: Build
-        run: mvn --batch-mode compile
+      - name: Install library
+        run: mvn -B -ntp install
 
-      - name: Test and package
-        run: mvn --batch-mode package
-
+      - name: Build example project
+        working-directory: ./example
+        run: mvn -B -ntp package
