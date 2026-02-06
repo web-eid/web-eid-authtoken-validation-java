@@ -102,7 +102,6 @@ public final class CertificateValidator {
      * {@link RevocationMode#CUSTOM_PKIX} when the provided {@code customPkixRevocationChecker}
      * has an explicit OCSP responder URI configured; otherwise it is empty.
      * <p>
-     * @throws NullPointerException            if any required parameter is {@code null}
      * @throws IllegalArgumentException        if the supplied checker parameters are inconsistent with {@code revocationMode}
      * @throws CertificateNotYetValidException if the subject or trust anchor certificate is not yet valid at {@code now}
      * @throws CertificateExpiredException     if the subject or trust anchor certificate is expired at {@code now}

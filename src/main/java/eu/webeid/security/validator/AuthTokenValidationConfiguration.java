@@ -34,7 +34,6 @@ import java.security.cert.PKIXRevocationChecker;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -116,11 +115,9 @@ public final class AuthTokenValidationConfiguration {
     /**
      * Checks that the configuration parameters are valid.
      *
-     * @throws NullPointerException     when required parameters are null
      * @throws IllegalArgumentException when any parameter is invalid
      */
     void validate() {
-        Objects.requireNonNull(siteOrigin, "Origin URI must not be null");
         validateIsOriginURL(siteOrigin);
         if (trustedCACertificates.isEmpty()) {
             throw new IllegalArgumentException("At least one trusted certificate authority must be provided");
@@ -141,6 +138,9 @@ public final class AuthTokenValidationConfiguration {
      */
     public static void validateIsOriginURL(URI uri) throws IllegalArgumentException {
         try {
+            if (uri == null) {
+                throw new IllegalArgumentException("Origin URI must not be null");
+            }
             // 1. Verify that the URI can be converted to absolute URL.
             uri.toURL();
             // 2. Verify that the URI contains only HTTPS scheme, host and optional port components.

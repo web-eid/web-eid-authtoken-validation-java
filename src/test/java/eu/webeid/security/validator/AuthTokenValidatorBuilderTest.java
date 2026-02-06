@@ -44,7 +44,7 @@ public class AuthTokenValidatorBuilderTest {
     @Test
     void testOriginMissing() {
         assertThatThrownBy(builder::build)
-            .isInstanceOf(NullPointerException.class)
+            .isInstanceOf(IllegalArgumentException.class)
             .hasMessageStartingWith("Origin URI must not be null");
     }
 

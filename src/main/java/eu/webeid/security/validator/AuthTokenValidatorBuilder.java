@@ -146,11 +146,10 @@ public class AuthTokenValidatorBuilder {
      * The returned {@link AuthTokenValidator} object is immutable/thread-safe.
      *
      * @return the configured authentication token validator object
-     * @throws NullPointerException     when required parameters are null
      * @throws IllegalArgumentException when any parameter is invalid
-     * @throws RuntimeException         when JCE configuration is invalid
+     * @throws JceException             when JCE configuration is invalid
      */
-    public AuthTokenValidator build() throws NullPointerException, IllegalArgumentException, JceException {
+    public AuthTokenValidator build() throws IllegalArgumentException, JceException {
         configuration.validate();
         return new AuthTokenValidatorImpl(configuration);
     }
