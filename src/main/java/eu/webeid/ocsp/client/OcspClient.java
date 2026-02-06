@@ -20,15 +20,16 @@
  * SOFTWARE.
  */
 
-package eu.webeid.security.authtoken;
+package eu.webeid.ocsp.client;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.bouncycastle.cert.ocsp.OCSPReq;
+import org.bouncycastle.cert.ocsp.OCSPResp;
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-public record WebEidAuthToken(
-        String unverifiedCertificate,
-        String signature,
-        String algorithm,
-        String format
-) {
+import java.io.IOException;
+import java.net.URI;
+
+public interface OcspClient {
+
+    OCSPResp request(URI url, OCSPReq request) throws IOException;
+
 }

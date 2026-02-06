@@ -19,16 +19,14 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+package eu.webeid.security.validator.revocationcheck;
 
-package eu.webeid.security.authtoken;
+import java.net.URI;
+import java.util.Map;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+public record RevocationInfo(URI ocspResponderUri, Map<String, Object> ocspResponseAttributes) {
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-public record WebEidAuthToken(
-        String unverifiedCertificate,
-        String signature,
-        String algorithm,
-        String format
-) {
+    public static final String KEY_OCSP_RESPONSE = "OCSP_RESPONSE";
+    public static final String KEY_OCSP_ERROR = "OCSP_ERROR";
+
 }
