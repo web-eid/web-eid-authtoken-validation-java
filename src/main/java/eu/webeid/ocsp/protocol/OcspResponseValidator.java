@@ -25,6 +25,8 @@ package eu.webeid.ocsp.protocol;
 import eu.webeid.ocsp.exceptions.OCSPCertificateException;
 import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
+import eu.webeid.ocsp.exceptions.UserCertificateUnknownException;
+import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.util.DateAndTime;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.ocsp.BasicOCSPResp;
@@ -77,7 +79,7 @@ public final class OcspResponseValidator {
         }
     }
 
-    public static void validateCertificateStatusUpdateTime(SingleResp certStatusResponse, Duration allowedTimeSkew, Duration maxThisupdateAge, URI ocspResponderUri) throws UserCertificateOCSPCheckFailedException {
+    public static void validateCertificateStatusUpdateTime(SingleResp certStatusResponse, Duration allowedTimeSkew, Duration maxThisupdateAge, URI ocspResponderUri, boolean allowThisUpdateInPast) throws UserCertificateOCSPCheckFailedException {
         // From RFC 2560, https://www.ietf.org/rfc/rfc2560.txt:
         // 4.2.2.  Notes on OCSP Responses
         // 4.2.2.1.  Time
@@ -98,7 +100,7 @@ public final class OcspResponseValidator {
                 "thisUpdate '" + thisUpdate + "' is too far in the future, " +
                 "latest allowed: '" + latestAcceptableTimeSkew + "'", ocspResponderUri);
         }
-        if (thisUpdate.isBefore(minimumValidThisUpdateTime)) {
+        if (!allowThisUpdateInPast && thisUpdate.isBefore(minimumValidThisUpdateTime)) {
             throw new UserCertificateOCSPCheckFailedException(ERROR_PREFIX +
                 "thisUpdate '" + thisUpdate + "' is too old, " +
                 "minimum time allowed: '" + minimumValidThisUpdateTime + "'", ocspResponderUri);
@@ -118,7 +120,7 @@ public final class OcspResponseValidator {
         }
     }
 
-    public static void validateSubjectCertificateStatus(SingleResp certStatusResponse, URI ocspResponderUri) throws UserCertificateRevokedException {
+    public static void validateSubjectCertificateStatus(SingleResp certStatusResponse, URI ocspResponderUri, boolean rejectUnknownOcspResponseStatus) throws AuthTokenException {
         final CertificateStatus status = certStatusResponse.getCertStatus();
         if (status == null) {
             return;
@@ -128,9 +130,11 @@ public final class OcspResponseValidator {
                 new UserCertificateRevokedException("Revocation reason: " + revokedStatus.getRevocationReason(), ocspResponderUri) :
                 new UserCertificateRevokedException(ocspResponderUri));
         } else if (status instanceof UnknownStatus) {
-            throw new UserCertificateRevokedException("Unknown status", ocspResponderUri);
+            throw rejectUnknownOcspResponseStatus ? new UserCertificateUnknownException("Unknown status", ocspResponderUri)
+                : new UserCertificateRevokedException("Unknown status", ocspResponderUri);
         } else {
-            throw new UserCertificateRevokedException("Status is neither good, revoked nor unknown", ocspResponderUri);
+            throw rejectUnknownOcspResponseStatus ? new UserCertificateUnknownException("Status is neither good, revoked nor unknown", ocspResponderUri)
+                : new UserCertificateRevokedException("Status is neither good, revoked nor unknown", ocspResponderUri);
         }
     }
 
