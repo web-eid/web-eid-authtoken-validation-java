@@ -38,11 +38,11 @@ import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.core.functions.CheckedSupplier;
 import io.github.resilience4j.decorators.Decorators;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
-import io.vavr.CheckedFunction0;
 import io.vavr.control.Try;
 import org.bouncycastle.asn1.ocsp.OCSPResponseStatus;
 import org.bouncycastle.cert.ocsp.BasicOCSPResp;
@@ -115,18 +115,18 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
 
         List<RevocationInfo> revocationInfoList = new ArrayList<>();
 
-        CheckedFunction0<RevocationInfo> primarySupplier = () -> request(ocspService, subjectCertificate, issuerCertificate, false);
+        CheckedSupplier<RevocationInfo> primarySupplier = () -> request(ocspService, subjectCertificate, issuerCertificate, false);
         OcspService firstFallbackService = ocspService.getFallbackService();
-        CheckedFunction0<RevocationInfo> firstFallbackSupplier = () -> request(firstFallbackService, subjectCertificate, issuerCertificate, true);
+        CheckedSupplier<RevocationInfo> firstFallbackSupplier = () -> request(firstFallbackService, subjectCertificate, issuerCertificate, true);
         OcspService secondFallbackService = getOcspServiceProvider().getFallbackService(firstFallbackService.getAccessLocation());
-        CheckedFunction0<RevocationInfo> fallbackSupplier;
+        CheckedSupplier<RevocationInfo> fallbackSupplier;
         if (secondFallbackService == null) {
             fallbackSupplier = firstFallbackSupplier;
         } else {
-            CheckedFunction0<RevocationInfo> secondFallbackSupplier = () -> request(secondFallbackService, subjectCertificate, issuerCertificate, true);
+            CheckedSupplier<RevocationInfo> secondFallbackSupplier = () -> request(secondFallbackService, subjectCertificate, issuerCertificate, true);
             fallbackSupplier = () -> {
                 try {
-                    return firstFallbackSupplier.apply();
+                    return firstFallbackSupplier.get();
                 } catch (ResilientUserCertificateRevokedException e) {
                     // NOTE: ResilientUserCertificateRevokedException must be re-thrown before the generic
                     // catch (Exception) block. Without this, a "revoked" verdict from the first fallback would
@@ -140,7 +140,7 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
                             Map.entry(RevocationInfo.KEY_OCSP_ERROR, e)
                         )));
                     }
-                    return secondFallbackSupplier.apply();
+                    return secondFallbackSupplier.get();
                 }
             };
         }
@@ -159,12 +159,12 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         decorateCheckedSupplier.withCircuitBreaker(circuitBreaker)
             .withFallback(List.of(ResilientUserCertificateOCSPCheckFailedException.class, CallNotPermittedException.class), e -> {
                 createAndAddRevocationInfoToList(e, revocationInfoList);
-                return fallbackSupplier.apply();
+                return fallbackSupplier.get();
             });
 
-        CheckedFunction0<RevocationInfo> decoratedSupplier = decorateCheckedSupplier.decorate();
+        CheckedSupplier<RevocationInfo> decoratedSupplier = decorateCheckedSupplier.decorate();
 
-        Try<RevocationInfo> result = Try.of(decoratedSupplier);
+        Try<RevocationInfo> result = Try.of(decoratedSupplier::get);
 
         RevocationInfo revocationInfo = result.getOrElseThrow(throwable -> {
             if (throwable instanceof ResilientUserCertificateOCSPCheckFailedException exception) {
