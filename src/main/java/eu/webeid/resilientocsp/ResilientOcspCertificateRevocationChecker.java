@@ -115,15 +115,36 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
 
         List<RevocationInfo> revocationInfoList = new ArrayList<>();
 
-        CheckedSupplier<RevocationInfo> primarySupplier = () -> request(ocspService, subjectCertificate, issuerCertificate, false);
+        CheckedSupplier<RevocationInfo> primarySupplier = () -> {
+            try {
+                return request(ocspService, subjectCertificate, issuerCertificate, false);
+            } catch (Exception e) {
+                createAndAddRevocationInfoToList(e, revocationInfoList);
+                throw e;
+            }
+        };
         OcspService firstFallbackService = ocspService.getFallbackService();
-        CheckedSupplier<RevocationInfo> firstFallbackSupplier = () -> request(firstFallbackService, subjectCertificate, issuerCertificate, true);
+        CheckedSupplier<RevocationInfo> firstFallbackSupplier = () -> {
+            try {
+                return request(firstFallbackService, subjectCertificate, issuerCertificate, true);
+            } catch (Exception e) {
+                createAndAddRevocationInfoToList(e, revocationInfoList);
+                throw e;
+            }
+        };
         OcspService secondFallbackService = getOcspServiceProvider().getFallbackService(firstFallbackService.getAccessLocation());
         CheckedSupplier<RevocationInfo> fallbackSupplier;
         if (secondFallbackService == null) {
             fallbackSupplier = firstFallbackSupplier;
         } else {
-            CheckedSupplier<RevocationInfo> secondFallbackSupplier = () -> request(secondFallbackService, subjectCertificate, issuerCertificate, true);
+            CheckedSupplier<RevocationInfo> secondFallbackSupplier = () -> {
+                try {
+                    return request(secondFallbackService, subjectCertificate, issuerCertificate, true);
+                } catch (Exception e) {
+                    createAndAddRevocationInfoToList(e, revocationInfoList);
+                    throw e;
+                }
+            };
             fallbackSupplier = () -> {
                 try {
                     return firstFallbackSupplier.get();
@@ -133,13 +154,6 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
                     // be swallowed, and the second fallback could silently override it with a "good" response.
                     throw e;
                 } catch (Exception e) {
-                    if (e instanceof ResilientUserCertificateOCSPCheckFailedException exception) {
-                        revocationInfoList.addAll((exception.getValidationInfo().revocationInfoList()));
-                    } else {
-                        revocationInfoList.add(new RevocationInfo(null, Map.ofEntries(
-                            Map.entry(RevocationInfo.KEY_OCSP_ERROR, e)
-                        )));
-                    }
                     return secondFallbackSupplier.get();
                 }
             };
@@ -147,20 +161,10 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         Decorators.DecorateCheckedSupplier<RevocationInfo> decorateCheckedSupplier = Decorators.ofCheckedSupplier(primarySupplier);
         if (retryRegistry != null) {
             Retry retry = retryRegistry.retry(ocspService.getAccessLocation().toASCIIString());
-            retry.getEventPublisher().onError(event -> {
-                Throwable throwable = event.getLastThrowable();
-                if (throwable == null) {
-                    return;
-                }
-                createAndAddRevocationInfoToList(throwable, revocationInfoList);
-            });
             decorateCheckedSupplier.withRetry(retry);
         }
         decorateCheckedSupplier.withCircuitBreaker(circuitBreaker)
-            .withFallback(List.of(ResilientUserCertificateOCSPCheckFailedException.class, CallNotPermittedException.class), e -> {
-                createAndAddRevocationInfoToList(e, revocationInfoList);
-                return fallbackSupplier.get();
-            });
+            .withFallback(List.of(ResilientUserCertificateOCSPCheckFailedException.class, CallNotPermittedException.class), e -> fallbackSupplier.get());
 
         CheckedSupplier<RevocationInfo> decoratedSupplier = decorateCheckedSupplier.decorate();
 
@@ -168,12 +172,10 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
 
         RevocationInfo revocationInfo = result.getOrElseThrow(throwable -> {
             if (throwable instanceof ResilientUserCertificateOCSPCheckFailedException exception) {
-                revocationInfoList.addAll(exception.getValidationInfo().revocationInfoList());
                 exception.setValidationInfo(new ValidationInfo(subjectCertificate, revocationInfoList));
                 return exception;
             }
             if (throwable instanceof ResilientUserCertificateRevokedException exception) {
-                revocationInfoList.addAll(exception.getValidationInfo().revocationInfoList());
                 exception.setValidationInfo(new ValidationInfo(subjectCertificate, revocationInfoList));
                 return exception;
             }
