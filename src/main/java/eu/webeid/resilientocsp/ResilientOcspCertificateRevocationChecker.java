@@ -192,6 +192,10 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
             revocationInfoList.addAll((exception.getValidationInfo().revocationInfoList()));
             return;
         }
+        if (throwable instanceof ResilientUserCertificateRevokedException exception) {
+            revocationInfoList.addAll((exception.getValidationInfo().revocationInfoList()));
+            return;
+        }
         revocationInfoList.add(new RevocationInfo(null, Map.ofEntries(
             Map.entry(RevocationInfo.KEY_OCSP_ERROR, throwable)
         )));

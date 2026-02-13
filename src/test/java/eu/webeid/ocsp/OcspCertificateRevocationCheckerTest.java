@@ -69,7 +69,7 @@ import static org.mockito.Mockito.when;
 
 // TODO Fix failing tests
 @Disabled
-class OcspCertificateRevocationCheckerTest extends AbstractTestWithValidator {
+public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValidator {
 
     private final OcspClient ocspClient = OcspClientImpl.build(Duration.ofSeconds(5));
     private X509Certificate estEid2018Cert;
@@ -366,7 +366,7 @@ class OcspCertificateRevocationCheckerTest extends AbstractTestWithValidator {
         return getOcspResponseBytesFromResources("ocsp_response.der");
     }
 
-    private static byte[] getOcspResponseBytesFromResources(String resource) throws IOException {
+    public static byte[] getOcspResponseBytesFromResources(String resource) throws IOException {
         try (final InputStream resourceAsStream = ClassLoader.getSystemResourceAsStream(resource)) {
             return toByteArray(resourceAsStream);
         }
