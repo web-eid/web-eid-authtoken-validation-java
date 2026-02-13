@@ -31,6 +31,7 @@ import eu.webeid.security.util.DateAndTime;
 import eu.webeid.security.validator.ocsp.OcspClient;
 import eu.webeid.security.validator.ocsp.OcspClientImpl;
 import eu.webeid.security.validator.ocsp.OcspServiceProvider;
+import eu.webeid.security.validator.ocsp.ResilientOcspService;
 import org.bouncycastle.asn1.ocsp.OCSPResponseStatus;
 import org.bouncycastle.cert.ocsp.OCSPException;
 import org.bouncycastle.cert.ocsp.OCSPResp;
@@ -258,9 +259,11 @@ class SubjectCertificateNotRevokedValidatorTest {
         );
         try (var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
             mockDate("2021-09-18T00:16:25", mockedClock);
-            assertThatExceptionOfType(CertificateNotTrustedException.class)
+            assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
                 .isThrownBy(() ->
                     validator.validateCertificateNotRevoked(estEid2018Cert))
+                .withCauseExactlyInstanceOf(CertificateNotTrustedException.class)
+                .havingCause()
                 .withMessage("Certificate EMAILADDRESS=pki@sk.ee, CN=TEST of SK OCSP RESPONDER 2020, OU=OCSP, O=AS Sertifitseerimiskeskus, C=EE is not trusted");
         }
     }
@@ -270,9 +273,11 @@ class SubjectCertificateNotRevokedValidatorTest {
         final SubjectCertificateNotRevokedValidator validator = getSubjectCertificateNotRevokedValidatorWithAiaOcsp(
             getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_unknown.der"))
         );
-        assertThatExceptionOfType(CertificateExpiredException.class)
+        assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
                 validator.validateCertificateNotRevoked(estEid2018Cert))
+            .withCauseExactlyInstanceOf(CertificateExpiredException.class)
+            .havingCause()
             .withMessage("AIA OCSP responder certificate has expired");
     }
 
@@ -347,7 +352,13 @@ class SubjectCertificateNotRevokedValidatorTest {
     }
 
     private SubjectCertificateNotRevokedValidator getSubjectCertificateNotRevokedValidator(OcspClient client, OcspServiceProvider ocspServiceProvider) {
-        return new SubjectCertificateNotRevokedValidator(trustedValidator, client, ocspServiceProvider, CONFIGURATION.getAllowedOcspResponseTimeSkew(), CONFIGURATION.getMaxOcspResponseThisUpdateAge());
+        ResilientOcspService resilientOcspService = new ResilientOcspService(client, ocspServiceProvider,
+            null,
+            null,
+            CONFIGURATION.getAllowedOcspResponseTimeSkew(),
+            CONFIGURATION.getMaxOcspResponseThisUpdateAge(),
+            CONFIGURATION.isRejectUnknownOcspResponseStatus());
+        return new SubjectCertificateNotRevokedValidator(resilientOcspService, trustedValidator);
     }
 
     private static void setSubjectCertificateIssuerCertificate(SubjectCertificateTrustedValidator trustedValidator) throws NoSuchFieldException, IllegalAccessException, CertificateException, IOException {

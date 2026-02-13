@@ -70,8 +70,12 @@ public class DesignatedOcspServiceConfiguration {
         return doesSupportNonce;
     }
 
-    public boolean supportsIssuerOf(X509Certificate certificate) throws CertificateEncodingException {
-        return supportedIssuers.contains(new JcaX509CertificateHolder(Objects.requireNonNull(certificate)).getIssuer());
+    public boolean supportsIssuerOf(X509Certificate certificate) {
+        try {
+            return supportedIssuers.contains(new JcaX509CertificateHolder(Objects.requireNonNull(certificate)).getIssuer());
+        } catch (CertificateEncodingException e) {
+            throw new IllegalArgumentException(e);
+        }
     }
 
     private Collection<X500Name> getIssuerX500Names(Collection<X509Certificate> supportedIssuers) throws OCSPCertificateException {

@@ -20,24 +20,23 @@
  * SOFTWARE.
  */
 
-package eu.webeid.security.exceptions;
+package eu.webeid.security.validator;
 
 import eu.webeid.security.validator.ocsp.OcspValidationInfo;
 
-/**
- * Thrown when the user certificate has been revoked.
- */
-public class UserCertificateRevokedException extends AuthTokenException {
+import java.security.cert.X509Certificate;
+
+public class ValidationInfo {
+    private final X509Certificate subjectCertificate;
     private final OcspValidationInfo ocspValidationInfo;
 
-    public UserCertificateRevokedException(OcspValidationInfo ocspValidationInfo) {
-        super("User certificate has been revoked");
+    public ValidationInfo(X509Certificate subjectCertificate, OcspValidationInfo ocspValidationInfo) {
+        this.subjectCertificate = subjectCertificate;
         this.ocspValidationInfo = ocspValidationInfo;
     }
 
-    public UserCertificateRevokedException(String msg, OcspValidationInfo ocspValidationInfo) {
-        super("User certificate has been revoked: " + msg);
-        this.ocspValidationInfo = ocspValidationInfo;
+    public X509Certificate getSubjectCertificate() {
+        return subjectCertificate;
     }
 
     public OcspValidationInfo getOcspValidationInfo() {

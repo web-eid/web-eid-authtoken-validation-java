@@ -16,6 +16,7 @@
         <bouncycastle.version>1.81</bouncycastle.version>
         <jackson.version>2.19.1</jackson.version>
         <slf4j.version>2.0.17</slf4j.version>
+        <resilience4j.version>1.7.0</resilience4j.version>
         <junit-jupiter.version>5.13.3</junit-jupiter.version>
         <assertj.version>3.27.7</assertj.version>
         <mockito.version>5.18.0</mockito.version>
@@ -65,6 +66,29 @@
             <artifactId>bcpkix-jdk18on</artifactId>
             <version>${bouncycastle.version}</version>
         </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-all</artifactId>
+            <version>${resilience4j.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.github.resilience4j</groupId>
+                    <artifactId>resilience4j-bulkhead</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.github.resilience4j</groupId>
+                    <artifactId>resilience4j-cache</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.github.resilience4j</groupId>
+                    <artifactId>resilience4j-ratelimiter</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.github.resilience4j</groupId>
+                    <artifactId>resilience4j-timelimiter</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -88,6 +112,12 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
             <version>${slf4j.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <version>4.3.0</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
