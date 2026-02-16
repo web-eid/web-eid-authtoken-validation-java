@@ -41,6 +41,7 @@ import java.util.Date;
 import java.util.Objects;
 import java.util.Set;
 
+import static eu.webeid.ocsp.protocol.IssuerCommonName.getIssuerCommonName;
 import static eu.webeid.ocsp.protocol.OcspUrl.getOcspUri;
 
 /**
@@ -60,8 +61,10 @@ public class AiaOcspService implements OcspService {
         this.trustedCACertificateAnchors = configuration.getTrustedCACertificateAnchors();
         this.trustedCACertificateCertStore = configuration.getTrustedCACertificateCertStore();
         this.url = getOcspAiaUrlFromCertificate(Objects.requireNonNull(certificate));
-        this.supportsNonce = !configuration.getNonceDisabledOcspUrls().contains(this.url);
         this.fallbackOcspService = fallbackOcspService;
+        String issuerCN = getIssuerCommonName(certificate).orElseThrow(() ->
+            new UserCertificateOCSPCheckFailedException("Getting the issuer common name failed"));
+        this.supportsNonce = !configuration.getNonceDisabledIssuerCNs().contains(issuerCN);
     }
 
     @Override

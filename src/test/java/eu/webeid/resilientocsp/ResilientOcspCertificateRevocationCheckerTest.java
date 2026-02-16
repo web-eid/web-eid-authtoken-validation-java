@@ -244,9 +244,10 @@ public class ResilientOcspCertificateRevocationCheckerTest {
         when(secondFallbackService.getAccessLocation()).thenReturn(SECOND_FALLBACK_URI);
         when(secondFallbackService.doesSupportNonce()).thenReturn(false);
 
-        OcspService fallbackService = mock(OcspService.class);
+        FallbackOcspService fallbackService = mock(FallbackOcspService.class);
         when(fallbackService.getAccessLocation()).thenReturn(FALLBACK_URI);
         when(fallbackService.doesSupportNonce()).thenReturn(false);
+        when(fallbackService.getNextFallback()).thenReturn(secondFallbackService);
 
         OcspService primaryService = mock(OcspService.class);
         when(primaryService.getAccessLocation()).thenReturn(PRIMARY_URI);
@@ -255,7 +256,6 @@ public class ResilientOcspCertificateRevocationCheckerTest {
 
         OcspServiceProvider ocspServiceProvider = mock(OcspServiceProvider.class);
         when(ocspServiceProvider.getService(any())).thenReturn(primaryService);
-        when(ocspServiceProvider.getFallbackService(eq(FALLBACK_URI))).thenReturn(secondFallbackService);
 
         return new ResilientOcspCertificateRevocationChecker(
             ocspClient,

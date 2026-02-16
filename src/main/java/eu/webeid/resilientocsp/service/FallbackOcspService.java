@@ -42,11 +42,15 @@ public class FallbackOcspService implements OcspService {
     private final URI url;
     private final boolean supportsNonce;
     private final X509Certificate trustedResponderCertificate;
+    private final FallbackOcspService nextFallback;
 
     public FallbackOcspService(FallbackOcspServiceConfiguration configuration) {
-        this.url = configuration.getFallbackOcspServiceAccessLocation();
+        this.url = configuration.getAccessLocation();
         this.supportsNonce = configuration.doesSupportNonce();
         this.trustedResponderCertificate = configuration.getResponderCertificate();
+        this.nextFallback = configuration.getNextFallbackConfiguration() != null
+            ? new FallbackOcspService(configuration.getNextFallbackConfiguration())
+            : null;
     }
 
     @Override
@@ -73,5 +77,9 @@ public class FallbackOcspService implements OcspService {
         } catch (CertificateException e) {
             throw new OCSPCertificateException("X509CertificateHolder conversion to X509Certificate failed", e);
         }
+    }
+
+    public FallbackOcspService getNextFallback() {
+        return nextFallback;
     }
 }
