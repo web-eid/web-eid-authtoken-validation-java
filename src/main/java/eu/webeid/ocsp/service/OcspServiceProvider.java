@@ -23,8 +23,6 @@
 package eu.webeid.ocsp.service;
 
 import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
-import eu.webeid.resilientocsp.service.FallbackOcspService;
-import eu.webeid.resilientocsp.service.FallbackOcspServiceConfiguration;
 import eu.webeid.security.exceptions.AuthTokenException;
 
 import java.security.cert.CertificateEncodingException;

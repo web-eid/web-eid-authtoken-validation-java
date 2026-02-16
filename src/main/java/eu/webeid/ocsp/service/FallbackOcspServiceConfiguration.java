@@ -20,7 +20,7 @@
  * SOFTWARE.
  */
 
-package eu.webeid.resilientocsp.service;
+package eu.webeid.ocsp.service;
 
 import eu.webeid.ocsp.exceptions.OCSPCertificateException;
 import eu.webeid.ocsp.protocol.OcspResponseValidator;

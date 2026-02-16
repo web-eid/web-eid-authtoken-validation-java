@@ -20,10 +20,9 @@
  * SOFTWARE.
  */
 
-package eu.webeid.resilientocsp.service;
+package eu.webeid.ocsp.service;
 
 import eu.webeid.ocsp.exceptions.OCSPCertificateException;
-import eu.webeid.ocsp.service.OcspService;
 import eu.webeid.security.exceptions.AuthTokenException;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
