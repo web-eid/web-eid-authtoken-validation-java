@@ -20,25 +20,33 @@
  * SOFTWARE.
  */
 
-package eu.webeid.ocsp.service;
+package eu.webeid.ocsp.protocol;
 
-import eu.webeid.resilientocsp.service.FallbackOcspService;
-import org.bouncycastle.cert.X509CertificateHolder;
-import eu.webeid.security.exceptions.AuthTokenException;
+import org.bouncycastle.asn1.x500.RDN;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x500.style.BCStyle;
+import org.bouncycastle.asn1.x500.style.IETFUtils;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 
-import java.net.URI;
-import java.util.Date;
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.X509Certificate;
+import java.util.Objects;
+import java.util.Optional;
 
-public interface OcspService {
+public class IssuerCommonName {
 
-    boolean doesSupportNonce();
-
-    URI getAccessLocation();
-
-    void validateResponderCertificate(X509CertificateHolder cert, Date now) throws AuthTokenException;
-
-    default FallbackOcspService getFallbackService() {
-        return null;
+    public static Optional<String> getIssuerCommonName(X509Certificate certificate) {
+        Objects.requireNonNull(certificate, "certificate");
+        try {
+            X500Name x500Name = new JcaX509CertificateHolder(certificate).getIssuer();
+            final RDN cn = x500Name.getRDNs(BCStyle.CN)[0];
+            return Optional.of(IETFUtils.valueToString(cn.getFirst().getValue()));
+        } catch (CertificateEncodingException e) {
+            return Optional.empty();
+        }
     }
 
+    private IssuerCommonName() {
+        throw new IllegalStateException("Utility class");
+    }
 }

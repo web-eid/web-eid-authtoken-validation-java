@@ -31,26 +31,23 @@ import java.util.Objects;
 
 public class FallbackOcspServiceConfiguration {
 
-    private final URI ocspServiceAccessLocation;
-    private final URI fallbackOcspServiceAccessLocation;
+    private final URI accessLocation;
     private final X509Certificate responderCertificate;
     private final boolean doesSupportNonce;
+    private final FallbackOcspServiceConfiguration nextFallbackConfiguration;
 
-    public FallbackOcspServiceConfiguration(URI ocspServiceAccessLocation, URI fallbackOcspServiceAccessLocation,
-                                            X509Certificate responderCertificate, boolean doesSupportNonce) throws OCSPCertificateException {
-        this.ocspServiceAccessLocation = Objects.requireNonNull(ocspServiceAccessLocation, "Primary OCSP service access location");
-        this.fallbackOcspServiceAccessLocation = Objects.requireNonNull(fallbackOcspServiceAccessLocation, "Fallback OCSP service access location");
+    public FallbackOcspServiceConfiguration(URI accessLocation, X509Certificate responderCertificate,
+                                            boolean doesSupportNonce,
+                                            FallbackOcspServiceConfiguration nextFallbackConfiguration) throws OCSPCertificateException {
+        this.accessLocation = Objects.requireNonNull(accessLocation, "Fallback OCSP service access location");
         this.responderCertificate = Objects.requireNonNull(responderCertificate, "Fallback OCSP responder certificate");
         OcspResponseValidator.validateHasSigningExtension(responderCertificate);
         this.doesSupportNonce = doesSupportNonce;
+        this.nextFallbackConfiguration = nextFallbackConfiguration;
     }
 
-    public URI getOcspServiceAccessLocation() {
-        return ocspServiceAccessLocation;
-    }
-
-    public URI getFallbackOcspServiceAccessLocation() {
-        return fallbackOcspServiceAccessLocation;
+    public URI getAccessLocation() {
+        return accessLocation;
     }
 
     public X509Certificate getResponderCertificate() {
@@ -61,4 +58,7 @@ public class FallbackOcspServiceConfiguration {
         return doesSupportNonce;
     }
 
+    public FallbackOcspServiceConfiguration getNextFallbackConfiguration() {
+        return nextFallbackConfiguration;
+    }
 }

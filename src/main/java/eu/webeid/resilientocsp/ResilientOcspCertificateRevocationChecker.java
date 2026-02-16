@@ -31,6 +31,7 @@ import eu.webeid.ocsp.service.OcspService;
 import eu.webeid.ocsp.service.OcspServiceProvider;
 import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateOCSPCheckFailedException;
 import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateRevokedException;
+import eu.webeid.resilientocsp.service.FallbackOcspService;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.validator.ValidationInfo;
 import eu.webeid.security.validator.revocationcheck.RevocationInfo;
@@ -106,8 +107,8 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         } catch (CertificateException e) {
             throw new ResilientUserCertificateOCSPCheckFailedException(new ValidationInfo(subjectCertificate, List.of()));
         }
-        final OcspService fallbackOcspService = ocspService.getFallbackService();
-        if (fallbackOcspService == null) {
+        final FallbackOcspService firstFallbackService = ocspService.getFallbackService();
+        if (firstFallbackService == null) {
             return List.of(request(ocspService, subjectCertificate, issuerCertificate, false));
         }
 
@@ -123,7 +124,6 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
                 throw e;
             }
         };
-        OcspService firstFallbackService = ocspService.getFallbackService();
         CheckedSupplier<RevocationInfo> firstFallbackSupplier = () -> {
             try {
                 return request(firstFallbackService, subjectCertificate, issuerCertificate, true);
@@ -132,7 +132,7 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
                 throw e;
             }
         };
-        OcspService secondFallbackService = getOcspServiceProvider().getFallbackService(firstFallbackService.getAccessLocation());
+        OcspService secondFallbackService = firstFallbackService.getNextFallback();
         CheckedSupplier<RevocationInfo> fallbackSupplier;
         if (secondFallbackService == null) {
             fallbackSupplier = firstFallbackSupplier;
