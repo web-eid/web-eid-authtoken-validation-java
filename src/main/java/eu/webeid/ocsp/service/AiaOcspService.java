@@ -22,7 +22,6 @@
 
 package eu.webeid.ocsp.service;
 
-import eu.webeid.resilientocsp.service.FallbackOcspService;
 import eu.webeid.security.certificate.CertificateValidator;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.ocsp.exceptions.OCSPCertificateException;

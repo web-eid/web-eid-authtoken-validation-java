@@ -22,7 +22,6 @@
 
 package eu.webeid.ocsp.service;
 
-import eu.webeid.resilientocsp.service.FallbackOcspService;
 import org.bouncycastle.cert.X509CertificateHolder;
 import eu.webeid.security.exceptions.AuthTokenException;
 

@@ -29,7 +29,7 @@ import eu.webeid.ocsp.service.OcspService;
 import eu.webeid.ocsp.service.OcspServiceProvider;
 import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateOCSPCheckFailedException;
 import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateRevokedException;
-import eu.webeid.resilientocsp.service.FallbackOcspService;
+import eu.webeid.ocsp.service.FallbackOcspService;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.validator.AuthTokenValidator;
 import eu.webeid.security.validator.revocationcheck.RevocationInfo;
