@@ -139,6 +139,8 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
                 throw e;
             }
         };
+        // NOTE: Up to two fallbacks are currently supported. To enable the full potential of recursive fallbacks
+        // with FallbackOcspService#getNextFallback, the fallback supplier creation needs to be changed.
         OcspService secondFallbackService = firstFallbackService.getNextFallback();
         if (secondFallbackService == null) {
             return firstFallbackSupplier;
