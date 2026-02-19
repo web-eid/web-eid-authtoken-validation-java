@@ -36,6 +36,7 @@ import eu.webeid.security.validator.revocationcheck.RevocationInfo;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.retry.RetryConfig;
 import org.bouncycastle.cert.ocsp.BasicOCSPResp;
+import org.bouncycastle.cert.ocsp.CertificateStatus;
 import org.bouncycastle.cert.ocsp.OCSPResp;
 import org.bouncycastle.cert.ocsp.RevokedStatus;
 import org.bouncycastle.cert.ocsp.SingleResp;
@@ -72,13 +73,16 @@ public class ResilientOcspCertificateRevocationCheckerTest {
 
     private X509Certificate estEid2018Cert;
     private X509Certificate testEsteid2018CA;
+
     private OCSPResp ocspRespGood;
+    private OCSPResp ocspRespRevoked;
 
     @BeforeEach
     void setUp() throws Exception {
         estEid2018Cert = getJaakKristjanEsteid2018Cert();
         testEsteid2018CA = getTestEsteid2018CA();
         ocspRespGood = new OCSPResp(getOcspResponseBytesFromResources("ocsp_response.der"));
+        ocspRespRevoked = new OCSPResp(getOcspResponseBytesFromResources("ocsp_response_revoked.der"));
     }
 
     @Test
@@ -133,8 +137,6 @@ public class ResilientOcspCertificateRevocationCheckerTest {
 
     @Test
     void whenFirstFallbackReturnsRevoked_thenRevocationPropagatesWithoutSecondFallback() throws Exception {
-        OCSPResp ocspRespRevoked = new OCSPResp(getOcspResponseBytesFromResources("ocsp_response_revoked.der"));
-
         OcspClient ocspClient = mock(OcspClient.class);
         when(ocspClient.request(eq(PRIMARY_URI), any()))
             .thenThrow(new OCSPClientException("Primary OCSP service unavailable"));
@@ -150,6 +152,25 @@ public class ResilientOcspCertificateRevocationCheckerTest {
             .withMessage("User certificate has been revoked");
 
         verify(ocspClient, never()).request(eq(SECOND_FALLBACK_URI), any());
+    }
+
+    @Test
+    void whenMaxAttemptsIsOneAndAllCallsFail_thenRevocationInfoListShouldHaveThreeElements() throws Exception {
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any()))
+            .thenThrow(new OCSPClientException());
+        when(ocspClient.request(eq(FALLBACK_URI), any()))
+            .thenThrow(new OCSPClientException());
+        when(ocspClient.request(eq(SECOND_FALLBACK_URI), any()))
+            .thenThrow(new OCSPClientException());
+
+        RetryConfig retryConfig = RetryConfig.custom()
+            .maxAttempts(1)
+            .build();
+
+        ResilientOcspCertificateRevocationChecker checker = buildChecker(ocspClient, retryConfig, false);
+        ResilientUserCertificateOCSPCheckFailedException ex = assertThrows(ResilientUserCertificateOCSPCheckFailedException.class, () -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA));
+        assertThat(ex.getValidationInfo().revocationInfoList().size()).isEqualTo(3);
     }
 
     @Test
@@ -179,6 +200,10 @@ public class ResilientOcspCertificateRevocationCheckerTest {
         when(ocspClient.request(eq(PRIMARY_URI), any()))
             .thenThrow(new OCSPClientException("Primary OCSP service unavailable (call1)"))
             .thenReturn(ocspRespGood);
+        when(ocspClient.request(eq(FALLBACK_URI), any()))
+            .thenReturn(ocspRespRevoked);
+        when(ocspClient.request(eq(SECOND_FALLBACK_URI), any()))
+            .thenReturn(ocspRespRevoked);
 
         RetryConfig retryConfig = RetryConfig.custom()
             .maxAttempts(2)
@@ -206,6 +231,10 @@ public class ResilientOcspCertificateRevocationCheckerTest {
         OcspClient ocspClient = mock(OcspClient.class);
         when(ocspClient.request(eq(PRIMARY_URI), any()))
             .thenReturn(ocspRespGood);
+        when(ocspClient.request(eq(FALLBACK_URI), any()))
+            .thenReturn(ocspRespRevoked);
+        when(ocspClient.request(eq(SECOND_FALLBACK_URI), any()))
+            .thenReturn(ocspRespRevoked);
 
         ResilientOcspCertificateRevocationChecker checker = buildChecker(ocspClient, null, false);
 
@@ -213,9 +242,8 @@ public class ResilientOcspCertificateRevocationCheckerTest {
         assertThat(revocationInfoList.size()).isEqualTo(1);
         Map<String, Object> responseAttributes = revocationInfoList.get(0).ocspResponseAttributes();
         OCSPResp ocspResp = (OCSPResp) responseAttributes.get("OCSP_RESPONSE");
-        final BasicOCSPResp basicResponse = (BasicOCSPResp) ocspResp.getResponseObject();
-        final SingleResp certStatusResponse = basicResponse.getResponses()[0];
-        assertThat(certStatusResponse.getCertStatus()).isEqualTo(org.bouncycastle.cert.ocsp.CertificateStatus.GOOD);
+        CertificateStatus status = getCertificateStatus(ocspResp);
+        assertThat(status).isEqualTo(org.bouncycastle.cert.ocsp.CertificateStatus.GOOD);
     }
 
     @Test
@@ -223,9 +251,12 @@ public class ResilientOcspCertificateRevocationCheckerTest {
         "which results in ResilientUserCertificateOCSPCheckFailedException")
     void whenFirstCallResultsInRevoked_thenRevocationInfoListShouldHaveOneElementAndItShouldHaveRevokedStatus() throws Exception {
         OcspClient ocspClient = mock(OcspClient.class);
-        OCSPResp ocspRespRevoked = new OCSPResp(getOcspResponseBytesFromResources("ocsp_response_revoked.der"));
         when(ocspClient.request(eq(PRIMARY_URI), any()))
             .thenReturn(ocspRespRevoked);
+        when(ocspClient.request(eq(FALLBACK_URI), any()))
+            .thenReturn(ocspRespGood);
+        when(ocspClient.request(eq(SECOND_FALLBACK_URI), any()))
+            .thenReturn(ocspRespGood);
 
         ResilientOcspCertificateRevocationChecker checker = buildChecker(ocspClient, null, false);
         ResilientUserCertificateRevokedException ex = assertThrows(ResilientUserCertificateRevokedException.class, () -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA));
@@ -233,9 +264,91 @@ public class ResilientOcspCertificateRevocationCheckerTest {
         assertThat(revocationInfoList.size()).isEqualTo(1);
         Map<String, Object> responseAttributes = ex.getValidationInfo().revocationInfoList().get(0).ocspResponseAttributes();
         OCSPResp ocspResp = (OCSPResp) responseAttributes.get("OCSP_RESPONSE");
-        final BasicOCSPResp basicResponse = (BasicOCSPResp) ocspResp.getResponseObject();
-        final SingleResp certStatusResponse = basicResponse.getResponses()[0];
-        assertThat(certStatusResponse.getCertStatus()).isInstanceOf(RevokedStatus.class);
+        CertificateStatus status = getCertificateStatus(ocspResp);
+        assertThat(status).isInstanceOf(RevokedStatus.class);
+    }
+
+    @Test
+    void whenOneFallbackIsConfiguredAndPrimaryFails_thenRevocationInfoListShouldHaveTwoElements() throws Exception {
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any()))
+            .thenThrow(new OCSPClientException());
+        when(ocspClient.request(eq(FALLBACK_URI), any()))
+            .thenThrow(new OCSPClientException());
+
+        FallbackOcspService fallbackService = mock(FallbackOcspService.class);
+        when(fallbackService.getAccessLocation()).thenReturn(FALLBACK_URI);
+        when(fallbackService.doesSupportNonce()).thenReturn(false);
+        when(fallbackService.getNextFallback()).thenReturn(null);
+
+        OcspService primaryService = mock(OcspService.class);
+        when(primaryService.getAccessLocation()).thenReturn(PRIMARY_URI);
+        when(primaryService.doesSupportNonce()).thenReturn(false);
+        when(primaryService.getFallbackService()).thenReturn(fallbackService);
+
+        OcspServiceProvider ocspServiceProvider = mock(OcspServiceProvider.class);
+        when(ocspServiceProvider.getService(any())).thenReturn(primaryService);
+
+        ResilientOcspCertificateRevocationChecker checker = new ResilientOcspCertificateRevocationChecker(
+            ocspClient,
+            ocspServiceProvider,
+            CircuitBreakerConfig.ofDefaults(),
+            null,
+            OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW,
+            OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
+            false
+        );
+
+        ResilientUserCertificateOCSPCheckFailedException ex = assertThrows(ResilientUserCertificateOCSPCheckFailedException.class, () -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA));
+        List<RevocationInfo> revocationInfoList = ex.getValidationInfo().revocationInfoList();
+        assertThat(revocationInfoList.size()).isEqualTo(2);
+    }
+
+    @Test
+    void whenNoFallbacksAreConfigured_thenRevocationInfoListShouldHaveOneElement() throws Exception {
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any()))
+            .thenThrow(new OCSPClientException());
+        when(ocspClient.request(eq(FALLBACK_URI), any()))
+            .thenThrow(new OCSPClientException());
+
+        OcspService primaryService = mock(OcspService.class);
+        when(primaryService.getAccessLocation()).thenReturn(PRIMARY_URI);
+        when(primaryService.doesSupportNonce()).thenReturn(false);
+        when(primaryService.getFallbackService()).thenReturn(null);
+
+        OcspServiceProvider ocspServiceProvider = mock(OcspServiceProvider.class);
+        when(ocspServiceProvider.getService(any())).thenReturn(primaryService);
+
+        ResilientOcspCertificateRevocationChecker checker = new ResilientOcspCertificateRevocationChecker(
+            ocspClient,
+            ocspServiceProvider,
+            CircuitBreakerConfig.ofDefaults(),
+            null,
+            OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW,
+            OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
+            false
+        );
+
+        ResilientUserCertificateOCSPCheckFailedException ex = assertThrows(ResilientUserCertificateOCSPCheckFailedException.class, () -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA));
+        List<RevocationInfo> revocationInfoList = ex.getValidationInfo().revocationInfoList();
+        assertThat(revocationInfoList.size()).isEqualTo(1);
+    }
+
+    @Test
+    void whenOcspResponseStatusIsUnauthorized_thenThrows() throws Exception {
+        OCSPResp ocspRespStatusUnauthorized = new OCSPResp(getOcspResponseBytesFromResources("ocsp_response_unauthorized.der"));
+
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any()))
+            .thenReturn(ocspRespStatusUnauthorized);
+
+        ResilientOcspCertificateRevocationChecker checker = buildChecker(ocspClient, null, false);
+        ResilientUserCertificateOCSPCheckFailedException ex = assertThrows(ResilientUserCertificateOCSPCheckFailedException.class, () -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA));
+
+        Map<String, Object> responseAttributes = ex.getValidationInfo().revocationInfoList().get(0).ocspResponseAttributes();
+        ResilientUserCertificateOCSPCheckFailedException firstException = (ResilientUserCertificateOCSPCheckFailedException) responseAttributes.get(RevocationInfo.KEY_OCSP_ERROR);
+        assertThat(firstException.getMessage()).isEqualTo("Response status: unauthorized");
     }
 
     private ResilientOcspCertificateRevocationChecker buildChecker(OcspClient ocspClient, RetryConfig retryConfig, boolean rejectUnknownOcspResponseStatus) throws Exception {
@@ -265,5 +378,11 @@ public class ResilientOcspCertificateRevocationCheckerTest {
             OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
             rejectUnknownOcspResponseStatus
         );
+    }
+
+    private CertificateStatus getCertificateStatus(OCSPResp ocspResp) throws Exception {
+        final BasicOCSPResp basicResponse = (BasicOCSPResp) ocspResp.getResponseObject();
+        final SingleResp certStatusResponse = basicResponse.getResponses()[0];
+        return certStatusResponse.getCertStatus();
     }
 }
