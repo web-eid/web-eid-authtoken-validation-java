@@ -81,9 +81,8 @@ public class ResilientOcspCertificateRevocationCheckerTest {
         ocspRespGood = new OCSPResp(getOcspResponseBytesFromResources("ocsp_response.der"));
     }
 
-    // TODO Rename to match the expected result
     @Test
-    void whenMultipleValidationCalls_thenStaleListenersMutatePreviousResults() throws Exception {
+    void whenMultipleValidationCalls_thenPreviousResultsAreNotModified() throws Exception {
         OcspClient ocspClient = mock(OcspClient.class);
         when(ocspClient.request(eq(PRIMARY_URI), any()))
             .thenThrow(new OCSPClientException("Primary OCSP service unavailable (call1)"))
