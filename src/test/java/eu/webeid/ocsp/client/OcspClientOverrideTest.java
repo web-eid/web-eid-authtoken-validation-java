@@ -30,7 +30,6 @@ import eu.webeid.security.testutil.AuthTokenValidators;
 import eu.webeid.security.validator.AuthTokenValidator;
 import org.bouncycastle.cert.ocsp.OCSPReq;
 import org.bouncycastle.cert.ocsp.OCSPResp;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -43,15 +42,12 @@ import static eu.webeid.ocsp.service.OcspServiceMaker.getAiaOcspServiceProvider;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-// TODO Fix failing tests
-@Disabled
 class OcspClientOverrideTest extends AbstractTestWithValidator {
 
     @Test
     void whenOcspClientIsOverridden_thenItIsUsed() throws JceException, CertificateException, IOException {
         final AuthTokenValidator validator = getAuthTokenValidatorWithOverriddenOcspClient(new OcpClientThatThrows());
         assertThatThrownBy(() -> validator.validate(validAuthToken, VALID_CHALLENGE_NONCE))
-            .cause()
             .isInstanceOf(OcpClientThatThrowsException.class);
     }
 
