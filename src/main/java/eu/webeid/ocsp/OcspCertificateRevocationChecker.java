@@ -64,7 +64,7 @@ import java.util.Map;
 import static eu.webeid.security.util.DateAndTime.requirePositiveDuration;
 import static java.util.Objects.requireNonNull;
 
-public final class OcspCertificateRevocationChecker implements CertificateRevocationChecker {
+public class OcspCertificateRevocationChecker implements CertificateRevocationChecker {
 
     public static final Duration DEFAULT_TIME_SKEW = Duration.ofMinutes(15);
     public static final Duration DEFAULT_THIS_UPDATE_AGE = Duration.ofMinutes(2);
@@ -131,7 +131,7 @@ public final class OcspCertificateRevocationChecker implements CertificateRevoca
             }
             LOG.debug("OCSP response received successfully");
 
-            verifyOcspResponse(basicResponse, ocspService, certificateId);
+            verifyOcspResponse(basicResponse, ocspService, certificateId, false, false);
             if (ocspService.doesSupportNonce()) {
                 checkNonce(request, basicResponse, ocspResponderUri);
             }
@@ -144,7 +144,7 @@ public final class OcspCertificateRevocationChecker implements CertificateRevoca
         }
     }
 
-    private void verifyOcspResponse(BasicOCSPResp basicResponse, OcspService ocspService, CertificateID requestCertificateId) throws AuthTokenException, OCSPException, CertificateException, OperatorCreationException {
+    protected void verifyOcspResponse(BasicOCSPResp basicResponse, OcspService ocspService, CertificateID requestCertificateId, boolean rejectUnknownOcspResponseStatus, boolean allowThisUpdateInPast) throws AuthTokenException, OCSPException, CertificateException, OperatorCreationException {
         // The verification algorithm follows RFC 2560, https://www.ietf.org/rfc/rfc2560.txt.
         //
         // 3.2.  Signed Response Acceptance Requirements
@@ -195,14 +195,14 @@ public final class OcspCertificateRevocationChecker implements CertificateRevoca
         //      be available about the status of the certificate (nextUpdate) is
         //      greater than the current time.
 
-        OcspResponseValidator.validateCertificateStatusUpdateTime(certStatusResponse, allowedOcspResponseTimeSkew, maxOcspResponseThisUpdateAge, ocspService.getAccessLocation());
+        OcspResponseValidator.validateCertificateStatusUpdateTime(certStatusResponse, allowedOcspResponseTimeSkew, maxOcspResponseThisUpdateAge, ocspService.getAccessLocation(), allowThisUpdateInPast);
 
         // Now we can accept the signed response as valid and validate the certificate status.
-        OcspResponseValidator.validateSubjectCertificateStatus(certStatusResponse, ocspService.getAccessLocation());
+        OcspResponseValidator.validateSubjectCertificateStatus(certStatusResponse, ocspService.getAccessLocation(), rejectUnknownOcspResponseStatus);
         LOG.debug("OCSP check result is GOOD");
     }
 
-    private static void checkNonce(OCSPReq request, BasicOCSPResp response, URI ocspResponderUri) throws UserCertificateOCSPCheckFailedException {
+    protected static void checkNonce(OCSPReq request, BasicOCSPResp response, URI ocspResponderUri) throws UserCertificateOCSPCheckFailedException {
         final Extension requestNonce = request.getExtension(OCSPObjectIdentifiers.id_pkix_ocsp_nonce);
         final Extension responseNonce = response.getExtension(OCSPObjectIdentifiers.id_pkix_ocsp_nonce);
         if (requestNonce == null || responseNonce == null) {
@@ -215,14 +215,14 @@ public final class OcspCertificateRevocationChecker implements CertificateRevoca
         }
     }
 
-    private static CertificateID getCertificateId(X509Certificate subjectCertificate, X509Certificate issuerCertificate) throws CertificateEncodingException, IOException, OCSPException {
+    protected static CertificateID getCertificateId(X509Certificate subjectCertificate, X509Certificate issuerCertificate) throws CertificateEncodingException, IOException, OCSPException {
         final BigInteger serial = subjectCertificate.getSerialNumber();
         final DigestCalculator digestCalculator = DigestCalculatorImpl.sha1();
         return new CertificateID(digestCalculator,
             new X509CertificateHolder(issuerCertificate.getEncoded()), serial);
     }
 
-    private static String ocspStatusToString(int status) {
+    protected static String ocspStatusToString(int status) {
         return switch (status) {
             case OCSPResp.MALFORMED_REQUEST -> "malformed request";
             case OCSPResp.INTERNAL_ERROR -> "internal error";
@@ -233,4 +233,11 @@ public final class OcspCertificateRevocationChecker implements CertificateRevoca
         };
     }
 
+    protected OcspClient getOcspClient() {
+        return ocspClient;
+    }
+
+    protected OcspServiceProvider getOcspServiceProvider() {
+        return ocspServiceProvider;
+    }
 }

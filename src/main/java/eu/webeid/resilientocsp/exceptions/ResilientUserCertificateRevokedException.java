@@ -20,16 +20,24 @@
  * SOFTWARE.
  */
 
-package eu.webeid.ocsp.client;
+package eu.webeid.resilientocsp.exceptions;
 
-import eu.webeid.ocsp.exceptions.OCSPClientException;
-import org.bouncycastle.cert.ocsp.OCSPReq;
-import org.bouncycastle.cert.ocsp.OCSPResp;
+import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
+import eu.webeid.security.validator.ValidationInfo;
 
-import java.net.URI;
+public class ResilientUserCertificateRevokedException extends UserCertificateRevokedException {
 
-public interface OcspClient {
+    private ValidationInfo validationInfo;
 
-    OCSPResp request(URI url, OCSPReq request) throws OCSPClientException;
+    public ResilientUserCertificateRevokedException(ValidationInfo validationInfo) {
+        this.validationInfo = validationInfo;
+    }
 
+    public ValidationInfo getValidationInfo() {
+        return validationInfo;
+    }
+
+    public void setValidationInfo(ValidationInfo validationInfo) {
+        this.validationInfo = validationInfo;
+    }
 }
