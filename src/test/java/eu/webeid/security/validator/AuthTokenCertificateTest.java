@@ -32,7 +32,7 @@ import eu.webeid.security.exceptions.CertificateNotTrustedException;
 import eu.webeid.security.exceptions.CertificateNotYetValidException;
 import eu.webeid.security.exceptions.UserCertificateDisallowedPolicyException;
 import eu.webeid.security.exceptions.UserCertificateMissingPurposeException;
-import eu.webeid.security.exceptions.UserCertificateRevokedException;
+import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
 import eu.webeid.security.exceptions.UserCertificateWrongPurposeException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
 import eu.webeid.security.testutil.AuthTokenValidators;
@@ -275,17 +275,6 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     void whenCertificateIsRevoked_thenOcspCheckFails() throws Exception {
         mockDate("2020-01-01", mockedClock);
         final AuthTokenValidator validatorWithOcspCheck = AuthTokenValidators.getAuthTokenValidatorWithOcspCheck();
-        final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", REVOKED_CERT);
-        assertThatThrownBy(() -> validatorWithOcspCheck
-            .validate(token, VALID_CHALLENGE_NONCE))
-            .isInstanceOf(UserCertificateRevokedException.class);
-    }
-
-    @Test
-    @Disabled("A new designated test OCSP responder certificate was issued whose validity period no longer overlaps with the revoked certificate")
-    void whenCertificateIsRevoked_thenOcspCheckWithDesignatedOcspServiceFails() throws Exception {
-        mockDate("2020-01-01", mockedClock);
-        final AuthTokenValidator validatorWithOcspCheck = AuthTokenValidators.getAuthTokenValidatorWithDesignatedOcspCheck();
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", REVOKED_CERT);
         assertThatThrownBy(() -> validatorWithOcspCheck
             .validate(token, VALID_CHALLENGE_NONCE))

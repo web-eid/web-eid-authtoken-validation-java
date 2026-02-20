@@ -20,48 +20,37 @@
  * SOFTWARE.
  */
 
-package eu.webeid.security.util;
+package eu.webeid.ocsp.service;
 
-import io.jsonwebtoken.Clock;
-
-import java.time.Duration;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
-import java.util.Date;
+import java.net.URI;
+import java.security.cert.CertStore;
+import java.security.cert.TrustAnchor;
+import java.util.Collection;
 import java.util.Objects;
+import java.util.Set;
 
-public final class DateAndTime {
+public class AiaOcspServiceConfiguration {
 
-    public static ZonedDateTime utcNow() {
-        return ZonedDateTime.now(ZoneOffset.UTC);
+    private final Collection<URI> nonceDisabledOcspUrls;
+    private final Set<TrustAnchor> trustedCACertificateAnchors;
+    private final CertStore trustedCACertificateCertStore;
+
+    public AiaOcspServiceConfiguration(Collection<URI> nonceDisabledOcspUrls, Set<TrustAnchor> trustedCACertificateAnchors, CertStore trustedCACertificateCertStore) {
+        this.nonceDisabledOcspUrls = Objects.requireNonNull(nonceDisabledOcspUrls);
+        this.trustedCACertificateAnchors = Objects.requireNonNull(trustedCACertificateAnchors);
+        this.trustedCACertificateCertStore = Objects.requireNonNull(trustedCACertificateCertStore);
     }
 
-    public static Duration requirePositiveDuration(Duration duration, String fieldName) {
-        Objects.requireNonNull(duration, fieldName + " must not be null");
-        if (duration.isNegative() || duration.isZero()) {
-            throw new IllegalArgumentException(fieldName + " must be greater than zero");
-        }
-        return duration;
+    public Collection<URI> getNonceDisabledOcspUrls() {
+        return nonceDisabledOcspUrls;
     }
 
-    public static class DefaultClock implements Clock {
-
-        // Allows mocking of time-dependent behavior with Mockito.mockStatic() in tests.
-        private static final Clock instance = new DefaultClock();
-
-        public static Clock getInstance() {
-            return instance;
-        }
-
-        @Override
-        public Date now() {
-            return new Date();
-        }
-
+    public Set<TrustAnchor> getTrustedCACertificateAnchors() {
+        return trustedCACertificateAnchors;
     }
 
-    private DateAndTime() {
-        throw new IllegalStateException("Utility class");
+    public CertStore getTrustedCACertificateCertStore() {
+        return trustedCACertificateCertStore;
     }
 
 }

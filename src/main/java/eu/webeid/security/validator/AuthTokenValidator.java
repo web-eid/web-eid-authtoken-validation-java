@@ -57,6 +57,6 @@ public interface AuthTokenValidator {
      * @return validated subject certificate
      * @throws AuthTokenException when validation fails
      */
-    X509Certificate validate(WebEidAuthToken authToken, String currentChallengeNonce) throws AuthTokenException;
+    ValidationInfo validate(WebEidAuthToken authToken, String currentChallengeNonce) throws AuthTokenException;
 
 }
