@@ -20,16 +20,17 @@
  * SOFTWARE.
  */
 
-package eu.webeid.ocsp.client;
+package eu.webeid.ocsp.exceptions;
 
-import eu.webeid.ocsp.exceptions.OCSPClientException;
-import org.bouncycastle.cert.ocsp.OCSPReq;
-import org.bouncycastle.cert.ocsp.OCSPResp;
+import eu.webeid.security.exceptions.AuthTokenException;
 
 import java.net.URI;
 
-public interface OcspClient {
+import static eu.webeid.ocsp.exceptions.OcspResponderUriMessage.withResponderUri;
 
-    OCSPResp request(URI url, OCSPReq request) throws OCSPClientException;
+public class UserCertificateUnknownException extends AuthTokenException {
 
+    public UserCertificateUnknownException(String msg, URI ocspResponderUri) {
+        super(withResponderUri("User certificate status is unknown: " + msg, ocspResponderUri));
+    }
 }

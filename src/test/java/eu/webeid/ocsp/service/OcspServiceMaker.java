@@ -41,7 +41,7 @@ public class OcspServiceMaker {
 
     private static final String TEST_OCSP_ACCESS_LOCATION = "http://demo.sk.ee/ocsp";
     private static final List<X509Certificate> TRUSTED_CA_CERTIFICATES;
-    private static final URI TEST_ESTEID_2015 = URI.create("http://aia.demo.sk.ee/esteid2015");
+    private static final String ISSUER_CN = "TEST of ESTEID-SK 2015";
 
     static {
         try {
@@ -69,7 +69,7 @@ public class OcspServiceMaker {
 
     private static AiaOcspServiceConfiguration getAiaOcspServiceConfiguration() throws JceException {
         return new AiaOcspServiceConfiguration(
-            Set.of(TEST_ESTEID_2015),
+            Set.of(ISSUER_CN),
             CertificateValidator.buildTrustAnchorsFromCertificates(TRUSTED_CA_CERTIFICATES),
             CertificateValidator.buildCertStoreFromCertificates(TRUSTED_CA_CERTIFICATES));
     }

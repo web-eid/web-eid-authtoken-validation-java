@@ -24,6 +24,10 @@ package eu.webeid.ocsp.protocol;
 
 import eu.webeid.ocsp.OcspCertificateRevocationChecker;
 import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
+import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
+import eu.webeid.ocsp.exceptions.UserCertificateUnknownException;
+import org.bouncycastle.cert.ocsp.BasicOCSPResp;
+import org.bouncycastle.cert.ocsp.OCSPResp;
 import org.bouncycastle.cert.ocsp.SingleResp;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +37,9 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
+import static eu.webeid.ocsp.OcspCertificateRevocationCheckerTest.getOcspResponseBytesFromResources;
 import static eu.webeid.ocsp.protocol.OcspResponseValidator.validateCertificateStatusUpdateTime;
+import static eu.webeid.ocsp.protocol.OcspResponseValidator.validateSubjectCertificateStatus;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.Mockito.mock;
@@ -53,7 +59,7 @@ class OcspResponseValidatorTest {
         var nextUpdateWithinAgeLimit = Date.from(now.minus(THIS_UPDATE_AGE.minusSeconds(2)));
         when(mockResponse.getThisUpdate()).thenReturn(thisUpdateWithinAgeLimit);
         when(mockResponse.getNextUpdate()).thenReturn(nextUpdateWithinAgeLimit);
-        assertThatCode(() -> validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE, OCSP_URL))
+        assertThatCode(() -> validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE, OCSP_URL, false))
             .doesNotThrowAnyException();
     }
 
@@ -67,7 +73,7 @@ class OcspResponseValidatorTest {
         when(mockResponse.getNextUpdate()).thenReturn(beforeThisUpdate);
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
-                validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE, OCSP_URL))
+                validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE, OCSP_URL, false))
             .withMessageStartingWith("User certificate revocation check has failed: "
                 + "Certificate status update time check failed: "
                 + "nextUpdate '" + beforeThisUpdate.toInstant() + "' is before thisUpdate '" + thisUpdateWithinAgeLimit.toInstant() + "'");
@@ -81,7 +87,7 @@ class OcspResponseValidatorTest {
         when(mockResponse.getThisUpdate()).thenReturn(halfHourBeforeNow);
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
-                validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE, OCSP_URL))
+                validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE, OCSP_URL, false))
             .withMessageStartingWith("User certificate revocation check has failed: "
                 + "Certificate status update time check failed: "
                 + "thisUpdate '" + halfHourBeforeNow.toInstant() + "' is too old, minimum time allowed: ");
@@ -95,7 +101,7 @@ class OcspResponseValidatorTest {
         when(mockResponse.getThisUpdate()).thenReturn(halfHourAfterNow);
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
-                validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE, OCSP_URL))
+                validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE, OCSP_URL, false))
             .withMessageStartingWith("User certificate revocation check has failed: "
                 + "Certificate status update time check failed: "
                 + "thisUpdate '" + halfHourAfterNow.toInstant() + "' is too far in the future, latest allowed: ");
@@ -111,15 +117,39 @@ class OcspResponseValidatorTest {
         when(mockResponse.getNextUpdate()).thenReturn(halfHourBeforeNow);
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() ->
-                validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE, OCSP_URL))
+                validateCertificateStatusUpdateTime(mockResponse, TIME_SKEW, THIS_UPDATE_AGE, OCSP_URL, false))
             .withMessage("User certificate revocation check has failed: "
                 + "Certificate status update time check failed: "
                 + "nextUpdate '" + halfHourBeforeNow.toInstant() + "' is in the past"
                 + " (OCSP responder: https://example.org)");
     }
 
+    @Test
+    void whenRejectUnknownOcspResponseStatusIsFalse_ThenUnknownStatusThrowsUserCertificateRevokedException() throws Exception {
+        SingleResp unknownCertStatus = getUnknownCertStatusResponse();
+        assertThatExceptionOfType(UserCertificateRevokedException.class)
+            .isThrownBy(() ->
+                validateSubjectCertificateStatus(unknownCertStatus, OCSP_URL, false))
+            .withMessage("User certificate has been revoked: Unknown status (OCSP responder: https://example.org)");
+    }
+
+    @Test
+    void whenRejectUnknownOcspResponseStatusIsTrue_ThenUnknownStatusThrowsUserCertificateUnknownException() throws Exception {
+        SingleResp unknownCertStatus = getUnknownCertStatusResponse();
+        assertThatExceptionOfType(UserCertificateUnknownException.class)
+            .isThrownBy(() ->
+                validateSubjectCertificateStatus(unknownCertStatus, OCSP_URL, true))
+            .withMessage("User certificate status is unknown: Unknown status (OCSP responder: https://example.org)");
+    }
+
     private static Date getThisUpdateWithinAgeLimit(Instant now) {
         return Date.from(now.minus(THIS_UPDATE_AGE.minusSeconds(1)));
+    }
+
+    private static SingleResp getUnknownCertStatusResponse() throws Exception {
+        final OCSPResp ocspRespUnknown = new OCSPResp(getOcspResponseBytesFromResources("ocsp_response_unknown.der"));
+        final BasicOCSPResp basicResponse = (BasicOCSPResp) ocspRespUnknown.getResponseObject();
+        return basicResponse.getResponses()[0];
     }
 
 }

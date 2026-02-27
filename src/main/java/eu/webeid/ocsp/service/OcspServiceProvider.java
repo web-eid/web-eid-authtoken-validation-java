@@ -22,22 +22,40 @@
 
 package eu.webeid.ocsp.service;
 
+import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.security.exceptions.AuthTokenException;
 
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
+
+import static eu.webeid.ocsp.protocol.IssuerCommonName.getIssuerCommonName;
 
 public class OcspServiceProvider {
 
     private final DesignatedOcspService designatedOcspService;
     private final AiaOcspServiceConfiguration aiaOcspServiceConfiguration;
+    private final Map<String, FallbackOcspService> fallbackOcspServiceMap = new HashMap<>();
 
     public OcspServiceProvider(DesignatedOcspServiceConfiguration designatedOcspServiceConfiguration, AiaOcspServiceConfiguration aiaOcspServiceConfiguration) {
+        this(designatedOcspServiceConfiguration, aiaOcspServiceConfiguration, null);
+    }
+
+    public OcspServiceProvider(DesignatedOcspServiceConfiguration designatedOcspServiceConfiguration, AiaOcspServiceConfiguration aiaOcspServiceConfiguration, Collection<FallbackOcspServiceConfiguration> fallbackOcspServiceConfigurations) {
         designatedOcspService = designatedOcspServiceConfiguration != null ?
             new DesignatedOcspService(designatedOcspServiceConfiguration)
             : null;
         this.aiaOcspServiceConfiguration = Objects.requireNonNull(aiaOcspServiceConfiguration, "aiaOcspServiceConfiguration");
+        if (fallbackOcspServiceConfigurations != null) {
+            for (FallbackOcspServiceConfiguration configuration : fallbackOcspServiceConfigurations) {
+                String issuerCN = getIssuerCommonName(configuration.getResponderCertificate()).orElseThrow(() ->
+                    new RuntimeException("Certificate does not contain issuer CN"));
+                fallbackOcspServiceMap.put(issuerCN, new FallbackOcspService(configuration));
+            }
+        }
     }
 
     /**
@@ -46,14 +64,16 @@ public class OcspServiceProvider {
      *
      * @param certificate subject certificate that is to be checked with OCSP
      * @return either the designated or AIA OCSP service instance
-     * @throws AuthTokenException when AIA URL is not found in certificate
-     * @throws CertificateEncodingException when certificate is invalid
+     * @throws UserCertificateOCSPCheckFailedException when issuer common name is not found in certificate
+     * @throws IllegalArgumentException when certificate is invalid
      */
     public OcspService getService(X509Certificate certificate) throws AuthTokenException, CertificateEncodingException {
         if (designatedOcspService != null && designatedOcspService.supportsIssuerOf(certificate)) {
             return designatedOcspService;
         }
-        return new AiaOcspService(aiaOcspServiceConfiguration, certificate);
+        String issuerCommonName = getIssuerCommonName(certificate).orElseThrow(() ->
+            new UserCertificateOCSPCheckFailedException("Getting the issuer common name failed"));
+        FallbackOcspService fallbackOcspService = fallbackOcspServiceMap.get(issuerCommonName);
+        return new AiaOcspService(aiaOcspServiceConfiguration, certificate, fallbackOcspService);
     }
-
 }

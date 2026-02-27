@@ -20,16 +20,33 @@
  * SOFTWARE.
  */
 
-package eu.webeid.ocsp.client;
+package eu.webeid.ocsp.protocol;
 
-import eu.webeid.ocsp.exceptions.OCSPClientException;
-import org.bouncycastle.cert.ocsp.OCSPReq;
-import org.bouncycastle.cert.ocsp.OCSPResp;
+import org.bouncycastle.asn1.x500.RDN;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x500.style.BCStyle;
+import org.bouncycastle.asn1.x500.style.IETFUtils;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 
-import java.net.URI;
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.X509Certificate;
+import java.util.Objects;
+import java.util.Optional;
 
-public interface OcspClient {
+public class IssuerCommonName {
 
-    OCSPResp request(URI url, OCSPReq request) throws OCSPClientException;
+    public static Optional<String> getIssuerCommonName(X509Certificate certificate) {
+        Objects.requireNonNull(certificate, "certificate");
+        try {
+            X500Name x500Name = new JcaX509CertificateHolder(certificate).getIssuer();
+            final RDN cn = x500Name.getRDNs(BCStyle.CN)[0];
+            return Optional.of(IETFUtils.valueToString(cn.getFirst().getValue()));
+        } catch (CertificateEncodingException e) {
+            return Optional.empty();
+        }
+    }
 
+    private IssuerCommonName() {
+        throw new IllegalStateException("Utility class");
+    }
 }

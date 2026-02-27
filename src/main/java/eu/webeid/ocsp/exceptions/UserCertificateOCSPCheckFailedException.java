@@ -33,6 +33,10 @@ import static eu.webeid.ocsp.exceptions.OcspResponderUriMessage.withResponderUri
  */
 public class UserCertificateOCSPCheckFailedException extends AuthTokenException {
 
+    public UserCertificateOCSPCheckFailedException() {
+        super("User certificate revocation check has failed");
+    }
+
     public UserCertificateOCSPCheckFailedException(Throwable cause, URI ocspResponderUri) {
         super(withResponderUri("User certificate revocation check has failed", ocspResponderUri), cause);
     }
