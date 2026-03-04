@@ -67,7 +67,7 @@ class WebEidMobileAuthInitFilterTest {
             .andReturn();
 
         JsonNode json = mapper.readTree(result.getResponse().getContentAsByteArray());
-        String eidAuthUri = json.get("auth_uri").asText();
+        String eidAuthUri = json.get("authUri").asText();
 
         assertThat(eidAuthUri).startsWith("web-eid-mobile://auth#");
 
@@ -78,6 +78,6 @@ class WebEidMobileAuthInitFilterTest {
         String challengeInSession = ((ChallengeNonce) Objects.requireNonNull(session.getAttribute("challenge-nonce"))).getBase64EncodedNonce();
 
         assertThat(challengeInPayload).isEqualTo(challengeInSession);
-        assertThat(payload.get("login_uri").asText()).endsWith("/auth/mobile/login");
+        assertThat(payload.get("loginUri").asText()).endsWith("/auth/mobile/login");
     }
 }
