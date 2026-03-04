@@ -25,8 +25,6 @@ package eu.webeid.example.service;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import eu.webeid.example.config.WebEidMobileProperties;
 import eu.webeid.example.security.WebEidAuthentication;
 import eu.webeid.example.service.dto.CertificateDTO;
@@ -131,13 +129,11 @@ public class MobileSigningService {
         }).toList();
     }
 
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record MobileInitRequest(
         String requestUri
     ) {
     }
 
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     record RequestObject(
         String responseUri,
