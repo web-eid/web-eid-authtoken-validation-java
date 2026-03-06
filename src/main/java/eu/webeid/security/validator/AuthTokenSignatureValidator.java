@@ -37,23 +37,21 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 
 import static eu.webeid.security.util.Base64Decoder.decodeBase64;
-import static eu.webeid.security.util.Collections.concat;
 import static eu.webeid.security.util.Strings.isNullOrEmpty;
 
 public class AuthTokenSignatureValidator {
 
     // Supported subset of JSON Web Signature algorithms as defined in RFC 7518, sections 3.3, 3.4, 3.5.
     // See https://github.com/web-eid/libelectronic-id/blob/main/include/electronic-id/enums.hpp#L176.
-    private static final Set<String> ALLOWED_SIGNATURE_ALGORITHMS = new HashSet<>(Arrays.asList(
+    private static final Set<String> ALLOWED_SIGNATURE_ALGORITHMS = Set.of(
         "ES256", "ES384", "ES512", // ECDSA
         "PS256", "PS384", "PS512", // RSASSA-PSS
         "RS256", "RS384", "RS512"  // RSASSA-PKCS1-v1_5
-    ));
+    );
 
     private final byte[] originBytes;
 
@@ -115,6 +113,12 @@ public class AuthTokenSignatureValidator {
         if (isNullOrEmpty(argument)) {
             throw new AuthTokenParseException("'" + fieldName + "' is null or empty");
         }
+    }
+
+    private static byte[] concat(byte[] first, byte[] second) {
+        byte[] result = Arrays.copyOf(first, first.length + second.length);
+        System.arraycopy(second, 0, result, first.length, second.length);
+        return result;
     }
 
 }

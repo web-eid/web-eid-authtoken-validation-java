@@ -20,48 +20,20 @@
  * SOFTWARE.
  */
 
-package eu.webeid.security.util;
+package eu.webeid.ocsp.service;
 
-import io.jsonwebtoken.Clock;
+import org.bouncycastle.cert.X509CertificateHolder;
+import eu.webeid.security.exceptions.AuthTokenException;
 
-import java.time.Duration;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
+import java.net.URI;
 import java.util.Date;
-import java.util.Objects;
 
-public final class DateAndTime {
+public interface OcspService {
 
-    public static ZonedDateTime utcNow() {
-        return ZonedDateTime.now(ZoneOffset.UTC);
-    }
+    boolean doesSupportNonce();
 
-    public static Duration requirePositiveDuration(Duration duration, String fieldName) {
-        Objects.requireNonNull(duration, fieldName + " must not be null");
-        if (duration.isNegative() || duration.isZero()) {
-            throw new IllegalArgumentException(fieldName + " must be greater than zero");
-        }
-        return duration;
-    }
+    URI getAccessLocation();
 
-    public static class DefaultClock implements Clock {
-
-        // Allows mocking of time-dependent behavior with Mockito.mockStatic() in tests.
-        private static final Clock instance = new DefaultClock();
-
-        public static Clock getInstance() {
-            return instance;
-        }
-
-        @Override
-        public Date now() {
-            return new Date();
-        }
-
-    }
-
-    private DateAndTime() {
-        throw new IllegalStateException("Utility class");
-    }
+    void validateResponderCertificate(X509CertificateHolder cert, Date now) throws AuthTokenException;
 
 }
