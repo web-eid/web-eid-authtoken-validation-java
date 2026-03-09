@@ -17,7 +17,7 @@
 	</description>
 
 	<properties>
-		<java.version>17</java.version>
+		<java.version>21</java.version>
 		<maven-surefire-plugin.version>3.5.3</maven-surefire-plugin.version>
 		<webeid.version>4.0.0-SNAPSHOT</webeid.version>
 		<digidoc4j.version>6.0.1</digidoc4j.version>
