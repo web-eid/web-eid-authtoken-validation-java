@@ -23,6 +23,7 @@
 package eu.webeid.example.security;
 
 import eu.webeid.security.authtoken.SupportedSignatureAlgorithm;
+import eu.webeid.security.authtoken.UnverifiedSigningCertificate;
 import eu.webeid.security.certificate.CertificateData;
 import org.springframework.lang.Nullable;
 import org.springframework.security.core.Authentication;
@@ -48,11 +49,17 @@ public class WebEidAuthentication extends PreAuthenticatedAuthenticationToken im
         this.supportedSignatureAlgorithms = supportedSignatureAlgorithms;
     }
 
-    public static Authentication fromCertificate(X509Certificate userCertificate, @Nullable String signingCertificate, @Nullable List<SupportedSignatureAlgorithm> supportedSignatureAlgorithms, List<GrantedAuthority> authorities) throws CertificateEncodingException {
+    public static Authentication fromCertificate(X509Certificate userCertificate, @Nullable UnverifiedSigningCertificate signingCertificate, List<GrantedAuthority> authorities) throws CertificateEncodingException {
         final String principalName = getPrincipalNameFromCertificate(userCertificate);
         final String idCode = CertificateData.getSubjectIdCode(userCertificate)
             .orElseThrow(() -> new CertificateEncodingException("Certificate does not contain subject ID code"));
-        return new WebEidAuthentication(principalName, idCode, signingCertificate, supportedSignatureAlgorithms, authorities);
+        return new WebEidAuthentication(
+            principalName,
+            idCode,
+            signingCertificate != null ? signingCertificate.getCertificate() : null,
+            signingCertificate != null ? signingCertificate.getSupportedSignatureAlgorithms() : null,
+            authorities
+        );
     }
 
     private static String getPrincipalNameFromCertificate(X509Certificate userCertificate) throws CertificateEncodingException {

@@ -78,6 +78,12 @@ class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
 
     @Override
     public X509Certificate validate(WebEidAuthToken token, String currentChallengeNonce) throws AuthTokenException {
+        if (isExactV10Format(token.getFormat()) && token.getUnverifiedSigningCertificates() != null) {
+            throw new AuthTokenParseException(
+                "'unverifiedSigningCertificates' field is not allowed for format '" + token.getFormat() + "'"
+            );
+        }
+
         if (token.getUnverifiedCertificate() == null || token.getUnverifiedCertificate().isEmpty()) {
             throw new AuthTokenParseException("'unverifiedCertificate' field is missing, null or empty");
         }
@@ -104,5 +110,9 @@ class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
         );
 
         return subjectCertificate;
+    }
+
+    private static boolean isExactV10Format(String format) {
+        return V1_SUPPORTED_TOKEN_FORMAT_PREFIX.equals(format) || "web-eid:1.0".equals(format);
     }
 }

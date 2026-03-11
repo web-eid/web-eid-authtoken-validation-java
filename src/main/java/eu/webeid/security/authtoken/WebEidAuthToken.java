@@ -34,8 +34,7 @@ public class WebEidAuthToken {
     private String algorithm;
     private String format;
 
-    private String unverifiedSigningCertificate;
-    private List<SupportedSignatureAlgorithm> supportedSignatureAlgorithms;
+    private List<UnverifiedSigningCertificate> unverifiedSigningCertificates;
 
     public String getUnverifiedCertificate() {
         return unverifiedCertificate;
@@ -69,19 +68,11 @@ public class WebEidAuthToken {
         this.format = format;
     }
 
-    public String getUnverifiedSigningCertificate() {
-        return unverifiedSigningCertificate;
+    public List<UnverifiedSigningCertificate> getUnverifiedSigningCertificates() {
+        return unverifiedSigningCertificates;
     }
 
-    public void setUnverifiedSigningCertificate(String unverifiedSigningCertificate) {
-        this.unverifiedSigningCertificate = unverifiedSigningCertificate;
-    }
-
-    public List<SupportedSignatureAlgorithm> getSupportedSignatureAlgorithms() {
-        return supportedSignatureAlgorithms;
-    }
-
-    public void setSupportedSignatureAlgorithms(List<SupportedSignatureAlgorithm> supportedSignatureAlgorithms) {
-        this.supportedSignatureAlgorithms = supportedSignatureAlgorithms;
+    public void setUnverifiedSigningCertificates(List<UnverifiedSigningCertificate> unverifiedSigningCertificates) {
+        this.unverifiedSigningCertificates = unverifiedSigningCertificates;
     }
 }
