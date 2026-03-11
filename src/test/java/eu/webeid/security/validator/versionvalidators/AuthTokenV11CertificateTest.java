@@ -25,6 +25,7 @@ package eu.webeid.security.validator.versionvalidators;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.certificate.CertificateLoader;
@@ -64,8 +65,10 @@ class AuthTokenV11CertificateTest extends AbstractTestWithValidator {
 
     private static final String V11_AUTH_TOKEN = "{\"algorithm\":\"ES384\"," +
         "\"unverifiedCertificate\":\"MIIEBDCCA2WgAwIBAgIQY5OGshxoPMFg+Wfc0gFEaTAKBggqhkjOPQQDBDBgMQswCQYDVQQGEwJFRTEbMBkGA1UECgwSU0sgSUQgU29sdXRpb25zIEFTMRcwFQYDVQRhDA5OVFJFRS0xMDc0NzAxMzEbMBkGA1UEAwwSVEVTVCBvZiBFU1RFSUQyMDE4MB4XDTIxMDcyMjEyNDMwOFoXDTI2MDcwOTIxNTk1OVowfzELMAkGA1UEBhMCRUUxKjAoBgNVBAMMIUrDlUVPUkcsSkFBSy1LUklTVEpBTiwzODAwMTA4NTcxODEQMA4GA1UEBAwHSsOVRU9SRzEWMBQGA1UEKgwNSkFBSy1LUklTVEpBTjEaMBgGA1UEBRMRUE5PRUUtMzgwMDEwODU3MTgwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAAQmwEKsJTjaMHSaZj19hb9EJaJlwbKc5VFzmlGMFSJVk4dDy+eUxa5KOA7tWXqzcmhh5SYdv+MxcaQKlKWLMa36pfgv20FpEDb03GCtLqjLTRZ7649PugAQ5EmAqIic29CjggHDMIIBvzAJBgNVHRMEAjAAMA4GA1UdDwEB/wQEAwIDiDBHBgNVHSAEQDA+MDIGCysGAQQBg5EhAQIBMCMwIQYIKwYBBQUHAgEWFWh0dHBzOi8vd3d3LnNrLmVlL0NQUzAIBgYEAI96AQIwHwYDVR0RBBgwFoEUMzgwMDEwODU3MThAZWVzdGkuZWUwHQYDVR0OBBYEFPlp/ceABC52itoqppEmbf71TJz6MGEGCCsGAQUFBwEDBFUwUzBRBgYEAI5GAQUwRzBFFj9odHRwczovL3NrLmVlL2VuL3JlcG9zaXRvcnkvY29uZGl0aW9ucy1mb3ItdXNlLW9mLWNlcnRpZmljYXRlcy8TAkVOMCAGA1UdJQEB/wQWMBQGCCsGAQUFBwMCBggrBgEFBQcDBDAfBgNVHSMEGDAWgBTAhJkpxE6fOwI09pnhClYACCk+ezBzBggrBgEFBQcBAQRnMGUwLAYIKwYBBQUHMAGGIGh0dHA6Ly9haWEuZGVtby5zay5lZS9lc3RlaWQyMDE4MDUGCCsGAQUFBzAChilodHRwOi8vYy5zay5lZS9UZXN0X29mX0VTVEVJRDIwMTguZGVyLmNydDAKBggqhkjOPQQDBAOBjAAwgYgCQgDCAgybz0u3W+tGI+AX+PiI5CrE9ptEHO5eezR1Jo4j7iGaO0i39xTGUB+NSC7P6AQbyE/ywqJjA1a62jTLcS9GHAJCARxN4NO4eVdWU3zVohCXm8WN3DWA7XUcn9TZiLGQ29P4xfQZOXJi/z4PNRRsR4plvSNB3dfyBvZn31HhC7my8woi\"," +
-        "\"unverifiedSigningCertificate\":\"X5C\"," +
-        "\"supportedSignatureAlgorithms\":[{\"cryptoAlgorithm\":\"RSA\",\"hashFunction\":\"SHA-256\",\"paddingScheme\":\"PKCS1.5\"}]," +
+        "\"unverifiedSigningCertificates\":[{" +
+        "\"certificate\":\"X5C\"," +
+        "\"supportedSignatureAlgorithms\":[{\"cryptoAlgorithm\":\"RSA\",\"hashFunction\":\"SHA-256\",\"paddingScheme\":\"PKCS1.5\"}]" +
+        "}]," +
         "\"appVersion\":\"https://web-eid.eu/web-eid-mobile-app/releases/v1.0.0\"," +
         "\"signature\":\"xsjXsQvVYXWcdV0YPhxLthJxtf0//R8p9WFFlYJGRARrl1ruyoAUwl0xeHgeZOKeJtwiCYCNWJzCG3VM3ydgt92bKhhk1u0JXIPVqvOkmDY72OCN4q73Y8iGSPVTgjk93TgquHlodf7YcqZNhutwNNf3oldHEWJD5zmkdwdpBFXgeOwTAdFwGljDQZbHr3h1Dr+apUDuloS0WuIzUuu8YXN2b8lh8FCTlF0G0DEjhHd/MGx8dbe3UTLHmD7K9DXv4zLJs6EF9i2v/C10SIBQDkPBSVPqMxCDPECjbEPi2+ds94eU7ThOhOQlFFtJ4KjQNTUa2crSixH7cYZF2rNNmA==\"," +
         "\"format\":\"web-eid:1.1\"}";
@@ -115,7 +118,7 @@ class AuthTokenV11CertificateTest extends AbstractTestWithValidator {
     void whenV11SigningCertificateFieldIsMissing_thenValidationFails() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         ObjectNode node = (ObjectNode) mapper.readTree(V11_AUTH_TOKEN);
-        node.remove("unverifiedSigningCertificate");
+        node.remove("unverifiedSigningCertificates");
         WebEidAuthToken token = OBJECT_READER.readValue(node.toString());
 
         AuthTokenVersion11Validator spyValidator = spyAuthTokenVersion11Validator();
@@ -123,7 +126,7 @@ class AuthTokenV11CertificateTest extends AbstractTestWithValidator {
 
         assertThatThrownBy(() -> spyValidator.validate(token, VALID_CHALLENGE_NONCE))
             .isInstanceOf(AuthTokenParseException.class)
-            .hasMessage("'unverifiedSigningCertificate' field is missing, null or empty for format 'web-eid:1.1'");
+            .hasMessage("'unverifiedSigningCertificates' field is missing, null or empty for format 'web-eid:1.1'");
     }
 
     @Test
@@ -187,7 +190,7 @@ class AuthTokenV11CertificateTest extends AbstractTestWithValidator {
         try (MockedStatic<CertificateLoader> mocked = mockStatic(CertificateLoader.class)) {
             mocked.when(() -> CertificateLoader.decodeCertificateFromBase64(parsedToken.getUnverifiedCertificate()))
                 .thenReturn(realSubjectCert);
-            mocked.when(() -> CertificateLoader.decodeCertificateFromBase64(parsedToken.getUnverifiedSigningCertificate()))
+            mocked.when(() -> CertificateLoader.decodeCertificateFromBase64(parsedToken.getUnverifiedSigningCertificates().getFirst().getCertificate()))
                 .thenReturn(mockSigningCert);
 
             assertThatThrownBy(() -> spyValidator.validate(parsedToken, VALID_CHALLENGE_NONCE))
@@ -210,7 +213,7 @@ class AuthTokenV11CertificateTest extends AbstractTestWithValidator {
         try (MockedStatic<CertificateLoader> mocked = mockStatic(CertificateLoader.class)) {
             mocked.when(() -> CertificateLoader.decodeCertificateFromBase64(parsedToken.getUnverifiedCertificate()))
                 .thenReturn(realSubjectCert);
-            mocked.when(() -> CertificateLoader.decodeCertificateFromBase64(parsedToken.getUnverifiedSigningCertificate()))
+            mocked.when(() -> CertificateLoader.decodeCertificateFromBase64(parsedToken.getUnverifiedSigningCertificates().getFirst().getCertificate()))
                 .thenReturn(mockSigningCert);
 
             assertThatThrownBy(() -> spyValidator.validate(parsedToken, VALID_CHALLENGE_NONCE))
@@ -236,7 +239,7 @@ class AuthTokenV11CertificateTest extends AbstractTestWithValidator {
         try (MockedStatic<CertificateLoader> mocked = mockStatic(CertificateLoader.class)) {
             mocked.when(() -> CertificateLoader.decodeCertificateFromBase64(parsedToken.getUnverifiedCertificate()))
                 .thenReturn(realSubjectCert);
-            mocked.when(() -> CertificateLoader.decodeCertificateFromBase64(parsedToken.getUnverifiedSigningCertificate()))
+            mocked.when(() -> CertificateLoader.decodeCertificateFromBase64(parsedToken.getUnverifiedSigningCertificates().getFirst().getCertificate()))
                 .thenReturn(signingCert);
 
             assertThatThrownBy(() -> spyValidator.validate(parsedToken, VALID_CHALLENGE_NONCE))
@@ -260,7 +263,12 @@ class AuthTokenV11CertificateTest extends AbstractTestWithValidator {
     private static WebEidAuthToken getWebEidAuthToken(String cert) throws JsonProcessingException {
         ObjectMapper mapper = new ObjectMapper();
         ObjectNode node = (ObjectNode) mapper.readTree(V11_AUTH_TOKEN);
-        node.put("unverifiedSigningCertificate", cert);
+
+        ArrayNode certs = (ArrayNode) node.get("unverifiedSigningCertificates");
+        ObjectNode certNode = (ObjectNode) certs.get(0);
+
+        certNode.put("certificate", cert);
+
         return OBJECT_READER.readValue(node.toString());
     }
 
