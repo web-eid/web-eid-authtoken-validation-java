@@ -38,6 +38,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
@@ -76,14 +77,10 @@ public class WebEidAuthenticationProvider implements AuthenticationProvider {
         try {
             final String nonce = challengeNonceStore.getAndRemove().getBase64EncodedNonce();
             final X509Certificate userCertificate = tokenValidator.validate(authToken, nonce);
-            final String signingCertificate = requireSigningCert
-                ? authToken.getUnverifiedSigningCertificate()
+            final var signingCertificate = requireSigningCert && !CollectionUtils.isEmpty(authToken.getUnverifiedSigningCertificates())
+                ? authToken.getUnverifiedSigningCertificates().getFirst() // NOTE: Handling multiple signing certificates is out of scope of this example.
                 : null;
-            final List<SupportedSignatureAlgorithm> supportedSignatureAlgorithms = requireSigningCert
-                ? authToken.getSupportedSignatureAlgorithms()
-                : null;
-
-            return WebEidAuthentication.fromCertificate(userCertificate, signingCertificate, supportedSignatureAlgorithms, authorities);
+            return WebEidAuthentication.fromCertificate(userCertificate, signingCertificate, authorities);
         } catch (AuthTokenException e) {
             throw new AuthenticationServiceException("Web eID token validation failed", e);
         } catch (CertificateEncodingException e) {
