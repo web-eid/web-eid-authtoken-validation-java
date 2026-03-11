@@ -23,6 +23,7 @@
 package eu.webeid.security.validator.versionvalidators;
 
 import eu.webeid.security.authtoken.WebEidAuthToken;
+import eu.webeid.security.authtoken.UnverifiedSigningCertificate;
 import eu.webeid.security.exceptions.AuthTokenParseException;
 import eu.webeid.security.validator.AuthTokenSignatureValidator;
 import eu.webeid.security.validator.AuthTokenValidationConfiguration;
@@ -35,6 +36,7 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.security.cert.CertStore;
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -75,10 +77,22 @@ class AuthTokenVersion1ValidatorTest {
     void whenUnverifiedCertificateMissing_thenValidationFails() {
         WebEidAuthToken token = mock(WebEidAuthToken.class);
         when(token.getFormat()).thenReturn("web-eid:1");
+        when(token.getUnverifiedSigningCertificates()).thenReturn(null);
         when(token.getUnverifiedCertificate()).thenReturn(null);
 
         assertThatThrownBy(() -> validator.validate(token, "nonce"))
             .isInstanceOf(AuthTokenParseException.class)
             .hasMessageContaining("'unverifiedCertificate' field is missing");
+    }
+
+    @Test
+    void whenUnverifiedSigningCertificatesPresentForV1_thenValidationFails() {
+        WebEidAuthToken token = mock(WebEidAuthToken.class);
+        when(token.getFormat()).thenReturn("web-eid:1");
+        when(token.getUnverifiedSigningCertificates()).thenReturn(List.of(mock(UnverifiedSigningCertificate.class)));
+
+        assertThatThrownBy(() -> validator.validate(token, "nonce"))
+            .isInstanceOf(AuthTokenParseException.class)
+            .hasMessageContaining("'unverifiedSigningCertificates' field is not allowed for format 'web-eid:1'");
     }
 }
