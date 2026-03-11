@@ -23,6 +23,7 @@
 package eu.webeid.security.validator.versionvalidators;
 
 import eu.webeid.security.authtoken.SupportedSignatureAlgorithm;
+import eu.webeid.security.authtoken.UnverifiedSigningCertificate;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.certificate.CertificateLoader;
 import eu.webeid.security.exceptions.AuthTokenException;
@@ -45,6 +46,7 @@ import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -90,25 +92,32 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
     @Override
     public X509Certificate validate(WebEidAuthToken token, String currentChallengeNonce) throws AuthTokenException {
         final X509Certificate subjectCertificate = validateV1(token, currentChallengeNonce);
-        final X509Certificate signingCertificate = validateSigningCertificateExists(token);
-        validateSupportedSignatureAlgorithms(token.getSupportedSignatureAlgorithms());
-        validateSameSubject(subjectCertificate, signingCertificate);
-        validateSameIssuer(subjectCertificate, signingCertificate);
-        validateSigningCertificateValidity(signingCertificate);
-        validateKeyUsage(signingCertificate);
+        final List<X509Certificate> signingCertificates = validateSigningCertificates(token);
+        for (X509Certificate signingCertificate : signingCertificates) {
+            validateSameSubject(subjectCertificate, signingCertificate);
+            validateSameIssuer(subjectCertificate, signingCertificate);
+            validateSigningCertificateValidity(signingCertificate);
+            validateKeyUsage(signingCertificate);
+        }
 
         return subjectCertificate;
     }
 
-    private static void validateSupportedSignatureAlgorithms(List<SupportedSignatureAlgorithm> algorithms) throws AuthTokenParseException {
+    private static void validateSupportedSignatureAlgorithms(UnverifiedSigningCertificate cert) throws AuthTokenParseException {
+        List<SupportedSignatureAlgorithm> algorithms = cert.getSupportedSignatureAlgorithms();
+
         if (algorithms == null || algorithms.isEmpty()) {
             throw new AuthTokenParseException("'supportedSignatureAlgorithms' field is missing");
         }
 
-        boolean hasInvalid = algorithms.stream().anyMatch(supportedSignatureAlgorithm ->
-            !SUPPORTED_SIGNING_CRYPTO_ALGORITHMS.contains(supportedSignatureAlgorithm.getCryptoAlgorithm()) ||
-                !SUPPORTED_SIGNING_HASH_FUNCTIONS.contains(supportedSignatureAlgorithm.getHashFunction()) ||
-                !SUPPORTED_SIGNING_PADDING_SCHEMES.contains(supportedSignatureAlgorithm.getPaddingScheme())
+        boolean hasInvalid = algorithms.stream().anyMatch(algorithm ->
+            algorithm == null ||
+                algorithm.getCryptoAlgorithm() == null ||
+                algorithm.getHashFunction() == null ||
+                algorithm.getPaddingScheme() == null ||
+                !SUPPORTED_SIGNING_CRYPTO_ALGORITHMS.contains(algorithm.getCryptoAlgorithm()) ||
+                !SUPPORTED_SIGNING_HASH_FUNCTIONS.contains(algorithm.getHashFunction()) ||
+                !SUPPORTED_SIGNING_PADDING_SCHEMES.contains(algorithm.getPaddingScheme())
         );
 
         if (hasInvalid) {
@@ -116,11 +125,24 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
         }
     }
 
-    private static X509Certificate validateSigningCertificateExists(WebEidAuthToken token) throws AuthTokenParseException, CertificateDecodingException {
-        if (isNullOrEmpty(token.getUnverifiedSigningCertificate())) {
-            throw new AuthTokenParseException("'unverifiedSigningCertificate' field is missing, null or empty for format 'web-eid:1.1'");
+    private static List<X509Certificate> validateSigningCertificates(WebEidAuthToken token) throws AuthTokenParseException, CertificateDecodingException {
+        List<UnverifiedSigningCertificate> signingCertificates = token.getUnverifiedSigningCertificates();
+
+        if (signingCertificates == null || signingCertificates.isEmpty()) {
+            throw new AuthTokenParseException("'unverifiedSigningCertificates' field is missing, null or empty for format 'web-eid:1.1'");
         }
-        return CertificateLoader.decodeCertificateFromBase64(token.getUnverifiedSigningCertificate());
+
+        List<X509Certificate> result = new ArrayList<>();
+
+        for (UnverifiedSigningCertificate certificate : signingCertificates) {
+            if (certificate == null || isNullOrEmpty(certificate.getCertificate())) {
+                throw new AuthTokenParseException("'unverifiedSigningCertificates' contains a null or empty entry for format 'web-eid:1.1'");
+            }
+            validateSupportedSignatureAlgorithms(certificate);
+            result.add(CertificateLoader.decodeCertificateFromBase64(certificate.getCertificate()));
+        }
+
+        return result;
     }
 
     private static void validateSameSubject(X509Certificate subjectCertificate, X509Certificate signingCertificate)
