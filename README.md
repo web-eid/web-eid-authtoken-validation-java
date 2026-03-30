@@ -174,7 +174,7 @@ public final class WebEidChallengeNonceFilter extends OncePerRequestFilter {
 }
 ```
 
-Similarly, the `WebEidMobileAuthInitFilter` handles `/auth/mobile/init` requests for Web eID for Mobile authentication flow by generating a challenge nonce and returning a deep link URI. This deep link contains both the challenge nonce and a login URI for the mobile authentication flow.
+The `WebEidMobileAuthInitFilter` handles `/auth/mobile/init` requests for authentication flows using **Web eID token format v1.1**. It generates a challenge nonce and returns a deep link URI that embeds both the challenge nonce and the authentication endpoint required for initiating the v1.1 flow.
 See the full implementation [here](example/src/main/java/eu/webeid/example/security/WebEidMobileAuthInitFilter.java).
 
 ```java
@@ -230,9 +230,12 @@ The gist of the validation is [in the `authenticate()` method](example/blob/main
 
 ```java
 try {
-  String nonce = challengeNonceStore.getAndRemove().getBase64EncodedNonce();
-  X509Certificate userCertificate = tokenValidator.validate(authToken, nonce);
-  return WebEidAuthentication.fromCertificate(userCertificate, authorities);
+    final String nonce = challengeNonceStore.getAndRemove().getBase64EncodedNonce();
+    final X509Certificate userCertificate = tokenValidator.validate(authToken, nonce);
+    final var signingCertificate = requireSigningCert && !CollectionUtils.isEmpty(authToken.getUnverifiedSigningCertificates())
+        ? authToken.getUnverifiedSigningCertificates().getFirst() // NOTE: Handling multiple signing certificates is out of scope of this example.
+        : null;
+                return WebEidAuthentication.fromCertificate(userCertificate, signingCertificate, authorities);
 } catch (AuthTokenException e) {
   ...
 ```
@@ -252,6 +255,7 @@ try {
   - [Basic usage](#basic-usage-1)
   - [Extended configuration](#extended-configuration-1)
 - [Differences between version 1 and version 2](#differences-between-version-1-and-version-2)
+- [Authentication token format versions](#authentication-token-format-versions)
 
 # Introduction
 
@@ -266,7 +270,7 @@ In the following,
 - **origin** is defined as the website origin, the URL serving the web application,
 - **challenge nonce** (or challenge) is defined as a cryptographic nonce, a large random number that can be used only once, with at least 256 bits of entropy.
 
-The Web eID authentication token is a JSON data structure that looks like the following example:
+The Web eID authentication token (format **`web-eid:1.0`**) is a JSON data structure that looks like the following example:
 
 ```json
 {
@@ -298,6 +302,55 @@ It contains the following fields:
 
 The value that is signed by the user’s authentication private key and included in the `signature` field is `hash(origin)+hash(challenge)`. The hash function is used before concatenation to ensure field separation as the hash of a value is guaranteed to have a fixed length. Otherwise the origin `example.com` with challenge nonce `.eu1234` and another origin `example.com.eu` with challenge nonce `1234` would result in the same value after concatenation. The hash function `hash` is the same hash function that is used in the signature algorithm, for example SHA256 in case of RS256.
 
+The Web eID authentication token (format **`web-eid:1.1`**) is a JSON data structure that looks like the following example:
+
+```json
+{
+  "unverifiedCertificate": "MIIFozCCA4ugAwIBAgIQHFpdK-zCQsFW4...",
+  "algorithm": "RS256",
+  "signature": "HBjNXIaUskXbfhzYQHvwjKDUWfNu4yxXZha...",
+  "unverifiedSigningCertificates": [
+    {
+      "certificate": "MIIFikACB3ugAwASAgIHHFrtdZ-zeQsas1...",
+      "supportedSignatureAlgorithms": [
+        {
+          "cryptoAlgorithm": "ECC",
+          "hashFunction": "SHA-384",
+          "paddingScheme": "NONE"
+        }
+      ]
+    }
+  ],
+  "format": "web-eid:1.1",
+  "appVersion": "https://web-eid.eu/web-eid-app/releases/v2.0.0"
+}
+```
+It contains the following fields:
+
+- `unverifiedSigningCertificates`: an array of objects containing signing certificate information.
+
+Each object inside `unverifiedSigningCertificates` contains:
+
+- `certificate`: base64-encoded DER-encoded signing certificate,
+
+- `supportedSignatureAlgorithms`: list of supported algorithms in the following format:
+
+    - `cryptoAlgorithm`: the cryptographic algorithm used for the key,
+
+    - `hashFunction`: the hashing algorithm used,
+
+    - `paddingScheme`: the padding scheme used (if applicable).
+
+
+Allowed values are:
+
+    cryptoAlgorithm: "ECC", "RSA"
+
+    hashFunction: 
+      "SHA-224", "SHA-256", "SHA-384", "SHA-512", 
+      "SHA3-224", "SHA3-256", "SHA3-384", "SHA3-512"
+
+    paddingScheme: "NONE", "PKCS1.5", "PSS"
 
 # Authentication token validation
 
@@ -305,8 +358,12 @@ The authentication token validation process consists of two stages:
 
 - First, **user certificate validation**: the validator parses the token and extracts the user certificate from the *unverifiedCertificate* field. Then it checks the certificate expiration, purpose and policies. Next it checks that the certificate is signed by a trusted CA and checks the certificate status with OCSP.
 - Second, **token signature validation**: the validator validates that the token signature was created using the provided user certificate by reconstructing the signed data `hash(origin)+hash(challenge)` and using the public key from the certificate to verify the signature in the `signature` field. If the signature verification succeeds, then the origin and challenge nonce have been implicitly and correctly verified without the need to implement any additional security checks.
+- Additional validation for **Web eID authentication tokens (format v1.1)**:
+  - **Subject match check**: The subject of the signing certificate must match the subject of the authentication certificate.
+    This ensures both certificates belong to the same user.
+  - **Signing certificate validation**: Expiration, key usage, and policies are checked. The certificate must be signed by a trusted certificate authority. OCSP is used to verify the revocation status.
 
-The website back end must lookup the challenge nonce from its local store using an identifier specific to the browser session, to guarantee that the authentication token was received from the same browser to which the corresponding challenge nonce was issued. The website back end must guarantee that the challenge nonce lifetime is limited and that its expiration is checked, and that it can be used only once by removing it from the store during validation.
+The website back end must look up the challenge nonce from its local store using an identifier specific to the browser session, to guarantee that the authentication token was received from the same browser to which the corresponding challenge nonce was issued. The website back end must guarantee that the challenge nonce lifetime is limited and that its expiration is checked, and that it can be used only once by removing it from the store during validation.
 
 ## Basic usage
 
@@ -431,3 +488,17 @@ NonceGenerator generator = new NonceGeneratorBuilder()
 In version 1, the generated challenge nonces were stored in a JSR107 compatible cache. The goal of using a cache was to support stateful and stateless authentication with a universal API that uses the same underlying mechanism. However, in case the website had a CSRF vulnerability, this made the solution vulnerable to [forged login attacks](https://en.wikipedia.org/wiki/Cross-site_request_forgery#Forging_login_requests) (the attacker could trick the victim to submit the authentication token with the attacker's challenge nonce to the website using a CSRF attack, so that the victim was authenticated to the website as the attacker). To mitigate this attack, in version 2 the requirement is that the library adopter must guarantee that the authentication token is received from the same browser to which the corresponding challenge nonce was issued. The recommended solution is to use a session-backed challenge nonce store, as in the code examples above. The library no longer uses the JSR107 cache API and provides a `ChallengeNonceStore` interface instead.
 
 In the internal implementation, the Web eID authentication token format changed in version 2. In version 1, the authentication token was in the OpenID X509 ID Token (JWT) format in order to be compatible with the standard OpenID Connect ID Token specification. During independent security review it was pointed out that any similarities of the Web eID authentication token to the JWT format are actually undesirable, as they would imply that the claims presented in the Web eID authentication token can be trusted and processed, while in fact they must be ignored, as they can be manipulated at the client side. The presence of the claims in the authentication token introduces a risk of vulnerabilities in case the authentication implementer decides to rely on any of them for making security critical decisions or decides to apply the same standard validation workflow that is applied to standard JWTs. Since there does not exist a standardized format for an authentication proof that corresponds to the requirements of the Web eID authentication protocol, a special purpose JSON-based format for the Web eID authentication token was adopted in version 2. The format is described in detail in the section *[Authentication token format](#authentication-token-format)*, and the full analysis of the format change is available in [this article](https://web-eid.github.io/web-eid-system-architecture-doc/web-eid-auth-token-v2-format-spec.pdf).
+
+# Authentication Token Format Versions
+
+The Web eID authentication protocol defines two token formats currently supported by this library:
+
+- **Format v1.0** – Used in desktop Web eID authentication flows with traditional smart card readers.  
+
+- **Format v1.1** – An extended token format introduced for broader device compatibility and improved interoperability.  
+  In addition to the fields present in v1.0, it includes:
+    - `unverifiedSigningCertificates` – an array of signing certificate entries. Each entry contains:
+        - `certificate` – a base64-encoded DER-encoded signing certificate;
+        - `supportedSignatureAlgorithms` – a list of supported signature algorithms associated with that certificate;
+
+Both token formats follow the same validation principles, differing only in the structure of embedded certificates and the additional verification steps required for v1.1.
