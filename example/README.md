@@ -118,7 +118,7 @@ The `src/main/java/eu/webeid/example` directory contains the Spring Boot applica
 -   `security`: Web eID authentication token validation library integration with Spring Security
     -   `AuthenticationProvider` and `AuthenticationProcessingFilter` for handling Web eID authentication tokens,
     -   `WebEidChallengeNonceFilter` for issuing the challenge nonce required by the authentication flow,
-    -   `WebEidMobileAuthInitFilter` for issuing the challenge nonce and generating the deep link with the authentication request, used to initiate the mobile authentication flow,
+    -   `WebEidMobileAuthInitFilter` for issuing the challenge nonce and generating the authentication request link (OS-verified App Link / Universal Link), used to initiate the mobile authentication flow,
     -   `WebEidAjaxLoginProcessingFilter` and `WebEidLoginPageGeneratingFilter` for handling login requests.
 -   `service`: Web eID signing service implementation that uses DigiDoc4j, and DigiDoc4j runtime configuration.
     -   `SigningService`: prepares ASiC-E containers and finalizes signatures.
@@ -245,7 +245,7 @@ Strict Transport Security (HSTS) header and the `JSESSIONID` session cookie has 
 
 ## Deployment
 
-A Docker Compose configuration file `docker-compose.yml` is available in the root of the project for packaging the application in a Docker image so that it can be deployed with a container enginge.
+A Docker Compose configuration file `docker-compose.yml` is available in the root of the project for packaging the application in a Docker image so that it can be deployed with a container engine.
 
 Build the Docker image with [Jib](https://github.com/GoogleContainerTools/jib) as follows:
 
