@@ -79,7 +79,7 @@ public class SessionBackedChallengeNonceStore implements ChallengeNonceStore {
 
 ## 3. Configure the challenge nonce generator
 
-The validation library needs to generate authentication challenge nonces and store them for later validation in the challenge nonce store. Overview of challenge nonce usage is provided in the [Web eID system architecture document](https://github.com/web-eid/web-eid-system-architecture-doc#authentication-1). The challenge nonce generator will be used in the REST endpoint that issues challenges; it is thread-safe and should be scoped as a singleton.
+The validation library needs to generate authentication challenge nonces and store them for later validation in the challenge nonce store. Overview of challenge nonce usage is provided in the [Web eID system architecture document](https://github.com/web-eid/web-eid-system-architecture-doc#authentication-1). The challenge nonce generator will be used in the filter that issues challenges; it is thread-safe and should be scoped as a singleton.
 
 Configure the challenge nonce generator as follows:
 
@@ -99,7 +99,7 @@ import eu.webeid.security.challenge.ChallengeNonceStore;
 
 ## 4. Add trusted certificate authority certificates
 
-You must explicitly specify which **intermediate** certificate authorities (CAs) are trusted to issue the eID authentication and OCSP responder certificates. CA certificates can be loaded from either the truststore file, resources or any stream source. We use the [`CertificateLoader`](https://github.com/web-eid/web-eid-authtoken-validation-java/blob/main/src/main/java/eu/webeid/security/certificate/CertificateLoader.java) helper class to load CA certificates from resources here, but consider using [the truststore file](./blob/example/main/src/main/java/eu/webeid/example/config/ValidationConfiguration.java#L104-L123) instead.
+You must explicitly specify which **intermediate** certificate authorities (CAs) are trusted to issue the eID authentication and OCSP responder certificates. CA certificates can be loaded from either the truststore file, resources or any stream source. We use the [`CertificateLoader`](src/main/java/eu/webeid/security/certificate/CertificateLoader.java) helper class to load CA certificates from resources here, but consider loading the truststore file (see [loadTrustedCACertificatesFromTrustStore](example/main/src/main/java/eu/webeid/example/config/ValidationConfiguration.java#L104-L123)) instead.
 
 First, copy the trusted certificates, for example `ESTEID2018.cer`, to `resources/cacerts/`, then load the certificates as follows:
 
@@ -136,7 +136,7 @@ import eu.webeid.security.validator.AuthTokenValidatorBuilder;
 
 ## 6. Add a filter for issuing challenge nonces
 
-Request Filters that issue challenge nonces for regular Web eID and  Web eID for Mobile authentication flows are required for authentication.
+Request Filters that issue challenge nonces for regular Web eID and Web eID for Mobile authentication flows are required for authentication.
 The filters must support POST requests.
 
 The `WebEidChallengeNonceFilter` handles `/auth/challenge` requests and issues a new nonce for regular Web eID authentication flow.
@@ -204,7 +204,7 @@ protected void doFilterInternal(@NonNull HttpServletRequest request,
 }
 ```
 
-Both filters are registered in the Spring Security filter chain in ApplicationConfiguration
+Both filters are registered in the Spring Security filter chain in ApplicationConfiguration.
 See the full implementation [here](example/src/main/java/eu/webeid/example/config/ApplicationConfiguration.java):
 ```java
 http
@@ -222,11 +222,11 @@ Authentication consists of calling the `validate()` method of the authentication
 
 When using [Spring Security](https://spring.io/guides/topicals/spring-security-architecture) with standard cookie-based authentication,
 
-- implement a custom authentication provider that uses the authentication token validator for authentication as shown [here](example/blob/main/src/main/java/eu/webeid/example/security/WebEidAuthenticationProvider.java),
-- implement an AJAX authentication processing filter that extracts the authentication token and passes it to the authentication manager as shown [here](example/blob/main/src/main/java/eu/webeid/example/security/WebEidAjaxLoginProcessingFilter.java),
-- configure the authentication provider and authentication processing filter in the application configuration as shown [here](example/blob/main/src/main/java/eu/webeid/example/config/ApplicationConfiguration.java).
+- implement a custom authentication provider that uses the authentication token validator for authentication as shown [here](example/src/main/java/eu/webeid/example/security/WebEidAuthenticationProvider.java),
+- implement an AJAX authentication processing filter that extracts the authentication token and passes it to the authentication manager as shown [here](example/src/main/java/eu/webeid/example/security/WebEidAjaxLoginProcessingFilter.java),
+- configure the authentication provider and authentication processing filter in the application configuration as shown [here](example/src/main/java/eu/webeid/example/config/ApplicationConfiguration.java).
 
-The gist of the validation is [in the `authenticate()` method](example/blob/main/src/main/java/eu/webeid/example/security/WebEidAuthenticationProvider.java#L74-L76) of the authentication provider:
+The gist of the validation is [in the `authenticate()` method](example/src/main/java/eu/webeid/example/security/WebEidAuthenticationProvider.java#L74-L76) of the authentication provider:
 
 ```java
 try {
@@ -235,7 +235,7 @@ try {
     final var signingCertificate = requireSigningCert && !CollectionUtils.isEmpty(authToken.getUnverifiedSigningCertificates())
         ? authToken.getUnverifiedSigningCertificates().getFirst() // NOTE: Handling multiple signing certificates is out of scope of this example.
         : null;
-                return WebEidAuthentication.fromCertificate(userCertificate, signingCertificate, authorities);
+            return WebEidAuthentication.fromCertificate(userCertificate, signingCertificate, authorities);
 } catch (AuthTokenException e) {
   ...
 ```
@@ -259,7 +259,7 @@ try {
 
 # Introduction
 
-The Web eID authentication token validation library for Java contains the implementation of the Web eID authentication token validation process in its entirety to ensure that the authentication token sent by the Web eID browser extension contains valid, consistent data that has not been modified by a third party. It also implements secure challenge nonce generation as required by the Web eID authentication protocol. It is easy to configure and integrate into your authentication service.
+The Web eID authentication token validation library for Java contains the implementation of the Web eID authentication token validation process in its entirety to ensure that the authentication token sent by the Web eID browser extension or mobile application contains valid, consistent data that has not been modified by a third party. It also implements secure challenge nonce generation as required by the Web eID authentication protocol. It is easy to configure and integrate into your authentication service.
 
 The authentication protocol, authentication token format, validation requirements and challenge nonce usage is described in more detail in the [Web eID system architecture document](https://github.com/web-eid/web-eid-system-architecture-doc#authentication-1).
 
@@ -358,10 +358,11 @@ The authentication token validation process consists of two stages:
 
 - First, **user certificate validation**: the validator parses the token and extracts the user certificate from the *unverifiedCertificate* field. Then it checks the certificate expiration, purpose and policies. Next it checks that the certificate is signed by a trusted CA and checks the certificate status with OCSP.
 - Second, **token signature validation**: the validator validates that the token signature was created using the provided user certificate by reconstructing the signed data `hash(origin)+hash(challenge)` and using the public key from the certificate to verify the signature in the `signature` field. If the signature verification succeeds, then the origin and challenge nonce have been implicitly and correctly verified without the need to implement any additional security checks.
-- Additional validation for **Web eID authentication tokens (format v1.1)**:
-  - **Subject match check**: The subject of the signing certificate must match the subject of the authentication certificate.
-    This ensures both certificates belong to the same user.
-  - **Signing certificate validation**: Expiration, key usage, and policies are checked. The certificate must be signed by a trusted certificate authority. OCSP is used to verify the revocation status.
+- Additional validation for **Web eID authentication tokens (format v1.1)**: the token must contain the `unverifiedSigningCertificates` field with at least one signing certificate entry. Each entry's `supportedSignatureAlgorithms` are validated against the set of allowed cryptographic algorithms, hash functions, and padding schemes. For each signing certificate, the following checks are performed:
+    - The subject must match the subject of the authentication certificate, ensuring both certificates belong to the same user.
+    - The issuing authority must match that of the authentication certificate, verified via the Authority Key Identifier (AKI) extension.
+    - The certificate must not be expired.
+    - The certificate must contain the non-repudiation key usage bit required for digital signatures.
 
 The website back end must look up the challenge nonce from its local store using an identifier specific to the browser session, to guarantee that the authentication token was received from the same browser to which the corresponding challenge nonce was issued. The website back end must guarantee that the challenge nonce lifetime is limited and that its expiration is checked, and that it can be used only once by removing it from the store during validation.
 
@@ -449,7 +450,7 @@ The authentication protocol requires support for generating challenge nonces, la
 
 The `-Djava.security.egd=file:/dev/./urandom` command line argument is added to `pom.xml` to avoid the risk of having the code execution blocked unexpectedly during random generation. Without this, the JVM uses `/dev/random`, which can block, to seed the `SecureRandom` class.
 
-The authentication protocol requires a REST endpoint that issues challenge nonces as described in section *[6. Add a REST endpoint for issuing challenge nonces](#6-add-a-rest-endpoint-for-issuing-challenge-nonces)*.
+The authentication protocol requires a filter that issues challenge nonces as described in section *[6. Add a filter for issuing challenge nonces](#6-add-a-filter-for-issuing-challenge-nonces)*.
 
 Nonce usage is described in more detail in the [Web eID system architecture document](https://github.com/web-eid/web-eid-system-architecture-doc#authentication-1).
 
@@ -469,18 +470,18 @@ The `generateAndStoreNonce()` method both generates the nonce and saves it in th
 
 ## Extended configuration  
 
-The following additional configuration options are available in `NonceGeneratorBuilder`:
+The following additional configuration options are available in `ChallengeNonceGeneratorBuilder`:
 
 - `withNonceTtl(Duration duration)` – overrides the default challenge nonce time-to-live duration. When the time-to-live passes, the nonce is considered to be expired. Default challenge nonce time-to-live is 5 minutes.
 - `withSecureRandom(SecureRandom)` - allows to specify a custom `SecureRandom` instance.
 
 Extended configuration example:  
 ```java  
-NonceGenerator generator = new NonceGeneratorBuilder()  
-        .withChallengeNonceStore(store)
-        .withNonceTtl(Duration.ofMinutes(5))
-        .withSecureRandom(customSecureRandom)  
-        .build();
+ChallengeNonceGenerator generator = new ChallengeNonceGeneratorBuilder()
+    .withChallengeNonceStore(store)
+    .withNonceTtl(Duration.ofMinutes(5))
+    .withSecureRandom(customSecureRandom)
+    .build();
 ```
 
 # Differences between version 1 and version 2
@@ -495,10 +496,9 @@ The Web eID authentication protocol defines two token formats currently supporte
 
 - **Format v1.0** – Used in desktop Web eID authentication flows with traditional smart card readers.  
 
-- **Format v1.1** – An extended token format introduced for broader device compatibility and improved interoperability.  
-  In addition to the fields present in v1.0, it includes:
-    - `unverifiedSigningCertificates` – an array of signing certificate entries. Each entry contains:
-        - `certificate` – a base64-encoded DER-encoded signing certificate;
-        - `supportedSignatureAlgorithms` – a list of supported signature algorithms associated with that certificate;
+- **Format v1.1** – An extended authentication token format that allows including signing certificate information in the authentication response.
+  - `unverifiedSigningCertificates` – an array of signing certificate entries. Each entry contains:
+    - `certificate` – a base64-encoded DER-encoded signing certificate;
+    - `supportedSignatureAlgorithms` – a list of supported signature algorithms associated with that certificate;
 
 Both token formats follow the same validation principles, differing only in the structure of embedded certificates and the additional verification steps required for v1.1.
