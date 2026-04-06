@@ -150,9 +150,9 @@ Spring Security has CSRF protection enabled by default. Web eID requires CSRF pr
 
 ### Integration with Web eID components
 
-Detailed overview of Java code changes required for integrating Web eID authentication token validation is available in the [_web-eid-authtoken-validation-java_ library README](https://github.com/web-eid/web-eid-authtoken-validation-java/README.md). There are instructions for configuring the nonce generator, trusted certificate authority certificates, authentication token validator, Spring Security authentication integration and security filters. The corresponding Java code is in the `src/main/java/eu/webeid/example/{config,security,web/rest}` directories.
+Detailed overview of Java code changes required for integrating Web eID authentication token validation is available in the [_web-eid-authtoken-validation-java_ library README](https://github.com/web-eid/web-eid-authtoken-validation-java/blob/main/README.md). There are instructions for configuring the nonce generator, trusted certificate authority certificates, authentication token validator, Spring Security authentication integration and security filters. The corresponding Java code is in the `src/main/java/eu/webeid/example/{config,security,web/rest}` directories.
 
-A similar overview of JavaScript and HTML code changes required for authentication and digital signing with Web eID is available in the [web-eid.js library README](https://github.com/web-eid/web-eid.js/README.md). The corresponding JavaScript and HTML code is in the `src/resources/{static,templates}` directories.
+A similar overview of JavaScript and HTML code changes required for authentication and digital signing with Web eID is available in the [web-eid.js library README](https://github.com/web-eid/web-eid.js/blob/main/README.md). The corresponding JavaScript and HTML code is in the `src/resources/{static,templates}` directories.
 
 ### Integration with DigiDoc4j components
 
@@ -160,7 +160,7 @@ Java code examples that show how to create and sign data containers that hold si
 
 #### Using the Certificates' _Authority Information Access_ (AIA) extension in DigiDoc4j
 
-In the `SigningService` constructor we have configured DigiDoc4j to use the AIA extension that contains the certificates’ OCSP service location with `signingConfiguration.setPreferAiaOcsp(true)`. Note that there may be limitations to using AIA URLs during signing as the services behind these URLs provide different security and SLA guarantees than dedicated OCSP services, so you should consider using a dedicated OCSP service instead. See the instructions in DigiDoc4j documentation and also the [corresponding section in _web-eid-authtoken-validation-java_ README](https://github.com/web-eid/web-eid-authtoken-validation-java/README.md#certificates-authority-information-access-aia-extension).
+In the `SigningService` constructor we have configured DigiDoc4j to use the AIA extension that contains the certificates’ OCSP service location with `signingConfiguration.setPreferAiaOcsp(true)`. Note that there may be limitations to using AIA URLs during signing as the services behind these URLs provide different security and SLA guarantees than dedicated OCSP services, so you should consider using a dedicated OCSP service instead. See the instructions in DigiDoc4j documentation and also the [corresponding section in _web-eid-authtoken-validation-java_ README](https://github.com/web-eid/web-eid-authtoken-validation-java/blob/main/README.md#certificates-authority-information-access-aia-extension).
 
 #### Using DigiDoc4j in test mode with the `dev` profile
 

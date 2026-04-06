@@ -99,7 +99,7 @@ import eu.webeid.security.challenge.ChallengeNonceStore;
 
 ## 4. Add trusted certificate authority certificates
 
-You must explicitly specify which **intermediate** certificate authorities (CAs) are trusted to issue the eID authentication and OCSP responder certificates. CA certificates can be loaded from either the truststore file, resources or any stream source. We use the [`CertificateLoader`](src/main/java/eu/webeid/security/certificate/CertificateLoader.java) helper class to load CA certificates from resources here, but consider loading the truststore file (see [loadTrustedCACertificatesFromTrustStore](example/main/src/main/java/eu/webeid/example/config/ValidationConfiguration.java#L104-L123)) instead.
+You must explicitly specify which **intermediate** certificate authorities (CAs) are trusted to issue the eID authentication and OCSP responder certificates. CA certificates can be loaded from either the truststore file, resources or any stream source. We use the [`CertificateLoader`](src/main/java/eu/webeid/security/certificate/CertificateLoader.java) helper class to load CA certificates from resources here, but consider loading the truststore file (see [loadTrustedCACertificatesFromTrustStore](example/src/main/java/eu/webeid/example/config/ValidationConfiguration.java#L104-L123)) instead.
 
 First, copy the trusted certificates, for example `ESTEID2018.cer`, to `resources/cacerts/`, then load the certificates as follows:
 
@@ -496,7 +496,7 @@ The Web eID authentication protocol defines two token formats currently supporte
 
 - **Format v1.0** – Used in desktop Web eID authentication flows with traditional smart card readers.  
 
-- **Format v1.1** – An extended authentication token format that allows including signing certificate information in the authentication response.
+- **Format v1.1** – An extended authentication token format that allows signing certificate information to be included in the authentication response.
   - `unverifiedSigningCertificates` – an array of signing certificate entries. Each entry contains:
     - `certificate` – a base64-encoded DER-encoded signing certificate;
     - `supportedSignatureAlgorithms` – a list of supported signature algorithms associated with that certificate;
