@@ -3,24 +3,35 @@
 
 package eu.webeid.ocsp.service;
 
-import org.bouncycastle.cert.X509CertificateHolder;
-import org.junit.jupiter.api.Test;
 import eu.webeid.ocsp.exceptions.OCSPCertificateException;
 import eu.webeid.security.certificate.CertificateValidator;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.BasicConstraints;
+import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.KeyPurposeId;
+import org.bouncycastle.asn1.x509.KeyUsage;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.junit.jupiter.api.Test;
 import eu.webeid.security.testutil.LocalOcspResponder;
 
 import java.net.URI;
+import java.security.cert.CertStore;
+import java.security.cert.TrustAnchor;
+import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
 import static eu.webeid.ocsp.service.OcspServiceMaker.getAiaOcspServiceProvider;
 import static eu.webeid.ocsp.service.OcspServiceMaker.getDesignatedOcspServiceProvider;
+import static eu.webeid.security.testutil.Certificates.getDemoEsteidSk2018AiaOcspResponder;
 import static eu.webeid.security.testutil.Certificates.getJaakKristjanEsteid2018Cert;
+import static eu.webeid.security.testutil.Certificates.getTestEsteid2018CA;
 import static eu.webeid.security.testutil.Certificates.getMariliisEsteid2015Cert;
 import static eu.webeid.security.testutil.Certificates.getTestEsteid2015CA;
-import static eu.webeid.security.testutil.Certificates.getTestEsteid2018CA;
-import static eu.webeid.security.testutil.Certificates.getTestSkOcspResponder2020;
+import static eu.webeid.security.testutil.Certificates.getTestSelfSignedOcspResponder;
+import static eu.webeid.security.testutil.TestCertificateBuilder.buildCertificate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -34,7 +45,7 @@ class OcspServiceProviderTest {
         assertThat(service.getAccessLocation()).isEqualTo(new URI("http://demo.sk.ee/ocsp"));
         assertThat(service.doesSupportNonce()).isTrue();
         assertThatCode(() ->
-            service.validateResponderCertificate(new X509CertificateHolder(getTestSkOcspResponder2020().getEncoded()), getTestEsteid2018CA(), new Date(1630000000000L)))
+            service.validateResponderCertificate(new X509CertificateHolder(getTestSelfSignedOcspResponder().getEncoded()), getTestEsteid2018CA(), new Date(1630000000000L)))
             .doesNotThrowAnyException();
         assertThatCode(() ->
             service.validateResponderCertificate(new X509CertificateHolder(getTestEsteid2018CA().getEncoded()), getTestEsteid2018CA(), new Date(1630000000000L)))
@@ -52,6 +63,9 @@ class OcspServiceProviderTest {
         final OcspService service2015 = ocspServiceProvider.getService(getMariliisEsteid2015Cert(), getTestEsteid2015CA());
         assertThat(service2015.getAccessLocation()).isEqualTo(new URI("http://aia.demo.sk.ee/esteid2015"));
         assertThat(service2015.doesSupportNonce()).isFalse();
+        assertThatCode(() ->
+            service2018.validateResponderCertificate(new X509CertificateHolder(getDemoEsteidSk2018AiaOcspResponder().getEncoded()), getTestEsteid2018CA(), new Date(1630000000000L)))
+            .doesNotThrowAnyException();
     }
 
     @Test
@@ -62,7 +76,7 @@ class OcspServiceProviderTest {
         assertThatExceptionOfType(OCSPCertificateException.class)
             .isThrownBy(() ->
                 service2018.validateResponderCertificate(wrongResponderCert, getTestEsteid2018CA(), new Date(1630000000000L)))
-            .withMessageContaining("does not contain the key usage extension for OCSP response signing");
+            .withMessageContaining("Key Usage extension does not contain Digital Signature, which is required for OCSP response signing");
     }
 
     @Test
@@ -84,6 +98,106 @@ class OcspServiceProviderTest {
             assertThat(provider.getService(first.subject(), first.issuer())).isInstanceOf(DesignatedOcspService.class);
             assertThat(provider.getService(second.subject(), second.issuer())).isInstanceOf(AiaOcspService.class);
         }
+    }
+
+    @Test
+    void whenAiaOcspResponderCertIsCA_thenThrows() throws Exception {
+        final OcspServiceProvider ocspServiceProvider = getAiaOcspServiceProvider();
+        final OcspService service2018 = ocspServiceProvider.getService(getJaakKristjanEsteid2018Cert(), getTestEsteid2018CA());
+        final X509Certificate caResponder = buildCertificate(
+            new Extension(Extension.basicConstraints, true, new BasicConstraints(0).getEncoded()));
+        final X509CertificateHolder caResponderCert = new X509CertificateHolder(caResponder.getEncoded());
+
+        assertThatExceptionOfType(OCSPCertificateException.class)
+            .isThrownBy(() ->
+                service2018.validateResponderCertificate(caResponderCert, getTestEsteid2018CA(), new Date()))
+            .withMessage("Certificate " + caResponder.getSubjectX500Principal() +
+                " must not be a CA certificate (Basic Constraints CA:TRUE is not allowed for OCSP responder)");
+    }
+
+    @Test
+    void whenAiaOcspResponderCertMissingKeyUsageDigitalSignature_thenThrows() throws Exception {
+        final OcspServiceProvider ocspServiceProvider = getAiaOcspServiceProvider();
+        final OcspService service2018 = ocspServiceProvider.getService(getJaakKristjanEsteid2018Cert(), getTestEsteid2018CA());
+        final X509Certificate responderWithoutDigitalSignature = buildCertificate(
+            new Extension(Extension.keyUsage, true, new KeyUsage(KeyUsage.nonRepudiation).getEncoded()));
+        final X509CertificateHolder responderCert = new X509CertificateHolder(responderWithoutDigitalSignature.getEncoded());
+
+        assertThatExceptionOfType(OCSPCertificateException.class)
+            .isThrownBy(() ->
+                service2018.validateResponderCertificate(responderCert, getTestEsteid2018CA(), new Date()))
+            .withMessage("Certificate " + responderWithoutDigitalSignature.getSubjectX500Principal() +
+                " Key Usage extension does not contain Digital Signature, which is required for OCSP response signing");
+    }
+
+    @Test
+    void whenAiaOcspResponderCertMissingOcspSigningEku_thenThrows() throws Exception {
+        final OcspServiceProvider ocspServiceProvider = getAiaOcspServiceProvider();
+        final OcspService service2018 = ocspServiceProvider.getService(getJaakKristjanEsteid2018Cert(), getTestEsteid2018CA());
+        final X509Certificate responderWithoutOcspSigning = buildCertificate(
+            new Extension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature).getEncoded()),
+            new Extension(Extension.extendedKeyUsage, true,
+                new ExtendedKeyUsage(KeyPurposeId.id_kp_clientAuth).getEncoded()));
+        final X509CertificateHolder responderCert = new X509CertificateHolder(responderWithoutOcspSigning.getEncoded());
+
+        assertThatExceptionOfType(OCSPCertificateException.class)
+            .isThrownBy(() ->
+                service2018.validateResponderCertificate(responderCert, getTestEsteid2018CA(), new Date()))
+            .withMessage("Certificate " + responderWithoutOcspSigning.getSubjectX500Principal() +
+                " Extended Key Usage extension does not contain OCSP Signing, which is required for OCSP response signing");
+    }
+
+    @Test
+    void whenFallbackOcspResponderCertIsCA_thenThrows() throws Exception {
+        final FallbackOcspService service = newFallbackOcspServiceWithoutPinnedResponder();
+        final X509Certificate caResponder = buildCertificate(
+            new Extension(Extension.basicConstraints, true, new BasicConstraints(0).getEncoded()));
+        final X509CertificateHolder caResponderCert = new X509CertificateHolder(caResponder.getEncoded());
+
+        assertThatExceptionOfType(OCSPCertificateException.class)
+            .isThrownBy(() ->
+                service.validateResponderCertificate(caResponderCert, getTestEsteid2018CA(), new Date()))
+            .withMessage("Certificate " + caResponder.getSubjectX500Principal() +
+                " must not be a CA certificate (Basic Constraints CA:TRUE is not allowed for OCSP responder)");
+    }
+
+    @Test
+    void whenFallbackOcspResponderCertMissingKeyUsageDigitalSignature_thenThrows() throws Exception {
+        final FallbackOcspService service = newFallbackOcspServiceWithoutPinnedResponder();
+        final X509Certificate responderWithoutDigitalSignature = buildCertificate(
+            new Extension(Extension.keyUsage, true, new KeyUsage(KeyUsage.nonRepudiation).getEncoded()));
+        final X509CertificateHolder responderCert = new X509CertificateHolder(responderWithoutDigitalSignature.getEncoded());
+
+        assertThatExceptionOfType(OCSPCertificateException.class)
+            .isThrownBy(() ->
+                service.validateResponderCertificate(responderCert, getTestEsteid2018CA(), new Date()))
+            .withMessage("Certificate " + responderWithoutDigitalSignature.getSubjectX500Principal() +
+                " Key Usage extension does not contain Digital Signature, which is required for OCSP response signing");
+    }
+
+    @Test
+    void whenFallbackOcspResponderCertMissingOcspSigningEku_thenThrows() throws Exception {
+        final FallbackOcspService service = newFallbackOcspServiceWithoutPinnedResponder();
+        final X509Certificate responderWithoutOcspSigning = buildCertificate(
+            new Extension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature).getEncoded()),
+            new Extension(Extension.extendedKeyUsage, true,
+                new ExtendedKeyUsage(KeyPurposeId.id_kp_clientAuth).getEncoded()));
+        final X509CertificateHolder responderCert = new X509CertificateHolder(responderWithoutOcspSigning.getEncoded());
+
+        assertThatExceptionOfType(OCSPCertificateException.class)
+            .isThrownBy(() ->
+                service.validateResponderCertificate(responderCert, getTestEsteid2018CA(), new Date()))
+            .withMessage("Certificate " + responderWithoutOcspSigning.getSubjectX500Principal() +
+                " Extended Key Usage extension does not contain OCSP Signing, which is required for OCSP response signing");
+    }
+
+    private static FallbackOcspService newFallbackOcspServiceWithoutPinnedResponder() throws Exception {
+        final List<X509Certificate> trustedCAs = List.of(getTestEsteid2018CA());
+        final Set<TrustAnchor> trustAnchors = CertificateValidator.buildTrustAnchorsFromCertificates(trustedCAs);
+        final CertStore certStore = CertificateValidator.buildCertStoreFromCertificates(trustedCAs);
+        final FallbackOcspServiceConfiguration configuration = new FallbackOcspServiceConfiguration(
+            URI.create("http://fallback.demo.sk.ee/ocsp"), null, true, null, new X500Name("CN=TEST ISSUER"), trustAnchors, certStore);
+        return new FallbackOcspService(configuration);
     }
 
 }

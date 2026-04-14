@@ -88,6 +88,9 @@ public class FallbackOcspService implements OcspService {
     }
 
     private void validatePinnedResponderCertificate(X509Certificate responderCertificate) throws OCSPCertificateException {
+        // Certificate extensions (Basic Constraints, Key Usage, Extended Key Usage) are validated at
+        // configuration time in FallbackOcspServiceConfiguration. Since equals() compares the full DER
+        // encoding, a matching certificate is guaranteed to have the same validated extensions.
         // Certificate pinning is implemented simply by comparing the certificates or their public keys,
         // see https://owasp.org/www-community/controls/Certificate_and_Public_Key_Pinning.
         if (!trustedResponderCertificate.equals(responderCertificate)) {
@@ -97,7 +100,10 @@ public class FallbackOcspService implements OcspService {
     }
 
     private void validateResponderCertificateAgainstTrustedCa(X509Certificate responderCertificate, Date now) throws AuthTokenException {
-        OcspResponseValidator.validateHasSigningExtension(responderCertificate);
+        OcspResponseValidator.validateBasicConstraintsNotCA(responderCertificate);
+        OcspResponseValidator.validateKeyUsageDigitalSignature(responderCertificate);
+        OcspResponseValidator.validateKeyUsageNotCertificateSigning(responderCertificate);
+        OcspResponseValidator.validateExtendedKeyUsageOcspSigning(responderCertificate);
         CertificateValidator.validateCertificateTrustAndRevocation(
             responderCertificate,
             trustedCACertificateAnchors,

@@ -32,7 +32,10 @@ public class DesignatedOcspServiceConfiguration {
         this.ocspServiceAccessLocation = Objects.requireNonNull(ocspServiceAccessLocation, "OCSP service access location");
         this.responderCertificate = Objects.requireNonNull(responderCertificate, "OCSP responder certificate");
         this.supportedIssuers = Set.copyOf(Objects.requireNonNull(supportedCertificateIssuers, "supported issuers"));
-        OcspResponseValidator.validateHasSigningExtension(responderCertificate);
+        OcspResponseValidator.validateBasicConstraintsNotCA(responderCertificate);
+        OcspResponseValidator.validateKeyUsageDigitalSignature(responderCertificate);
+        OcspResponseValidator.validateKeyUsageNotCertificateSigning(responderCertificate);
+        OcspResponseValidator.validateExtendedKeyUsageOcspSigning(responderCertificate);
         this.doesSupportNonce = doesSupportNonce;
     }
 

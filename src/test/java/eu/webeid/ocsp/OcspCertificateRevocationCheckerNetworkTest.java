@@ -138,7 +138,7 @@ class OcspCertificateRevocationCheckerNetworkTest {
                 .hasMessageContaining(responder.aiaUri().toString())
                 .cause()
                 .isExactlyInstanceOf(OCSPCertificateException.class)
-                .hasMessageContaining("does not contain the key usage extension for OCSP response signing");
+                .hasMessageContaining("does not contain the Key Usage extension required for OCSP response signing");
         assertThat(responder.requestCount()).isEqualTo(1);
         assertThat(responder.receivedPath()).isEqualTo("/aia");
     }

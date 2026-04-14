@@ -51,7 +51,10 @@ public class FallbackOcspServiceConfiguration {
         this.accessLocation = Objects.requireNonNull(accessLocation, "Fallback OCSP service access location");
         this.responderCertificate = responderCertificate;
         if (responderCertificate != null) {
-            OcspResponseValidator.validateHasSigningExtension(responderCertificate);
+            OcspResponseValidator.validateBasicConstraintsNotCA(responderCertificate);
+            OcspResponseValidator.validateKeyUsageDigitalSignature(responderCertificate);
+            OcspResponseValidator.validateKeyUsageNotCertificateSigning(responderCertificate);
+            OcspResponseValidator.validateExtendedKeyUsageOcspSigning(responderCertificate);
         }
         this.doesSupportNonce = doesSupportNonce;
         this.nextFallbackConfiguration = nextFallbackConfiguration;
