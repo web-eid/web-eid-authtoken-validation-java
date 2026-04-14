@@ -43,6 +43,9 @@ public class DesignatedOcspService implements OcspService {
     public void validateResponderCertificate(X509CertificateHolder cert, Date now) throws AuthTokenException {
         try {
             final X509Certificate responderCertificate = certificateConverter.getCertificate(cert);
+            // Certificate extensions (Basic Constraints, Key Usage, Extended Key Usage) are validated at
+            // configuration time in DesignatedOcspServiceConfiguration. Since equals() compares the full DER
+            // encoding, a matching certificate is guaranteed to have the same validated extensions.
             // Certificate pinning is implemented simply by comparing the certificates or their public keys,
             // see https://owasp.org/www-community/controls/Certificate_and_Public_Key_Pinning.
             if (!configuration.getResponderCertificate().equals(responderCertificate)) {

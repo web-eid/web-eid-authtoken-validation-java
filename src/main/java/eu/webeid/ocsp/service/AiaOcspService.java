@@ -67,9 +67,11 @@ public class AiaOcspService implements OcspService {
     public void validateResponderCertificate(X509CertificateHolder cert, Date now) throws AuthTokenException {
         try {
             final X509Certificate certificate = certificateConverter.getCertificate(cert);
-            CertificateValidator.requireCertificateIsValidOnDate(certificate, now, "AIA OCSP responder");
-            // Trusted certificates' validity has been already verified in validateCertificateExpiry().
-            OcspResponseValidator.validateHasSigningExtension(certificate);
+            CertificateValidator.requireCertificateIsValidOnDate(certificate, now, "AIA OCSP responder"); // Trusted certificates' validity has been already verified in validateCertificateExpiry().
+            OcspResponseValidator.validateBasicConstraintsNotCA(certificate);
+            OcspResponseValidator.validateKeyUsageDigitalSignature(certificate);
+            OcspResponseValidator.validateKeyUsageNotCertificateSigning(certificate);
+            OcspResponseValidator.validateExtendedKeyUsageOcspSigning(certificate);
             CertificateValidator.validateCertificateTrustAndRevocation(
                     certificate,
                     trustedCACertificateAnchors,

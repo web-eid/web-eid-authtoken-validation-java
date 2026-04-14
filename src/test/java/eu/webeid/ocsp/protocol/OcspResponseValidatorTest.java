@@ -4,24 +4,38 @@
 package eu.webeid.ocsp.protocol;
 
 import eu.webeid.ocsp.OcspCertificateRevocationChecker;
+import eu.webeid.ocsp.exceptions.OCSPCertificateException;
 import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
+import org.bouncycastle.asn1.DLBitString;
+import org.bouncycastle.asn1.x509.BasicConstraints;
+import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.KeyPurposeId;
+import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.cert.ocsp.BasicOCSPResp;
 import org.bouncycastle.cert.ocsp.OCSPResp;
 import org.bouncycastle.cert.ocsp.SingleResp;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
 import static eu.webeid.ocsp.OcspCertificateRevocationCheckerTest.getOcspResponseBytesFromResources;
+import static eu.webeid.ocsp.protocol.OcspResponseValidator.validateBasicConstraintsNotCA;
 import static eu.webeid.ocsp.protocol.OcspResponseValidator.validateCertificateStatusUpdateTime;
+import static eu.webeid.ocsp.protocol.OcspResponseValidator.validateExtendedKeyUsageOcspSigning;
+import static eu.webeid.ocsp.protocol.OcspResponseValidator.validateKeyUsageDigitalSignature;
+import static eu.webeid.ocsp.protocol.OcspResponseValidator.validateKeyUsageNotCertificateSigning;
 import static eu.webeid.ocsp.protocol.OcspResponseValidator.validateSubjectCertificateStatus;
+import static eu.webeid.security.testutil.TestCertificateBuilder.buildCertificate;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -111,6 +125,158 @@ class OcspResponseValidatorTest {
             .isThrownBy(() ->
                 validateSubjectCertificateStatus(unknownCertStatus, OCSP_URL))
             .withMessage("User certificate revocation check has failed: Unknown status (OCSP responder: https://example.org)");
+    }
+
+    @Test
+    void whenCertIsNotCA_thenBasicConstraintsValidationSucceeds() throws Exception {
+        final X509Certificate cert = buildCertificate(
+            new Extension(Extension.basicConstraints, true, new BasicConstraints(false).getEncoded()));
+        assertThatCode(() -> validateBasicConstraintsNotCA(cert)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenBasicConstraintsExtensionAbsent_thenBasicConstraintsValidationSucceeds() throws Exception {
+        final X509Certificate cert = buildCertificate();
+        assertThatCode(() -> validateBasicConstraintsNotCA(cert)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenCertIsCA_thenBasicConstraintsValidationThrows() throws Exception {
+        final X509Certificate cert = buildCertificate(
+            new Extension(Extension.basicConstraints, true, new BasicConstraints(0).getEncoded()));
+        assertThatExceptionOfType(OCSPCertificateException.class)
+            .isThrownBy(() -> validateBasicConstraintsNotCA(cert))
+            .withMessage("Certificate " + cert.getSubjectX500Principal() +
+                " must not be a CA certificate (Basic Constraints CA:TRUE is not allowed for OCSP responder)");
+    }
+
+    @Test
+    void whenCertIsNull_thenBasicConstraintsValidationThrowsNullPointerException() {
+        assertThatNullPointerException().isThrownBy(() -> validateBasicConstraintsNotCA(null))
+            .withMessage("certificate");
+    }
+
+    @Test
+    void whenCertHasKeyUsageDigitalSignature_thenKeyUsageValidationSucceeds() throws Exception {
+        final X509Certificate cert = buildCertificate(
+            new Extension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature).getEncoded()));
+        assertThatCode(() -> validateKeyUsageDigitalSignature(cert)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenKeyUsageExtensionAbsent_thenKeyUsageValidationThrows() throws Exception {
+        final X509Certificate cert = buildCertificate();
+        assertThatExceptionOfType(OCSPCertificateException.class)
+            .isThrownBy(() -> validateKeyUsageDigitalSignature(cert))
+            .withMessage("Certificate " + cert.getSubjectX500Principal() +
+                " does not contain the Key Usage extension required for OCSP response signing");
+    }
+
+    @Test
+    void whenCertMissingKeyUsageDigitalSignature_thenKeyUsageValidationThrows() throws Exception {
+        final X509Certificate cert = buildCertificate(
+            new Extension(Extension.keyUsage, true, new KeyUsage(KeyUsage.nonRepudiation).getEncoded()));
+        assertThatExceptionOfType(OCSPCertificateException.class)
+            .isThrownBy(() -> validateKeyUsageDigitalSignature(cert))
+            .withMessage("Certificate " + cert.getSubjectX500Principal() +
+                " Key Usage extension does not contain Digital Signature, which is required for OCSP response signing");
+    }
+
+    @Test
+    void whenCertKeyUsageBitStringEmpty_thenKeyUsageValidationThrows() throws Exception {
+        final X509Certificate cert = buildCertificate(
+            new Extension(Extension.keyUsage, true, new DLBitString(new byte[0]).getEncoded()));
+        assertThatExceptionOfType(OCSPCertificateException.class)
+            .isThrownBy(() -> validateKeyUsageDigitalSignature(cert))
+            .withMessage("Certificate " + cert.getSubjectX500Principal() +
+                " Key Usage extension does not contain Digital Signature, which is required for OCSP response signing");
+    }
+
+    @Test
+    void whenCertIsNull_thenKeyUsageValidationThrowsNullPointerException() {
+        assertThatNullPointerException().isThrownBy(() -> validateKeyUsageDigitalSignature(null))
+            .withMessage("certificate");
+    }
+
+    @Test
+    void whenCertHasNoKeyUsageKeyCertSign_thenKeyCertSignValidationSucceeds() throws Exception {
+        final X509Certificate cert = buildCertificate(
+            new Extension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature).getEncoded()));
+        assertThatCode(() -> validateKeyUsageNotCertificateSigning(cert)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenKeyUsageExtensionAbsent_thenKeyCertSignValidationSucceeds() throws Exception {
+        final X509Certificate cert = buildCertificate();
+        assertThatCode(() -> validateKeyUsageNotCertificateSigning(cert)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenCertKeyUsageBitStringEmpty_thenKeyCertSignValidationSucceeds() throws Exception {
+        final X509Certificate cert = buildCertificate(
+            new Extension(Extension.keyUsage, true, new DLBitString(new byte[0]).getEncoded()));
+        assertThatCode(() -> validateKeyUsageNotCertificateSigning(cert)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenCertHasKeyUsageKeyCertSign_thenKeyCertSignValidationThrows() throws Exception {
+        final X509Certificate cert = buildCertificate(
+            new Extension(Extension.keyUsage, true, new KeyUsage(KeyUsage.keyCertSign).getEncoded()));
+        assertThatExceptionOfType(OCSPCertificateException.class)
+            .isThrownBy(() -> validateKeyUsageNotCertificateSigning(cert))
+            .withMessage("Certificate " + cert.getSubjectX500Principal() +
+                " Key Usage extension contains Certificate Signing, which is not allowed for OCSP responder");
+    }
+
+    @Test
+    void whenCertHasKeyUsageKeyCertSignCombinedWithDigitalSignature_thenKeyCertSignValidationThrows() throws Exception {
+        final X509Certificate cert = buildCertificate(
+            new Extension(Extension.keyUsage, true,
+                new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyCertSign).getEncoded()));
+        assertThatExceptionOfType(OCSPCertificateException.class)
+            .isThrownBy(() -> validateKeyUsageNotCertificateSigning(cert))
+            .withMessage("Certificate " + cert.getSubjectX500Principal() +
+                " Key Usage extension contains Certificate Signing, which is not allowed for OCSP responder");
+    }
+
+    @Test
+    void whenCertIsNull_thenKeyCertSignValidationThrowsNullPointerException() {
+        assertThatNullPointerException().isThrownBy(() -> validateKeyUsageNotCertificateSigning(null))
+            .withMessage("certificate");
+    }
+
+    @Test
+    void whenCertHasOcspSigningEku_thenExtendedKeyUsageValidationSucceeds() throws Exception {
+        final X509Certificate cert = buildCertificate(
+            new Extension(Extension.extendedKeyUsage, true,
+                new ExtendedKeyUsage(KeyPurposeId.id_kp_OCSPSigning).getEncoded()));
+        assertThatCode(() -> validateExtendedKeyUsageOcspSigning(cert)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenExtendedKeyUsageExtensionAbsent_thenExtendedKeyUsageValidationThrows() throws Exception {
+        final X509Certificate cert = buildCertificate();
+        assertThatExceptionOfType(OCSPCertificateException.class)
+            .isThrownBy(() -> validateExtendedKeyUsageOcspSigning(cert))
+            .withMessage("Certificate " + cert.getSubjectX500Principal() +
+                " does not contain the Extended Key Usage extension required for OCSP response signing");
+    }
+
+    @Test
+    void whenCertMissingOcspSigningEku_thenExtendedKeyUsageValidationThrows() throws Exception {
+        final X509Certificate cert = buildCertificate(
+            new Extension(Extension.extendedKeyUsage, true,
+                new ExtendedKeyUsage(KeyPurposeId.id_kp_clientAuth).getEncoded()));
+        assertThatExceptionOfType(OCSPCertificateException.class)
+            .isThrownBy(() -> validateExtendedKeyUsageOcspSigning(cert))
+            .withMessage("Certificate " + cert.getSubjectX500Principal() +
+                " Extended Key Usage extension does not contain OCSP Signing, which is required for OCSP response signing");
+    }
+
+    @Test
+    void whenCertIsNull_thenExtendedKeyUsageValidationThrowsNullPointerException() {
+        assertThatNullPointerException().isThrownBy(() -> validateExtendedKeyUsageOcspSigning(null))
+            .withMessage("certificate");
     }
 
     private static Date getThisUpdateWithinAgeLimit(Instant now) {

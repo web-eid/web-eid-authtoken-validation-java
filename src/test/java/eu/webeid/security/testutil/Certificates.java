@@ -22,13 +22,15 @@ public class Certificates {
     private static X509Certificate jaakKristjanEsteid2018Cert;
     private static X509Certificate mariliisEsteid2015Cert;
     private static X509Certificate organizationCert;
-    private static X509Certificate testSkOcspResponder2020;
+    private static X509Certificate testSelfSignedOcspResponder;
+    private static X509Certificate demoEsteidSk2018AiaOcspResponder;
 
     static void loadCertificates() throws CertificateException, IOException {
-        X509Certificate[] certificates = CertificateLoader.loadCertificatesFromResources("TEST_of_ESTEID-SK_2015.cer", "TEST_of_ESTEID2018.cer", "TEST_of_SK_OCSP_RESPONDER_2020.cer");
+        X509Certificate[] certificates = CertificateLoader.loadCertificatesFromResources("TEST_of_ESTEID-SK_2015.cer", "TEST_of_ESTEID2018.cer", "TEST_of_self-signed_OCSP_RESPONDER.cer", "DEMO_of_ESTEID-SK_2018_AIA_OCSP_RESPONDER_2018.cer");
         testEsteid2015CA = certificates[0];
         testEsteid2018CA = certificates[1];
-        testSkOcspResponder2020 = certificates[2];
+        testSelfSignedOcspResponder = certificates[2];
+        demoEsteidSk2018AiaOcspResponder = certificates[3];
     }
 
     public static X509Certificate getTestEsteid2018CA() throws CertificateException, IOException {
@@ -45,11 +47,18 @@ public class Certificates {
         return testEsteid2015CA;
     }
 
-    public static X509Certificate getTestSkOcspResponder2020() throws CertificateException, IOException {
-        if (testSkOcspResponder2020 == null) {
+    public static X509Certificate getTestSelfSignedOcspResponder() throws CertificateException, IOException {
+        if (testSelfSignedOcspResponder == null) {
             loadCertificates();
         }
-        return testSkOcspResponder2020;
+        return testSelfSignedOcspResponder;
+    }
+
+    public static X509Certificate getDemoEsteidSk2018AiaOcspResponder() throws CertificateException, IOException {
+        if (demoEsteidSk2018AiaOcspResponder == null) {
+            loadCertificates();
+        }
+        return demoEsteidSk2018AiaOcspResponder;
     }
 
     public static X509Certificate getJaakKristjanEsteid2018Cert() throws CertificateDecodingException {

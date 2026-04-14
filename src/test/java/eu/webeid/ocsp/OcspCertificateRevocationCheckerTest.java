@@ -236,7 +236,7 @@ public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValida
     @Test
     void whenOcspResponseUnknown_thenThrows() throws Exception {
         final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider("https://web-eid-test.free.beeceptor.com");
-        final HttpResponse<byte[]> response = getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_unknown.der"));
+        final HttpResponse<byte[]> response = getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_unknown_self_signed.der"));
         final OcspCertificateRevocationChecker validator = getOcspCertificateRevocationChecker(getMockClient(response), ocspServiceProvider);
         try (var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
             mockDate("2021-09-18T00:16:25", mockedClock);
@@ -250,21 +250,21 @@ public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValida
     @Test
     void whenOcspResponseCACertNotTrusted_thenThrows() throws Exception {
         final OcspCertificateRevocationChecker validator = getOcspCertificateRevocationCheckerWithAiaOcsp(
-            getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_unknown.der"))
+            getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_unknown_self_signed.der"))
         );
         try (var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
             mockDate("2021-09-18T00:16:25", mockedClock);
             assertThatExceptionOfType(CertificateNotTrustedException.class)
                 .isThrownBy(() ->
                     validator.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
-                .withMessage("Certificate EMAILADDRESS=pki@sk.ee, CN=TEST of SK OCSP RESPONDER 2020, OU=OCSP, O=AS Sertifitseerimiskeskus, C=EE is not trusted");
+                .withMessage("Certificate CN=TEST of self-signed OCSP RESPONDER 2024, OU=OCSP, O=TEST Self-signed OCSP, C=EE is not trusted");
         }
     }
 
     @Test
     void whenOcspResponseCACertExpired_thenThrows() throws Exception {
         final OcspCertificateRevocationChecker validator = getOcspCertificateRevocationCheckerWithAiaOcsp(
-            getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_unknown.der"))
+            getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_unknown_self_signed.der"))
         );
         assertThatExceptionOfType(CertificateExpiredException.class)
             .isThrownBy(() ->
