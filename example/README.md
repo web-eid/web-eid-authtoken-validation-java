@@ -140,7 +140,7 @@ The `src/tests` directory contains the application test suite. The most importan
 
 As described in section [_4. Choose either the `dev` or `prod` profile_](#4-choose-either-the-dev-or-prod-profile) above, the application has two different configuration profiles: `dev` profile for running the application in development mode and `prod` profile for production mode. The `dev` profile is activated by default.
 
-The profile-specific configuration files `src/main/resources/application-{dev,prod}.yaml` contain the `web-eid-auth-token.validation.use-digidoc4j-prod-configuration` setting that configures DigiDoc4j either in test or production mode, and a setting for configuring the origin URL as described in section [_2. Configure the origin URL_](#2-configure-the-origin-url) above. Additionally, the `web-eid-auth-token.validation.truststore-password` setting specifies the truststore password used in the `prod` profile.
+The profile-specific configuration files `src/main/resources/application-{dev,prod}.yaml` contain the `web-eid-auth-token.validation.use-digidoc4j-prod-configuration` setting that configures DigiDoc4j either in test or production mode, and a setting for configuring the origin URL as described in section [_2. Configure the origin URL_](#2-configure-the-origin-url) above. Additionally, the `web-eid-auth-token.validation.truststore-password` setting specifies the truststore password used in the `prod` profile. The `web-eid-mobile` section configures the mobile authentication flow, including the `base-request-uri` for deep link generation and the `request-signing-cert` flag that controls whether the signing certificate is requested during authentication.
 
 The main configuration file `src/main/resources/application.yaml` is shared by all profiles and contains logging configuration and settings that make the session cookie secure behind a reverse proxy as described in section [_HTTPS support_](#https-support) below.
 
@@ -150,7 +150,7 @@ Spring Security has CSRF protection enabled by default. Web eID requires CSRF pr
 
 ### Integration with Web eID components
 
-Detailed overview of Java code changes required for integrating Web eID authentication token validation is available in the [_web-eid-authtoken-validation-java_ library README](https://github.com/web-eid/web-eid-authtoken-validation-java/blob/main/README.md). There are instructions for configuring the nonce generator, trusted certificate authority certificates, authentication token validator, Spring Security authentication integration and REST endpoints. The corresponding Java code is in the `src/main/java/eu/webeid/example/{config,security,web/rest}` directories.
+Detailed overview of Java code changes required for integrating Web eID authentication token validation is available in the [_web-eid-authtoken-validation-java_ library README](https://github.com/web-eid/web-eid-authtoken-validation-java/blob/main/README.md). There are instructions for configuring the nonce generator, trusted certificate authority certificates, authentication token validator, Spring Security authentication integration and security filters. The corresponding Java code is in the `src/main/java/eu/webeid/example/{config,security,web/rest}` directories.
 
 A similar overview of JavaScript and HTML code changes required for authentication and digital signing with Web eID is available in the [web-eid.js library README](https://github.com/web-eid/web-eid.js/blob/main/README.md). The corresponding JavaScript and HTML code is in the `src/resources/{static,templates}` directories.
 
@@ -232,9 +232,9 @@ Tomcat web server automatically if it detects the presence of the
     server.tomcat.protocol-header=x-forwarded-proto
 
 These settings are already enabled in the main configuration file `application.yaml`. See chapter
-[9.3.12](https://docs.spring.io/spring-boot/docs/2.2.5.RELEASE/reference/htmlsingle/#howto-use-behind-a-proxy-server)
+[Running Behind a Front-end Proxy Server](https://docs.spring.io/spring-boot/3.5/how-to/webserver.html#howto.webserver.use-behind-a-proxy-server)
 and
-[9.14.3](https://docs.spring.io/spring-boot/docs/2.2.5.RELEASE/reference/htmlsingle/#howto-enable-https)
+[Enable HTTPS When Running Behind a Proxy Server](https://docs.spring.io/spring-boot/3.5/how-to/security.html#howto.security.enable-https)
 in the official documentation for further details.
 
 ### How to verify that HTTPS is configured properly
@@ -245,7 +245,7 @@ Strict Transport Security (HSTS) header and the `JSESSIONID` session cookie has 
 
 ## Deployment
 
-A Docker Compose configuration file `docker-compose.yml` is available in the root of the project for packaging the application in a Docker image so that it can be deployed with a container enginge.
+A Docker Compose configuration file `docker-compose.yml` is available in the root of the project for packaging the application in a Docker image so that it can be deployed with a container engine.
 
 Build the Docker image with [Jib](https://github.com/GoogleContainerTools/jib) as follows:
 
