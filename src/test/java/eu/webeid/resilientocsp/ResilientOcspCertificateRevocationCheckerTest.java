@@ -25,6 +25,7 @@ package eu.webeid.resilientocsp;
 import eu.webeid.ocsp.OcspCertificateRevocationChecker;
 import eu.webeid.ocsp.client.OcspClient;
 import eu.webeid.ocsp.exceptions.OCSPClientException;
+import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.ocsp.service.OcspService;
 import eu.webeid.ocsp.service.OcspServiceProvider;
 import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateOCSPCheckFailedException;
@@ -44,6 +45,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.List;
@@ -378,6 +380,20 @@ public class ResilientOcspCertificateRevocationCheckerTest {
         Map<String, Object> responseAttributes = ex.getValidationInfo().revocationInfoList().get(0).ocspResponseAttributes();
         ResilientUserCertificateOCSPCheckFailedException firstException = (ResilientUserCertificateOCSPCheckFailedException) responseAttributes.get(RevocationInfo.KEY_OCSP_ERROR);
         assertThat(firstException.getMessage()).isEqualTo("Response status: unauthorized");
+    }
+
+    @Test
+    void whenCertificateIdComputationFails_thenThrows() throws Exception {
+        ResilientOcspCertificateRevocationChecker checker = buildChecker(mock(OcspClient.class), null);
+        X509Certificate badIssuer = mock(X509Certificate.class);
+        CertificateEncodingException encodingException = new CertificateEncodingException("bad issuer");
+        when(badIssuer.getEncoded()).thenThrow(encodingException);
+
+        assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
+            .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, badIssuer))
+            .isExactlyInstanceOf(UserCertificateOCSPCheckFailedException.class)
+            .withMessage("Unable to compute certificateId for subject certificate")
+            .withCause(encodingException);
     }
 
     private ResilientOcspCertificateRevocationChecker buildChecker(OcspClient ocspClient, RetryConfig retryConfig) throws Exception {
