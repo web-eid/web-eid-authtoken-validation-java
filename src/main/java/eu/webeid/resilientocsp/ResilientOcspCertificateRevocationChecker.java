@@ -270,24 +270,27 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         ))));
     }
 
-    private RevocationInfo request(OcspService ocspService, X509Certificate subjectCertificate, X509Certificate issuerCertificate, CertificateID certificateId, Duration maxOcspResponseThisUpdateAge) throws ResilientUserCertificateOCSPCheckFailedException, ResilientUserCertificateRevokedException {
-        URI ocspResponderUri = null;
-        OCSPResp response = null;
-        OCSPReq request = null;
-        Duration requestDuration = null;
-        Instant responseTime = null;
+    private RevocationInfo request(OcspService ocspService, X509Certificate subjectCertificate, X509Certificate issuerCertificate, CertificateID certificateId, Duration maxOcspResponseThisUpdateAge) throws UserCertificateOCSPCheckFailedException, ResilientUserCertificateRevokedException {
+        final URI ocspResponderUri;
+        final OCSPReq request;
         try {
             ocspResponderUri = requireNonNull(ocspService.getAccessLocation(), "ocspResponderUri");
-
             request = new OcspRequestBuilder()
                 .withCertificateId(certificateId)
                 .enableOcspNonce(ocspService.doesSupportNonce())
                 .build();
+        } catch (Exception e) {
+            throw new UserCertificateOCSPCheckFailedException(e, ocspService.getAccessLocation());
+        }
 
-            if (!ocspService.doesSupportNonce()) {
-                LOG.debug("Disabling OCSP nonce extension");
-            }
+        if (!ocspService.doesSupportNonce()) {
+            LOG.debug("Disabling OCSP nonce extension");
+        }
 
+        OCSPResp response = null;
+        Duration requestDuration = null;
+        Instant responseTime = null;
+        try {
             LOG.debug("Sending OCSP request");
             Instant requestTime = Instant.now();
             try {
