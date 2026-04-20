@@ -30,4 +30,8 @@ public class UserCertificateOCSPCheckFailedException extends CertificateRevocati
         super(message);
     }
 
+    public UserCertificateOCSPCheckFailedException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
 }

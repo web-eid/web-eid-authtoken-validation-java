@@ -28,11 +28,11 @@ import eu.webeid.ocsp.exceptions.OCSPClientException;
 import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
 import eu.webeid.ocsp.protocol.OcspRequestBuilder;
+import eu.webeid.ocsp.service.FallbackOcspService;
 import eu.webeid.ocsp.service.OcspService;
 import eu.webeid.ocsp.service.OcspServiceProvider;
 import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateOCSPCheckFailedException;
 import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateRevokedException;
-import eu.webeid.ocsp.service.FallbackOcspService;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.validator.ValidationInfo;
 import eu.webeid.security.validator.revocationcheck.RevocationInfo;
@@ -49,12 +49,15 @@ import io.vavr.control.Try;
 import org.bouncycastle.asn1.ocsp.OCSPResponseStatus;
 import org.bouncycastle.cert.ocsp.BasicOCSPResp;
 import org.bouncycastle.cert.ocsp.CertificateID;
+import org.bouncycastle.cert.ocsp.OCSPException;
 import org.bouncycastle.cert.ocsp.OCSPReq;
 import org.bouncycastle.cert.ocsp.OCSPResp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.net.URI;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
@@ -112,18 +115,26 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
     public List<RevocationInfo> validateCertificateNotRevoked(X509Certificate subjectCertificate,
                                                               X509Certificate issuerCertificate) throws AuthTokenException {
         OcspService primaryService = resolvePrimaryOcspService(subjectCertificate);
+
+        final CertificateID certificateId;
+        try {
+            certificateId = getCertificateId(subjectCertificate, issuerCertificate);
+        } catch (CertificateEncodingException | IOException | OCSPException e) {
+            throw new UserCertificateOCSPCheckFailedException("Unable to compute certificateId for subject certificate", e);
+        }
+
         Optional<FallbackOcspService> firstFallbackServiceOpt = primaryService.getFallbackService();
         if (firstFallbackServiceOpt.isEmpty()) {
             // Without a configured fallback, use the primary service directly without retry or circuit breaker.
-            return List.of(request(primaryService, subjectCertificate, issuerCertificate, getMaxOcspResponseThisUpdateAge()));
+            return List.of(request(primaryService, subjectCertificate, certificateId, getMaxOcspResponseThisUpdateAge()));
         }
 
         CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(primaryService.getAccessLocation().toASCIIString());
         List<RevocationInfo> revocationInfoList = new ArrayList<>();
         CheckedSupplier<RevocationInfo> fallbackSupplier = buildFallbackSupplier(firstFallbackServiceOpt.get(), subjectCertificate,
-            issuerCertificate, revocationInfoList);
+            certificateId, revocationInfoList);
         CheckedSupplier<RevocationInfo> decoratedSupplier = decorateWithResilience(primaryService, subjectCertificate,
-            issuerCertificate, revocationInfoList, fallbackSupplier, circuitBreaker);
+            certificateId, revocationInfoList, fallbackSupplier, circuitBreaker);
 
         // Take a snapshot of circuit breaker statistics right before the first request.
         CircuitBreakerStatistics circuitBreakerStatistics = createCircuitBreakerStatistics(circuitBreaker);
@@ -158,11 +169,11 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
 
     private CheckedSupplier<RevocationInfo> buildFallbackSupplier(FallbackOcspService firstFallbackService,
                                                                   X509Certificate subjectCertificate,
-                                                                  X509Certificate issuerCertificate,
+                                                                  CertificateID certificateId,
                                                                   List<RevocationInfo> revocationInfoList) {
         CheckedSupplier<RevocationInfo> firstFallbackSupplier = () -> {
             try {
-                return request(firstFallbackService, subjectCertificate, issuerCertificate, fallbackMaxOcspResponseThisUpdateAge);
+                return request(firstFallbackService, subjectCertificate, certificateId, fallbackMaxOcspResponseThisUpdateAge);
             } catch (Exception e) {
                 createAndAddRevocationInfoToList(e, revocationInfoList);
                 throw e;
@@ -176,7 +187,7 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         }
         CheckedSupplier<RevocationInfo> secondFallbackSupplier = () -> {
             try {
-                return request(secondFallbackService, subjectCertificate, issuerCertificate, fallbackMaxOcspResponseThisUpdateAge);
+                return request(secondFallbackService, subjectCertificate, certificateId, fallbackMaxOcspResponseThisUpdateAge);
             } catch (Exception e) {
                 createAndAddRevocationInfoToList(e, revocationInfoList);
                 throw e;
@@ -198,13 +209,13 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
 
     private CheckedSupplier<RevocationInfo> decorateWithResilience(OcspService primaryService,
                                                                    X509Certificate subjectCertificate,
-                                                                   X509Certificate issuerCertificate,
+                                                                   CertificateID certificateId,
                                                                    List<RevocationInfo> revocationInfoList,
                                                                    CheckedSupplier<RevocationInfo> fallbackSupplier,
                                                                    CircuitBreaker circuitBreaker) {
         CheckedSupplier<RevocationInfo> primarySupplier = () -> {
             try {
-                return request(primaryService, subjectCertificate, issuerCertificate, getMaxOcspResponseThisUpdateAge());
+                return request(primaryService, subjectCertificate, certificateId, getMaxOcspResponseThisUpdateAge());
             } catch (Exception e) {
                 createAndAddRevocationInfoToList(e, revocationInfoList);
                 throw e;
@@ -266,7 +277,7 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         ))));
     }
 
-    private RevocationInfo request(OcspService ocspService, X509Certificate subjectCertificate, X509Certificate issuerCertificate, Duration maxOcspResponseThisUpdateAge) throws ResilientUserCertificateOCSPCheckFailedException, ResilientUserCertificateRevokedException {
+    private RevocationInfo request(OcspService ocspService, X509Certificate subjectCertificate, CertificateID certificateId, Duration maxOcspResponseThisUpdateAge) throws ResilientUserCertificateOCSPCheckFailedException, ResilientUserCertificateRevokedException {
         URI ocspResponderUri = null;
         OCSPResp response = null;
         OCSPReq request = null;
@@ -275,7 +286,6 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         try {
             ocspResponderUri = requireNonNull(ocspService.getAccessLocation(), "ocspResponderUri");
 
-            final CertificateID certificateId = getCertificateId(subjectCertificate, issuerCertificate);
             request = new OcspRequestBuilder()
                 .withCertificateId(certificateId)
                 .enableOcspNonce(ocspService.doesSupportNonce())

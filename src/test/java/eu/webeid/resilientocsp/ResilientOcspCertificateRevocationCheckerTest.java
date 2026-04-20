@@ -402,6 +402,20 @@ public class ResilientOcspCertificateRevocationCheckerTest {
             .withMessage("Resolving primary OCSP service from subject certificate failed");
     }
 
+    @Test
+    void whenCertificateIdComputationFails_thenThrows() throws Exception {
+        ResilientOcspCertificateRevocationChecker checker = buildChecker(mock(OcspClient.class), null);
+        X509Certificate badIssuer = mock(X509Certificate.class);
+        CertificateEncodingException encodingException = new CertificateEncodingException("bad issuer");
+        when(badIssuer.getEncoded()).thenThrow(encodingException);
+
+        assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
+            .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, badIssuer))
+            .isExactlyInstanceOf(UserCertificateOCSPCheckFailedException.class)
+            .withMessage("Unable to compute certificateId for subject certificate")
+            .withCause(encodingException);
+    }
+
     private ResilientOcspCertificateRevocationChecker buildChecker(OcspClient ocspClient, RetryConfig retryConfig) throws Exception {
         return buildChecker(ocspClient, retryConfig, CircuitBreakerConfig.ofDefaults());
     }
