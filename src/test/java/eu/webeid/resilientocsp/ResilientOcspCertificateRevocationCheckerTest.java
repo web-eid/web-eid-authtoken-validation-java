@@ -26,11 +26,11 @@ import eu.webeid.ocsp.OcspCertificateRevocationChecker;
 import eu.webeid.ocsp.client.OcspClient;
 import eu.webeid.ocsp.exceptions.OCSPClientException;
 import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
+import eu.webeid.ocsp.service.FallbackOcspService;
 import eu.webeid.ocsp.service.OcspService;
 import eu.webeid.ocsp.service.OcspServiceProvider;
 import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateOCSPCheckFailedException;
 import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateRevokedException;
-import eu.webeid.ocsp.service.FallbackOcspService;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.validator.AuthTokenValidator;
 import eu.webeid.security.validator.revocationcheck.RevocationInfo;
@@ -384,8 +384,9 @@ public class ResilientOcspCertificateRevocationCheckerTest {
 
     @Test
     void whenOcspServiceProviderThrowsCertificateException_thenThrows() throws Exception {
+        CertificateEncodingException encodingException = new CertificateEncodingException();
         OcspServiceProvider ocspServiceProvider = mock(OcspServiceProvider.class);
-        when(ocspServiceProvider.getService(any())).thenThrow(new CertificateEncodingException("bad cert"));
+        when(ocspServiceProvider.getService(any())).thenThrow(encodingException);
         ResilientOcspCertificateRevocationChecker checker = new ResilientOcspCertificateRevocationChecker(
             mock(OcspClient.class),
             ocspServiceProvider,
@@ -399,7 +400,8 @@ public class ResilientOcspCertificateRevocationCheckerTest {
         assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
             .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
             .isExactlyInstanceOf(UserCertificateOCSPCheckFailedException.class)
-            .withMessage("Resolving primary OCSP service from subject certificate failed");
+            .withMessage("Resolving primary OCSP service from subject certificate failed")
+            .withCause(encodingException);
     }
 
     @Test
