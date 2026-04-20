@@ -25,6 +25,7 @@ package eu.webeid.resilientocsp;
 import eu.webeid.ocsp.OcspCertificateRevocationChecker;
 import eu.webeid.ocsp.client.OcspClient;
 import eu.webeid.ocsp.exceptions.OCSPClientException;
+import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
 import eu.webeid.ocsp.protocol.OcspRequestBuilder;
 import eu.webeid.ocsp.service.OcspService;
@@ -135,7 +136,7 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         try {
             return getOcspServiceProvider().getService(subjectCertificate);
         } catch (CertificateException e) {
-            throw new ResilientUserCertificateOCSPCheckFailedException(new ValidationInfo(subjectCertificate, List.of()));
+            throw new UserCertificateOCSPCheckFailedException("Resolving primary OCSP service from subject certificate failed");
         }
     }
 
