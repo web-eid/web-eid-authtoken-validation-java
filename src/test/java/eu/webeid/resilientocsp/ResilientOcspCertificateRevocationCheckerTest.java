@@ -25,7 +25,7 @@ package eu.webeid.resilientocsp;
 import eu.webeid.ocsp.OcspCertificateRevocationChecker;
 import eu.webeid.ocsp.client.OcspClient;
 import eu.webeid.ocsp.exceptions.OCSPClientException;
-import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
+import eu.webeid.ocsp.exceptions.UserCertificateOCSPException;
 import eu.webeid.ocsp.service.FallbackOcspService;
 import eu.webeid.ocsp.service.OcspService;
 import eu.webeid.ocsp.service.OcspServiceProvider;
@@ -389,9 +389,9 @@ public class ResilientOcspCertificateRevocationCheckerTest {
         CertificateEncodingException encodingException = new CertificateEncodingException("bad issuer");
         when(badIssuer.getEncoded()).thenThrow(encodingException);
 
-        assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
+        assertThatExceptionOfType(UserCertificateOCSPException.class)
             .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, badIssuer))
-            .isExactlyInstanceOf(UserCertificateOCSPCheckFailedException.class)
+            .isExactlyInstanceOf(UserCertificateOCSPException.class)
             .withMessage("Unable to compute certificateId for subject certificate")
             .withCause(encodingException);
     }
