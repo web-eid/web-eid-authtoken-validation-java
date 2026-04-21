@@ -368,10 +368,14 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
 
     private static CircuitBreakerConfig getCircuitBreakerConfig(CircuitBreakerConfig circuitBreakerConfig) {
         return CircuitBreakerConfig.from(circuitBreakerConfig)
-            // Users must not be able to modify these three values.
-            .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
-            .ignoreExceptions(ResilientUserCertificateRevokedException.class)
-            .automaticTransitionFromOpenToHalfOpenEnabled(true)
+            // Users must not be able to modify this value.
+            // Only ResilientUserCertificateOCSPCheckFailedException counts as a failure.
+            // ResilientUserCertificateRevokedException is counted as a SUCCESS because it represents
+            // a definitive OCSP answer (the service is healthy), not a transient failure.
+            // Clear any recordExceptions list of the given configuration first, because it is combined
+            // with the predicate below by OR and would otherwise widen what counts as a failure.
+            .recordExceptions()
+            .recordException(throwable -> throwable instanceof ResilientUserCertificateOCSPCheckFailedException)
             .build();
     }
 

@@ -63,6 +63,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -266,6 +267,37 @@ public class ResilientOcspCertificateRevocationCheckerTest {
     }
 
     @Test
+    void whenCallerConfigRecordsAllExceptions_thenRevokedVerdictDoesNotOpenCircuitBreaker() throws Exception {
+        // A revoked verdict is a definitive OCSP answer, so it must never count as a circuit breaker failure.
+        // CircuitBreakerConfig.from() copies both the record predicate and the recordExceptions array of the
+        // caller configuration, and the array is combined with our own predicate by OR. A caller that records
+        // every exception must therefore not be able to make a revoked verdict open the circuit breaker.
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any()))
+            .thenReturn(ocspRespRevoked);
+        when(ocspClient.request(eq(FALLBACK_URI), any()))
+            .thenReturn(ocspRespGood);
+        CircuitBreakerConfig callerConfig = CircuitBreakerConfig.custom()
+            .recordExceptions(Throwable.class)
+            .slidingWindowSize(2)
+            .minimumNumberOfCalls(2)
+            .failureRateThreshold(50)
+            .permittedNumberOfCallsInHalfOpenState(1)
+            .build();
+
+        ResilientOcspCertificateRevocationChecker checker = buildChecker(ocspClient, null, callerConfig);
+
+        // The configuration above would open the circuit breaker after two recorded failures. All three calls
+        // must still report revocation from the primary service, and no call must reach the fallback service.
+        for (int i = 0; i < 3; i++) {
+            assertThatExceptionOfType(ResilientUserCertificateRevokedException.class)
+                .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA));
+        }
+        verify(ocspClient, times(3)).request(eq(PRIMARY_URI), any());
+        verify(ocspClient, never()).request(eq(FALLBACK_URI), any());
+    }
+
+    @Test
     void whenOneFallbackIsConfiguredAndPrimaryFails_thenRevocationInfoListShouldHaveTwoElements() throws Exception {
         OcspClient ocspClient = mock(OcspClient.class);
         when(ocspClient.request(eq(PRIMARY_URI), any()))
@@ -349,6 +381,10 @@ public class ResilientOcspCertificateRevocationCheckerTest {
     }
 
     private ResilientOcspCertificateRevocationChecker buildChecker(OcspClient ocspClient, RetryConfig retryConfig) throws Exception {
+        return buildChecker(ocspClient, retryConfig, CircuitBreakerConfig.ofDefaults());
+    }
+
+    private ResilientOcspCertificateRevocationChecker buildChecker(OcspClient ocspClient, RetryConfig retryConfig, CircuitBreakerConfig circuitBreakerConfig) throws Exception {
         FallbackOcspService secondFallbackService = mock(FallbackOcspService.class);
         when(secondFallbackService.getAccessLocation()).thenReturn(SECOND_FALLBACK_URI);
         when(secondFallbackService.doesSupportNonce()).thenReturn(false);
@@ -369,7 +405,7 @@ public class ResilientOcspCertificateRevocationCheckerTest {
         return new ResilientOcspCertificateRevocationChecker(
             ocspClient,
             ocspServiceProvider,
-            CircuitBreakerConfig.ofDefaults(),
+            circuitBreakerConfig,
             retryConfig,
             OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW,
             LONG_THIS_UPDATE_AGE,
