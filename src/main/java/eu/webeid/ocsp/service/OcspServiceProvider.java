@@ -3,11 +3,10 @@
 
 package eu.webeid.ocsp.service;
 
-import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
-import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.ocsp.exceptions.UserCertificateOCSPException;
 import org.bouncycastle.asn1.x500.X500Name;
 
-import java.security.cert.CertificateEncodingException;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
 import java.util.HashMap;
@@ -44,15 +43,20 @@ public class OcspServiceProvider {
      *
      * @param certificate subject certificate that is to be checked with OCSP
      * @return either the designated or AIA OCSP service instance
-     * @throws UserCertificateOCSPCheckFailedException when issuer common name is not found in certificate
+     * @throws UserCertificateOCSPException when the subject certificate's issuer cannot be extracted,
+     *         or when the AIA OCSP responder URL cannot be resolved from the certificate
      * @throws IllegalArgumentException when certificate is invalid
      */
-    public OcspService getService(X509Certificate certificate) throws AuthTokenException, CertificateEncodingException {
-        if (designatedOcspService != null && designatedOcspService.supportsIssuerOf(certificate)) {
-            return designatedOcspService;
+    public OcspService getService(X509Certificate certificate) throws UserCertificateOCSPException {
+        try {
+            if (designatedOcspService != null && designatedOcspService.supportsIssuerOf(certificate)) {
+                return designatedOcspService;
+            }
+            X500Name issuerDistinguishedName = getIssuerDistinguishedName(certificate);
+            FallbackOcspService fallbackOcspService = fallbackOcspServiceMap.get(issuerDistinguishedName);
+            return new AiaOcspService(aiaOcspServiceConfiguration, certificate, fallbackOcspService);
+        } catch (CertificateException e) {
+            throw new UserCertificateOCSPException("Resolving OCSP service from subject certificate failed", e);
         }
-        X500Name issuerDistinguishedName = getIssuerDistinguishedName(certificate);
-        FallbackOcspService fallbackOcspService = fallbackOcspServiceMap.get(issuerDistinguishedName);
-        return new AiaOcspService(aiaOcspServiceConfiguration, certificate, fallbackOcspService);
     }
 }

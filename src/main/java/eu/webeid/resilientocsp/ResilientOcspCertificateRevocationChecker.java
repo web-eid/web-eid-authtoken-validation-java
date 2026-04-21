@@ -56,10 +56,7 @@ import org.bouncycastle.cert.ocsp.OCSPResp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.net.URI;
-import java.security.cert.CertificateEncodingException;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
@@ -115,14 +112,8 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
     @Override
     public List<RevocationInfo> validateCertificateNotRevoked(X509Certificate subjectCertificate,
                                                               X509Certificate issuerCertificate) throws AuthTokenException {
-        OcspService primaryService = resolvePrimaryOcspService(subjectCertificate);
-
-        final CertificateID certificateId;
-        try {
-            certificateId = getCertificateId(subjectCertificate, issuerCertificate);
-        } catch (CertificateEncodingException | IOException | OCSPException e) {
-            throw new UserCertificateOCSPException("Unable to compute certificateId for subject certificate", e);
-        }
+        OcspService primaryService = getOcspServiceProvider().getService(subjectCertificate);
+        CertificateID certificateId = getCertificateId(subjectCertificate, issuerCertificate);
 
         Optional<FallbackOcspService> firstFallbackServiceOpt = primaryService.getFallbackService();
         if (firstFallbackServiceOpt.isEmpty()) {
@@ -142,14 +133,6 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         RevocationInfo revocationInfo = processResult(Try.of(decoratedSupplier::get), subjectCertificate, revocationInfoList, circuitBreakerStatistics);
         revocationInfoList.add(revocationInfo);
         return revocationInfoList;
-    }
-
-    private OcspService resolvePrimaryOcspService(X509Certificate subjectCertificate) throws AuthTokenException {
-        try {
-            return getOcspServiceProvider().getService(subjectCertificate);
-        } catch (CertificateException e) {
-            throw new UserCertificateOCSPException("Resolving primary OCSP service from subject certificate failed", e);
-        }
     }
 
     private CircuitBreakerStatistics createCircuitBreakerStatistics(CircuitBreaker circuitBreaker) {
@@ -287,7 +270,7 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
                 .withCertificateId(certificateId)
                 .enableOcspNonce(ocspService.doesSupportNonce())
                 .build();
-        } catch (Exception e) {
+        } catch (OCSPException | NullPointerException e) {
             throw new UserCertificateOCSPException("Unable to create OCSP request", e);
         }
 
