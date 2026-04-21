@@ -6,7 +6,7 @@ package eu.webeid.ocsp.service;
 import eu.webeid.security.certificate.CertificateValidator;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.ocsp.exceptions.OCSPCertificateException;
-import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
+import eu.webeid.ocsp.exceptions.UserCertificateOCSPException;
 import eu.webeid.ocsp.protocol.OcspResponseValidator;
 import eu.webeid.security.validator.revocationcheck.RevocationMode;
 import org.bouncycastle.asn1.x500.X500Name;
@@ -18,6 +18,7 @@ import java.security.GeneralSecurityException;
 import java.security.cert.CertStore;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.Date;
 import java.util.Objects;
 import java.util.Optional;
@@ -37,8 +38,10 @@ public class AiaOcspService implements OcspService {
     private final URI url;
     private final boolean supportsNonce;
     private final FallbackOcspService fallbackOcspService;
+    private final Duration maxThisUpdateAge;
+    private final Duration maxNextUpdateAge;
 
-    public AiaOcspService(AiaOcspServiceConfiguration configuration, X509Certificate certificate, FallbackOcspService fallbackOcspService) throws AuthTokenException {
+    public AiaOcspService(AiaOcspServiceConfiguration configuration, X509Certificate certificate, FallbackOcspService fallbackOcspService) throws UserCertificateOCSPException {
         Objects.requireNonNull(configuration);
         this.trustedCACertificateAnchors = configuration.getTrustedCACertificateAnchors();
         this.trustedCACertificateCertStore = configuration.getTrustedCACertificateCertStore();
@@ -46,6 +49,8 @@ public class AiaOcspService implements OcspService {
         this.fallbackOcspService = fallbackOcspService;
         X500Name issuerDN = getIssuerDistinguishedName(certificate);
         this.supportsNonce = !configuration.getNonceDisabledIssuerDNs().contains(issuerDN);
+        this.maxThisUpdateAge = configuration.getMaxThisUpdateAge();
+        this.maxNextUpdateAge = configuration.getMaxNextUpdateAge();
     }
 
     @Override
@@ -59,6 +64,16 @@ public class AiaOcspService implements OcspService {
     }
 
     @Override
+    public Duration getMaxThisUpdateAge() {
+        return maxThisUpdateAge;
+    }
+
+    @Override
+    public Duration getMaxNextUpdateAge() {
+        return maxNextUpdateAge;
+    }
+
+    @Override
     public Optional<FallbackOcspService> getFallbackService() {
         return Optional.ofNullable(fallbackOcspService);
     }
@@ -69,7 +84,10 @@ public class AiaOcspService implements OcspService {
             final X509Certificate certificate = certificateConverter.getCertificate(cert);
             CertificateValidator.requireCertificateIsValidOnDate(certificate, now, "AIA OCSP responder");
             if (!certificate.equals(issuerCertificate)) {
-                OcspResponseValidator.validateHasSigningExtension(certificate);
+                OcspResponseValidator.validateBasicConstraintsNotCA(certificate);
+                OcspResponseValidator.validateKeyUsageDigitalSignature(certificate);
+                OcspResponseValidator.validateKeyUsageNotCertificateSigning(certificate);
+                OcspResponseValidator.validateExtendedKeyUsageOcspSigning(certificate);
                 // A delegated OCSP signer must be issued directly by the CA whose certificate status was requested.
                 if (!certificate.getIssuerX500Principal().equals(issuerCertificate.getSubjectX500Principal())) {
                     throw new OCSPCertificateException("AIA OCSP responder is not issued by the subject certificate's issuer");
@@ -91,9 +109,9 @@ public class AiaOcspService implements OcspService {
         }
     }
 
-    private static URI getOcspAiaUrlFromCertificate(X509Certificate certificate) throws AuthTokenException {
+    private static URI getOcspAiaUrlFromCertificate(X509Certificate certificate) throws UserCertificateOCSPException {
         return getOcspUri(certificate).orElseThrow(() ->
-            new UserCertificateOCSPCheckFailedException("Getting the AIA OCSP responder field from the certificate failed")
+            new UserCertificateOCSPException("Getting the AIA OCSP responder field from the certificate failed")
         );
     }
 

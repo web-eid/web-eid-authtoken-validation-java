@@ -116,7 +116,8 @@ class OcspCertificateRevocationCheckerNetworkTest {
     @Test
     void whenDesignatedResponderCertificateDiffers_thenFailurePreservesCertificateCause() throws Exception {
         final var checker = customChecker(new DesignatedOcspServiceConfiguration(
-                responder.designatedUri(), responder.responderCertificate(), List.of(responder.issuer()), true));
+                responder.designatedUri(), responder.responderCertificate(), List.of(responder.issuer()), true,
+                OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE, OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE));
         responder.replaceResponderCertificate(true);
 
         assertThatThrownBy(() -> checker.validateCertificateNotRevoked(responder.subject(), responder.issuer()))
@@ -138,7 +139,7 @@ class OcspCertificateRevocationCheckerNetworkTest {
                 .hasMessageContaining(responder.aiaUri().toString())
                 .cause()
                 .isExactlyInstanceOf(OCSPCertificateException.class)
-                .hasMessageContaining("does not contain the key usage extension for OCSP response signing");
+                .hasMessageContaining("does not contain the Key Usage extension required for OCSP response signing");
         assertThat(responder.requestCount()).isEqualTo(1);
         assertThat(responder.receivedPath()).isEqualTo("/aia");
     }
@@ -239,9 +240,9 @@ class OcspCertificateRevocationCheckerNetworkTest {
                 OcspClientImpl.build(Duration.ofSeconds(2)),
                 new OcspServiceProvider(designated, new AiaOcspServiceConfiguration(Set.of(),
                         CertificateValidator.buildTrustAnchorsFromCertificates(anchors),
-                        CertificateValidator.buildCertStoreFromCertificates(intermediates))),
-                OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW,
-                OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE);
+                        CertificateValidator.buildCertStoreFromCertificates(intermediates),
+                        OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE, OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE)),
+                OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW);
     }
 
     private List<RevocationInfo> validate() throws Exception {
@@ -250,7 +251,8 @@ class OcspCertificateRevocationCheckerNetworkTest {
 
     private List<RevocationInfo> validate(boolean nonceEnabled) throws Exception {
         final var checker = customChecker(new DesignatedOcspServiceConfiguration(
-                responder.designatedUri(), responder.responderCertificate(), List.of(responder.issuer()), nonceEnabled));
+                responder.designatedUri(), responder.responderCertificate(), List.of(responder.issuer()), nonceEnabled,
+                OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE, OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE));
         return CertificateValidator.validateCertificateTrustAndRevocation(
                 responder.subject(),
                 CertificateValidator.buildTrustAnchorsFromCertificates(List.of(responder.issuer())),
