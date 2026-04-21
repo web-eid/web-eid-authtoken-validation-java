@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.exceptions.AuthTokenSignatureValidationException;
 import eu.webeid.security.exceptions.AuthTokenParseException;
 import eu.webeid.security.exceptions.CertificateDecodingException;
 import eu.webeid.security.exceptions.CertificateExpiredException;
@@ -160,13 +161,13 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     }
 
     @Test
-    void whenCertificatePoliciesExtensionIsMissing_thenValidationContinuesToTrustCheck() throws Exception {
+    void whenCertificatePoliciesExtensionIsMissing_thenValidationContinuesToSignatureCheck() throws Exception {
         final String certificateWithoutPolicies = Base64.getEncoder()
             .encodeToString(getCertificateWithoutCertificatePolicies().getEncoded());
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", certificateWithoutPolicies);
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
-            .isInstanceOf(CertificateNotTrustedException.class);
+            .isInstanceOf(AuthTokenSignatureValidationException.class);
     }
 
     @Test

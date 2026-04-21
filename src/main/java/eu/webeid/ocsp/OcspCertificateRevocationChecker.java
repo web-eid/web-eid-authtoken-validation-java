@@ -11,6 +11,7 @@ import eu.webeid.ocsp.protocol.OcspRequestBuilder;
 import eu.webeid.ocsp.protocol.OcspResponseValidator;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
+import eu.webeid.ocsp.exceptions.UserCertificateOCSPException;
 import eu.webeid.security.util.DateAndTime;
 import eu.webeid.ocsp.service.OcspServiceProvider;
 import eu.webeid.ocsp.service.OcspService;
@@ -87,22 +88,25 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
         requireNonNull(subjectCertificate, "subjectCertificate");
         requireNonNull(issuerCertificate, "issuerCertificate");
 
-        URI ocspResponderUri = null;
+        final OcspService ocspService = ocspServiceProvider.getService(subjectCertificate, issuerCertificate);
+        final CertificateID certificateId = getCertificateId(subjectCertificate, issuerCertificate);
+        final URI ocspResponderUri;
+        final OCSPReq request;
         try {
-            OcspService ocspService = ocspServiceProvider.getService(subjectCertificate, issuerCertificate);
             ocspResponderUri = requireNonNull(ocspService.getAccessLocation(), "ocspResponderUri");
-
-            final CertificateID certificateId = getCertificateId(subjectCertificate, issuerCertificate);
-
-            final OCSPReq request = new OcspRequestBuilder()
+            request = new OcspRequestBuilder()
                 .withCertificateId(certificateId)
                 .enableOcspNonce(ocspService.doesSupportNonce())
                 .build();
+        } catch (OCSPException | NullPointerException e) {
+            throw new UserCertificateOCSPException("Unable to create OCSP request", e);
+        }
 
-            if (!ocspService.doesSupportNonce()) {
-                LOG.debug("Disabling OCSP nonce extension");
-            }
+        if (!ocspService.doesSupportNonce()) {
+            LOG.debug("Disabling OCSP nonce extension");
+        }
 
+        try {
             LOG.debug("Sending OCSP request");
             final OCSPResp response = requireNonNull(ocspClient.request(ocspResponderUri, request), "OCSPResp");
             if (response.getStatus() != OCSPResponseStatus.SUCCESSFUL) {
@@ -122,7 +126,7 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
 
             return List.of(new RevocationInfo(ocspResponderUri, Map.of(RevocationInfo.KEY_OCSP_RESPONSE, response)));
 
-        } catch (OCSPException | CertificateException | OperatorCreationException | IOException | OCSPClientException e) {
+        } catch (OCSPException | CertificateException | OperatorCreationException | OCSPClientException e) {
             throw new UserCertificateOCSPCheckFailedException(e, ocspResponderUri);
         }
     }
@@ -203,11 +207,15 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
         }
     }
 
-    protected static CertificateID getCertificateId(X509Certificate subjectCertificate, X509Certificate issuerCertificate) throws CertificateEncodingException, IOException, OCSPException {
-        final BigInteger serial = subjectCertificate.getSerialNumber();
-        final DigestCalculator digestCalculator = DigestCalculatorImpl.sha1();
-        return new CertificateID(digestCalculator,
-            new X509CertificateHolder(issuerCertificate.getEncoded()), serial);
+    protected static CertificateID getCertificateId(X509Certificate subjectCertificate, X509Certificate issuerCertificate) throws UserCertificateOCSPException {
+        try {
+            final BigInteger serial = subjectCertificate.getSerialNumber();
+            final DigestCalculator digestCalculator = DigestCalculatorImpl.sha1();
+            return new CertificateID(digestCalculator,
+                new X509CertificateHolder(issuerCertificate.getEncoded()), serial);
+        } catch (CertificateEncodingException | IOException | OCSPException e) {
+            throw new UserCertificateOCSPException("Unable to compute certificateId for subject certificate", e);
+        }
     }
 
     protected static String ocspStatusToString(int status) {
