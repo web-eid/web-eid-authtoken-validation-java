@@ -11,13 +11,13 @@ import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
 import eu.webeid.security.testutil.AuthTokenValidators;
+import eu.webeid.security.testutil.ResourceUtil;
 import eu.webeid.security.util.DateAndTime;
 import eu.webeid.ocsp.client.OcspClient;
 import eu.webeid.ocsp.client.OcspClientImpl;
 import eu.webeid.ocsp.service.OcspServiceProvider;
 import eu.webeid.security.validator.AuthTokenValidator;
 import org.bouncycastle.asn1.ocsp.OCSPResponseStatus;
-import org.bouncycastle.cert.CertIOException;
 import org.bouncycastle.cert.ocsp.OCSPException;
 import org.bouncycastle.cert.ocsp.OCSPResp;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,7 +25,6 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.ConnectException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -41,19 +40,19 @@ import java.util.Objects;
 import static eu.webeid.security.testutil.Certificates.getJaakKristjanEsteid2018Cert;
 import static eu.webeid.security.testutil.Certificates.getTestEsteid2018CA;
 import static eu.webeid.security.testutil.DateMocker.mockDate;
+import static eu.webeid.security.testutil.OcspResponses.buildOcspResponseBodyWithInvalidSignature;
 import static eu.webeid.ocsp.service.OcspServiceMaker.getAiaOcspServiceProvider;
+import static eu.webeid.ocsp.service.OcspServiceMaker.getAiaOcspServiceProviderWithEsteid2018NonceDisabled;
 import static eu.webeid.ocsp.service.OcspServiceMaker.getDesignatedOcspServiceProvider;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
-public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValidator {
+class OcspCertificateRevocationCheckerTest extends AbstractTestWithValidator {
 
     private final OcspClient ocspClient = OcspClientImpl.build(Duration.ofSeconds(5));
     private X509Certificate estEid2018Cert;
@@ -117,11 +116,13 @@ public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValida
     void whenOcspRequestFails_thenThrows() throws Exception {
         final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider("http://demo.sk.ee/ocsps");
         final OcspCertificateRevocationChecker validator = getOcspCertificateRevocationChecker(ocspServiceProvider);
-        UserCertificateOCSPCheckFailedException ex = assertThrows(UserCertificateOCSPCheckFailedException.class, () ->
-            validator.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA));
-        OCSPClientException ocspClientException = assertInstanceOf(OCSPClientException.class, ex.getCause());
-        assertThat(ocspClientException).hasMessageStartingWith("OCSP request was not successful");
-        assertThat(ocspClientException.getStatusCode()).isEqualTo(404);
+        assertThatThrownBy(() ->
+            validator.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
+            .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
+            .cause()
+            .isInstanceOf(OCSPClientException.class)
+            .hasMessageStartingWith("OCSP request was not successful")
+            .satisfies(cause -> assertThat(((OCSPClientException) cause).getStatusCode()).isEqualTo(404));
     }
 
     @Test
@@ -181,7 +182,8 @@ public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValida
             validator.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
             .cause()
-            .isExactlyInstanceOf(OCSPException.class);
+            .isExactlyInstanceOf(OCSPCertificateException.class)
+            .hasMessage("Invalid responder certificate");
     }
 
     @Test
@@ -235,8 +237,8 @@ public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValida
 
     @Test
     void whenOcspResponseUnknown_thenThrows() throws Exception {
-        final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider("https://web-eid-test.free.beeceptor.com");
-        final HttpResponse<byte[]> response = getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_unknown.der"));
+        final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider(false, "https://web-eid-test.free.beeceptor.com");
+        final HttpResponse<byte[]> response = getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_unknown_self_signed.der"));
         final OcspCertificateRevocationChecker validator = getOcspCertificateRevocationChecker(getMockClient(response), ocspServiceProvider);
         try (var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
             mockDate("2021-09-18T00:16:25", mockedClock);
@@ -250,7 +252,7 @@ public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValida
     @Test
     void whenOcspResponseSignerIsNotIssuedBySubjectIssuer_thenThrows() throws Exception {
         final OcspCertificateRevocationChecker validator = getOcspCertificateRevocationCheckerWithAiaOcsp(
-            getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_unknown.der"))
+            getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_unknown_self_signed.der"))
         );
         try (var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
             mockDate("2021-09-18T00:16:25", mockedClock);
@@ -266,7 +268,7 @@ public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValida
     @Test
     void whenOcspResponseCACertExpired_thenThrows() throws Exception {
         final OcspCertificateRevocationChecker validator = getOcspCertificateRevocationCheckerWithAiaOcsp(
-            getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_unknown.der"))
+            getMockedResponse(getOcspResponseBytesFromResources("ocsp_response_unknown_self_signed.der"))
         );
         assertThatThrownBy(() -> validator.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
@@ -278,8 +280,8 @@ public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValida
 
     @Test
     void whenNonceDiffers_thenThrows() throws Exception {
-        final OcspCertificateRevocationChecker validator = getOcspCertificateRevocationCheckerWithAiaOcsp(
-            getMockedResponse(getOcspResponseBytesFromResources())
+        final OcspCertificateRevocationChecker validator = getOcspCertificateRevocationChecker(
+            getMockClient(getMockedResponse(getOcspResponseBytesFromResources())), getAiaOcspServiceProvider()
         );
         try (var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
             mockDate("2021-09-17T18:25:24", mockedClock);
@@ -291,17 +293,21 @@ public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValida
     }
 
     @Test
-    void whenInvalidOcspResponseTimeSkew_thenThrows() {
-        assertThatThrownBy(() -> getOcspCertificateRevocationCheckerWithTimeSkewAndUpdateAge(Duration.ofMinutes(-1), Duration.ofMinutes(1)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("allowedOcspResponseTimeSkew must be greater than zero");
+    void whenNonceDiffersAndResponseSignatureIsInvalid_thenNonceCheckFailsFirst() throws Exception {
+        final OcspCertificateRevocationChecker validator = getOcspCertificateRevocationChecker(
+            getMockClient(getMockedResponse(buildOcspResponseBodyWithInvalidSignature())), getAiaOcspServiceProvider()
+        );
+        assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
+            .isThrownBy(() ->
+                validator.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
+            .withMessage("User certificate revocation check has failed: OCSP request and response nonces differ, possible replay attack (OCSP responder: http://aia.demo.sk.ee/esteid2018)");
     }
 
     @Test
-    void whenInvalidMaxOcspResponseThisUpdateAge_thenThrows() {
-        assertThatThrownBy(() -> getOcspCertificateRevocationCheckerWithTimeSkewAndUpdateAge(Duration.ofMinutes(1), Duration.ZERO))
+    void whenInvalidOcspResponseTimeSkew_thenThrows() {
+        assertThatThrownBy(() -> new OcspCertificateRevocationChecker(ocspClient, getAiaOcspServiceProvider(), Duration.ofMinutes(-1)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("maxOcspResponseThisUpdateAge must be greater than zero");
+                .hasMessageStartingWith("allowedOcspResponseTimeSkew must be greater than zero");
     }
 
     private static AuthTokenValidator getAuthTokenValidatorWithOcspCertificateRevocationChecker() throws CertificateException, JceException, IOException {
@@ -309,8 +315,7 @@ public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValida
                 .withCertificateRevocationChecker(new OcspCertificateRevocationChecker(
                         OcspClientImpl.build(Duration.ofSeconds(5)),
                         getAiaOcspServiceProvider(),
-                        OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW,
-                        OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE
+                        OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW
                 )).build();
     }
 
@@ -325,13 +330,6 @@ public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValida
         final byte[] ocspResponseBytes = getOcspResponseBytesFromResources();
         final int CERTIFICATE_ID_OFFSET = 234;
         ocspResponseBytes[CERTIFICATE_ID_OFFSET + 3] = 0x42;
-        return ocspResponseBytes;
-    }
-
-    private byte[] buildOcspResponseBodyWithInvalidSignature() throws IOException {
-        final byte[] ocspResponseBytes = getOcspResponseBytesFromResources();
-        final int SIGNATURE_OFFSET = 349;
-        ocspResponseBytes[SIGNATURE_OFFSET + 5] = 0x01;
         return ocspResponseBytes;
     }
 
@@ -356,14 +354,13 @@ public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValida
         return getOcspResponseBytesFromResources("ocsp_response.der");
     }
 
-    public static byte[] getOcspResponseBytesFromResources(String resource) throws IOException {
-        try (final InputStream resourceAsStream = ClassLoader.getSystemResourceAsStream(resource)) {
-            return toByteArray(resourceAsStream);
-        }
+    private static byte[] getOcspResponseBytesFromResources(String resource) throws IOException {
+        return ResourceUtil.bytesFromResource(resource);
     }
 
+    // The canned OCSP responses contain a fixed nonce, so nonce checking is disabled to reach response verification.
     private OcspCertificateRevocationChecker getOcspCertificateRevocationCheckerWithAiaOcsp(HttpResponse<byte[]> response) throws JceException {
-        return getOcspCertificateRevocationChecker(getMockClient(response), getAiaOcspServiceProvider());
+        return getOcspCertificateRevocationChecker(getMockClient(response), getAiaOcspServiceProviderWithEsteid2018NonceDisabled());
     }
 
     private OcspCertificateRevocationChecker getOcspCertificateRevocationChecker(OcspServiceProvider ocspServiceProvider) {
@@ -371,11 +368,7 @@ public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValida
     }
 
     private OcspCertificateRevocationChecker getOcspCertificateRevocationChecker(OcspClient client, OcspServiceProvider ocspServiceProvider) {
-        return new OcspCertificateRevocationChecker(client, ocspServiceProvider, OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW, OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE);
-    }
-
-    private void getOcspCertificateRevocationCheckerWithTimeSkewAndUpdateAge(Duration timeSkew, Duration updateAge) throws JceException {
-        new OcspCertificateRevocationChecker(ocspClient, getAiaOcspServiceProvider(), timeSkew, updateAge);
+        return new OcspCertificateRevocationChecker(client, ocspServiceProvider, OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW);
     }
 
     private HttpResponse<byte[]> getMockedResponse(byte[] bodyContent) throws URISyntaxException {
@@ -403,17 +396,6 @@ public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValida
                 throw new OCSPClientException(e);
             }
         };
-    }
-
-    private static byte[] toByteArray(InputStream resourceAsStream) throws IOException {
-        Objects.requireNonNull(resourceAsStream);
-        int bytesAvailable = resourceAsStream.available();
-        byte[] result = new byte[bytesAvailable];
-        int bytesRead = resourceAsStream.read(result);
-        if (bytesRead != bytesAvailable) {
-            throw new RuntimeException("Short read while loading resources");
-        }
-        return result;
     }
 
 }

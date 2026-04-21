@@ -56,8 +56,7 @@ class OcspClientOverrideTest extends AbstractTestWithValidator {
                 .withCertificateRevocationChecker(new OcspCertificateRevocationChecker(
                         ocspClient,
                         getAiaOcspServiceProvider(),
-                        OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW,
-                        OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE
+                        OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW
                 )).build();
     }
 

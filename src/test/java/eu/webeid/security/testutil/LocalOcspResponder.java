@@ -7,13 +7,16 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1OctetString;
+import org.bouncycastle.asn1.DERNull;
 import org.bouncycastle.asn1.DEROctetString;
+import org.bouncycastle.asn1.ocsp.CertID;
 import org.bouncycastle.asn1.ocsp.OCSPObjectIdentifiers;
 import org.bouncycastle.asn1.ocsp.OCSPResponse;
 import org.bouncycastle.asn1.ocsp.OCSPResponseStatus;
 import org.bouncycastle.asn1.ocsp.ResponseBytes;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.AccessDescription;
+import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.AuthorityInformationAccess;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.CRLReason;
@@ -73,6 +76,7 @@ public final class LocalOcspResponder implements AutoCloseable {
     private KeyPair responderKeys;
     private volatile Reply reply = Reply.GOOD;
     private volatile boolean includeNonce = true;
+    private volatile boolean nullCertIdHashParameters;
 
     public enum Reply { GOOD, REVOKED, TRY_LATER, DISCONNECT, UNSUPPORTED_TYPE, MISSING_RESPONSE }
 
@@ -192,6 +196,11 @@ public final class LocalOcspResponder implements AutoCloseable {
         this.includeNonce = includeNonce;
     }
 
+    /** Rebuilds the response certificate ID with NULL hash algorithm parameters, as OpenSSL does. */
+    public void setNullCertIdHashParameters(boolean nullCertIdHashParameters) {
+        this.nullCertIdHashParameters = nullCertIdHashParameters;
+    }
+
     public void useIssuerAsResponder() {
         responder = issuer;
         responderKeys = issuerKeys;
@@ -266,7 +275,7 @@ public final class LocalOcspResponder implements AutoCloseable {
                 new JcaDigestCalculatorProviderBuilder().build().get(CertificateID.HASH_SHA1));
         final CertificateStatus status = reply == Reply.REVOKED
                 ? new RevokedStatus(Date.from(now.minusSeconds(60)), CRLReason.keyCompromise) : CertificateStatus.GOOD;
-        builder.addResponse(requestedId, status,
+        builder.addResponse(nullCertIdHashParameters ? withNullHashParameters(requestedId) : requestedId, status,
                 Date.from(now.minusSeconds(1)), Date.from(now.plusSeconds(60)), null);
         final Extension nonce = request.getExtension(OCSPObjectIdentifiers.id_pkix_ocsp_nonce);
         if (includeNonce && nonce != null) {
@@ -275,6 +284,12 @@ public final class LocalOcspResponder implements AutoCloseable {
         return new OCSPRespBuilder().build(OCSPResp.SUCCESSFUL, builder.build(
                 new JcaContentSignerBuilder("SHA256withECDSA").build(responderKeys.getPrivate()),
                 new X509CertificateHolder[] {new JcaX509CertificateHolder(responder)}, Date.from(now)));
+    }
+
+    private static CertificateID withNullHashParameters(CertificateID certificateId) {
+        final CertID certId = certificateId.toASN1Primitive();
+        return new CertificateID(new CertID(new AlgorithmIdentifier(certId.getHashAlgorithm().getAlgorithm(), DERNull.INSTANCE),
+                certId.getIssuerNameHash(), certId.getIssuerKeyHash(), certId.getSerialNumber()));
     }
 
     private JcaX509v3CertificateBuilder certificateBuilder(X500Name issuerName, X500Name subjectName, KeyPair keys, int serial) {
