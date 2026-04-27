@@ -28,7 +28,6 @@ import eu.webeid.ocsp.exceptions.OCSPClientException;
 import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.ocsp.exceptions.UserCertificateOCSPException;
 import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
-import eu.webeid.ocsp.protocol.OcspRequestBuilder;
 import eu.webeid.ocsp.service.FallbackOcspService;
 import eu.webeid.ocsp.service.OcspService;
 import eu.webeid.ocsp.service.OcspServiceProvider;
@@ -50,7 +49,6 @@ import io.vavr.control.Try;
 import org.bouncycastle.asn1.ocsp.OCSPResponseStatus;
 import org.bouncycastle.cert.ocsp.BasicOCSPResp;
 import org.bouncycastle.cert.ocsp.CertificateID;
-import org.bouncycastle.cert.ocsp.OCSPException;
 import org.bouncycastle.cert.ocsp.OCSPReq;
 import org.bouncycastle.cert.ocsp.OCSPResp;
 import org.slf4j.Logger;
@@ -264,17 +262,8 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
     }
 
     private RevocationInfo request(OcspService ocspService, X509Certificate subjectCertificate, X509Certificate issuerCertificate, CertificateID certificateId, Duration maxOcspResponseThisUpdateAge) throws UserCertificateOCSPCheckFailedException, ResilientUserCertificateRevokedException, UserCertificateOCSPException {
-        final URI ocspResponderUri;
-        final OCSPReq request;
-        try {
-            ocspResponderUri = ocspService.getAccessLocation();
-            request = new OcspRequestBuilder()
-                .withCertificateId(certificateId)
-                .enableOcspNonce(ocspService.doesSupportNonce())
-                .build();
-        } catch (OCSPException e) {
-            throw new UserCertificateOCSPException("Unable to create OCSP request", e);
-        }
+        final URI ocspResponderUri = ocspService.getAccessLocation();
+        final OCSPReq request = getOcspRequest(certificateId, ocspService);
 
         if (!ocspService.doesSupportNonce()) {
             LOG.debug("Disabling OCSP nonce extension");

@@ -90,17 +90,8 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
 
         final OcspService ocspService = ocspServiceProvider.getService(subjectCertificate, issuerCertificate);
         final CertificateID certificateId = getCertificateId(subjectCertificate, issuerCertificate);
-        final URI ocspResponderUri;
-        final OCSPReq request;
-        try {
-            ocspResponderUri = ocspService.getAccessLocation();
-            request = new OcspRequestBuilder()
-                .withCertificateId(certificateId)
-                .enableOcspNonce(ocspService.doesSupportNonce())
-                .build();
-        } catch (OCSPException e) {
-            throw new UserCertificateOCSPException("Unable to create OCSP request", e);
-        }
+        final URI ocspResponderUri = ocspService.getAccessLocation();
+        final OCSPReq request = getOcspRequest(certificateId, ocspService);
 
         if (!ocspService.doesSupportNonce()) {
             LOG.debug("Disabling OCSP nonce extension");
@@ -129,6 +120,19 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
         } catch (OCSPException | CertificateException | OperatorCreationException | OCSPClientException e) {
             throw new UserCertificateOCSPCheckFailedException(e, ocspResponderUri);
         }
+    }
+
+    protected static OCSPReq getOcspRequest(CertificateID certificateId, OcspService ocspService) throws UserCertificateOCSPException {
+        final OCSPReq request;
+        try {
+            request = new OcspRequestBuilder()
+                .withCertificateId(certificateId)
+                .enableOcspNonce(ocspService.doesSupportNonce())
+                .build();
+        } catch (OCSPException e) {
+            throw new UserCertificateOCSPException("Unable to create OCSP request", e);
+        }
+        return request;
     }
 
     protected void verifyOcspResponse(BasicOCSPResp basicResponse, OcspService ocspService, CertificateID requestCertificateId, X509Certificate issuerCertificate, Duration maxOcspResponseThisUpdateAge) throws AuthTokenException, OCSPException, CertificateException, OperatorCreationException {
