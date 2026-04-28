@@ -22,8 +22,8 @@
 
 package eu.webeid.example.testutil;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JsonProcessingException;
+import tools.jackson.databind.ObjectMapper;
 import eu.webeid.example.service.dto.SignatureAlgorithmDTO;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import org.apache.commons.lang3.ArrayUtils;

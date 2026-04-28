@@ -22,8 +22,9 @@
 
 package eu.webeid.security.validator;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectReader;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.certificate.CertificateLoader;
 import eu.webeid.security.certificate.CertificateValidator;
@@ -140,7 +141,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
                 throw new AuthTokenParseException("Web eID authentication token is null");
             }
             return token;
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new AuthTokenParseException("Error parsing Web eID authentication token", e);
         }
     }

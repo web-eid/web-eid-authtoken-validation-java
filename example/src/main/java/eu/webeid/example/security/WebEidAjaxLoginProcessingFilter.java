@@ -22,8 +22,8 @@
 
 package eu.webeid.example.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectReader;
 import eu.webeid.example.security.ajax.AjaxAuthenticationFailureHandler;
 import eu.webeid.example.security.ajax.AjaxAuthenticationSuccessHandler;
 import eu.webeid.example.security.dto.AuthTokenDTO;
