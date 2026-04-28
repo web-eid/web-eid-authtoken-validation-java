@@ -28,20 +28,9 @@ import java.net.URI;
 
 import static eu.webeid.ocsp.exceptions.OcspResponderUriMessageAppender.appendResponderUri;
 
-/**
- * Thrown when the user certificate has been revoked.
- */
-public class UserCertificateRevokedException extends AuthTokenException {
+public class UserCertificateUnknownException extends AuthTokenException {
 
-    public UserCertificateRevokedException() {
-        super("User certificate has been revoked");
-    }
-
-    public UserCertificateRevokedException(URI ocspResponderUri) {
-        super(appendResponderUri("User certificate has been revoked", ocspResponderUri));
-    }
-
-    public UserCertificateRevokedException(String msg, URI ocspResponderUri) {
-        super(appendResponderUri("User certificate has been revoked: " + msg, ocspResponderUri));
+    public UserCertificateUnknownException(String msg, URI ocspResponderUri) {
+        super(appendResponderUri("User certificate status is unknown: " + msg, ocspResponderUri));
     }
 }

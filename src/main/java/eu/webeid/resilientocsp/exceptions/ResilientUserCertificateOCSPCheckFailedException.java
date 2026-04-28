@@ -20,28 +20,34 @@
  * SOFTWARE.
  */
 
-package eu.webeid.ocsp.exceptions;
+package eu.webeid.resilientocsp.exceptions;
 
-import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
+import eu.webeid.security.validator.ValidationInfo;
 
-import java.net.URI;
+public class ResilientUserCertificateOCSPCheckFailedException extends UserCertificateOCSPCheckFailedException {
 
-import static eu.webeid.ocsp.exceptions.OcspResponderUriMessageAppender.appendResponderUri;
+    private ValidationInfo validationInfo;
 
-/**
- * Thrown when the user certificate has been revoked.
- */
-public class UserCertificateRevokedException extends AuthTokenException {
-
-    public UserCertificateRevokedException() {
-        super("User certificate has been revoked");
+    public ResilientUserCertificateOCSPCheckFailedException(String message) {
+        this(message, null);
     }
 
-    public UserCertificateRevokedException(URI ocspResponderUri) {
-        super(appendResponderUri("User certificate has been revoked", ocspResponderUri));
+    public ResilientUserCertificateOCSPCheckFailedException(ValidationInfo validationInfo) {
+        super();
+        this.validationInfo = validationInfo;
     }
 
-    public UserCertificateRevokedException(String msg, URI ocspResponderUri) {
-        super(appendResponderUri("User certificate has been revoked: " + msg, ocspResponderUri));
+    public ResilientUserCertificateOCSPCheckFailedException(String message, ValidationInfo validationInfo) {
+        super(message);
+        this.validationInfo = validationInfo;
+    }
+
+    public ValidationInfo getValidationInfo() {
+        return validationInfo;
+    }
+
+    public void setValidationInfo(ValidationInfo validationInfo) {
+        this.validationInfo = validationInfo;
     }
 }

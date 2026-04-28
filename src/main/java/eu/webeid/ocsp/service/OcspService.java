@@ -27,6 +27,7 @@ import eu.webeid.security.exceptions.AuthTokenException;
 
 import java.net.URI;
 import java.util.Date;
+import java.util.Optional;
 
 public interface OcspService {
 
@@ -35,5 +36,9 @@ public interface OcspService {
     URI getAccessLocation();
 
     void validateResponderCertificate(X509CertificateHolder cert, Date now) throws AuthTokenException;
+
+    default Optional<FallbackOcspService> getFallbackService() {
+        return Optional.empty();
+    }
 
 }
