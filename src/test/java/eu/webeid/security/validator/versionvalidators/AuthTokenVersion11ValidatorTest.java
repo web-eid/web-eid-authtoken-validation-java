@@ -46,6 +46,7 @@ import java.util.Collections;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
@@ -92,7 +93,7 @@ class AuthTokenVersion11ValidatorTest {
     }
 
     @Test
-    void whenUnverifiedSigningCertificatesMissing_thenValidationFails() throws Exception {
+    void whenUnverifiedSigningCertificatesMissing_thenValidationSucceeds() throws Exception {
         WebEidAuthToken token = mock(WebEidAuthToken.class);
         when(token.getFormat()).thenReturn("web-eid:1.1");
         when(token.getUnverifiedSigningCertificates()).thenReturn(null);
@@ -100,9 +101,22 @@ class AuthTokenVersion11ValidatorTest {
         AuthTokenVersion11Validator spyValidator = Mockito.spy(validator);
         doReturn(mock(X509Certificate.class)).when(spyValidator).validateV1(any(), any());
 
+        assertThatCode(() -> spyValidator.validate(token, "nonce"))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenUnverifiedSigningCertificatesIsEmpty_thenValidationFails() throws Exception {
+        WebEidAuthToken token = mock(WebEidAuthToken.class);
+        when(token.getFormat()).thenReturn("web-eid:1.1");
+        when(token.getUnverifiedSigningCertificates()).thenReturn(Collections.emptyList());
+
+        AuthTokenVersion11Validator spyValidator = Mockito.spy(validator);
+        doReturn(mock(X509Certificate.class)).when(spyValidator).validateV1(any(), any());
+
         assertThatThrownBy(() -> spyValidator.validate(token, "nonce"))
             .isInstanceOf(AuthTokenParseException.class)
-            .hasMessage("'unverifiedSigningCertificates' field is missing, null or empty for format 'web-eid:1.1'");
+            .hasMessage("'unverifiedSigningCertificates' field is empty for format 'web-eid:1.1'");
     }
 
     @Test

@@ -115,7 +115,7 @@ class AuthTokenV11CertificateTest extends AbstractTestWithValidator {
     }
 
     @Test
-    void whenV11SigningCertificateFieldIsMissing_thenValidationFails() throws Exception {
+    void whenV11SigningCertificateFieldIsMissing_thenValidationSucceeds() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         ObjectNode node = (ObjectNode) mapper.readTree(V11_AUTH_TOKEN);
         node.remove("unverifiedSigningCertificates");
@@ -124,9 +124,24 @@ class AuthTokenV11CertificateTest extends AbstractTestWithValidator {
         AuthTokenVersion11Validator spyValidator = spyAuthTokenVersion11Validator();
         doReturn(mock(X509Certificate.class)).when(spyValidator).validateV1(any(), any());
 
+        assertThatCode(() -> spyValidator.validate(token, VALID_CHALLENGE_NONCE))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenV11SigningCertificateFieldIsEmpty_thenValidationFails() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode node = (ObjectNode) mapper.readTree(V11_AUTH_TOKEN);
+        node.putArray("unverifiedSigningCertificates"); // []
+
+        WebEidAuthToken token = OBJECT_READER.readValue(node.toString());
+
+        AuthTokenVersion11Validator spyValidator = spyAuthTokenVersion11Validator();
+        doReturn(mock(X509Certificate.class)).when(spyValidator).validateV1(any(), any());
+
         assertThatThrownBy(() -> spyValidator.validate(token, VALID_CHALLENGE_NONCE))
             .isInstanceOf(AuthTokenParseException.class)
-            .hasMessage("'unverifiedSigningCertificates' field is missing, null or empty for format 'web-eid:1.1'");
+            .hasMessage("'unverifiedSigningCertificates' field is empty for format 'web-eid:1.1'");
     }
 
     @Test

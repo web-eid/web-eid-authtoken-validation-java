@@ -128,8 +128,12 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
     private static List<X509Certificate> validateSigningCertificates(WebEidAuthToken token) throws AuthTokenParseException, CertificateDecodingException {
         List<UnverifiedSigningCertificate> signingCertificates = token.getUnverifiedSigningCertificates();
 
-        if (signingCertificates == null || signingCertificates.isEmpty()) {
-            throw new AuthTokenParseException("'unverifiedSigningCertificates' field is missing, null or empty for format 'web-eid:1.1'");
+        if (signingCertificates == null) {
+            return List.of();
+        }
+
+        if (signingCertificates.isEmpty()) {
+            throw new AuthTokenParseException("'unverifiedSigningCertificates' field is empty for format 'web-eid:1.1'");
         }
 
         List<X509Certificate> result = new ArrayList<>();
