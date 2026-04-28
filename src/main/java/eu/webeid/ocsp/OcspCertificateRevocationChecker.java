@@ -91,12 +91,12 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
         final URI ocspResponderUri;
         final OCSPReq request;
         try {
-            ocspResponderUri = requireNonNull(ocspService.getAccessLocation(), "ocspResponderUri");
+            ocspResponderUri = ocspService.getAccessLocation();
             request = new OcspRequestBuilder()
                 .withCertificateId(certificateId)
                 .enableOcspNonce(ocspService.doesSupportNonce())
                 .build();
-        } catch (OCSPException | NullPointerException e) {
+        } catch (OCSPException e) {
             throw new UserCertificateOCSPException("Unable to create OCSP request", e);
         }
 
