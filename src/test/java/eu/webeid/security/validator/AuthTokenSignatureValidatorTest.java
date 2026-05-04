@@ -22,8 +22,8 @@
 
 package eu.webeid.security.validator;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectReader;
 import eu.webeid.security.certificate.CertificateLoader;
 import org.junit.jupiter.api.Test;
 import eu.webeid.security.authtoken.WebEidAuthToken;
