@@ -55,15 +55,24 @@ public class WebEidAuthentication extends PreAuthenticatedAuthenticationToken im
 
     private static String getPrincipalNameFromCertificate(X509Certificate userCertificate) throws CertificateEncodingException {
         final Optional<String> givenName = CertificateData.getSubjectGivenName(userCertificate);
-        final Optional<String> surname = CertificateData.getSubjectSurname(userCertificate);
+        final Optional<String> surname = CertificateData.getSubjectSurname(userCertificate).filter(sn -> !"-".equals(sn));
 
         if (givenName.isPresent() && surname.isPresent()) {
             return givenName.get() + ' ' + surname.get();
-        } else {
-            // Organization certificates do not have given name and surname fields.
-            return CertificateData.getSubjectCN(userCertificate)
-                    .orElseThrow(() -> new CertificateEncodingException("Certificate does not contain subject CN"));
         }
+
+        if (surname.isPresent()) {
+            return surname.get();
+        }
+
+        if (givenName.isPresent()) {
+            return givenName.get();
+        }
+
+        // Organization certificates do not have given name and surname fields.
+        return CertificateData.getSubjectCN(userCertificate)
+                .orElseThrow(() -> new CertificateEncodingException("Certificate does not contain subject CN"));
+
     }
 
     @Override

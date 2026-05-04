@@ -23,6 +23,18 @@
 package eu.webeid.example.security;
 
 import eu.webeid.security.certificate.CertificateLoader;
+import java.math.BigInteger;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Date;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x500.X500NameBuilder;
+import org.bouncycastle.asn1.x500.style.BCStyle;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.Authentication;
 
@@ -40,6 +52,62 @@ class WebEidAuthenticationTest {
         final X509Certificate certificate = CertificateLoader.decodeCertificateFromBase64(ORGANIZATION_CERT);
         final Authentication authentication = WebEidAuthentication.fromCertificate(certificate, Collections.emptyList());
         assertThat(authentication.getPrincipal()).isEqualTo("Testijad.ee isikutuvastus");
+    }
+
+    @Test
+    void whenPersonHasGivenNameAndSurnamePresent_thenBothAreReturned() throws Exception {
+        final Authentication authentication = createMockAuthenticationUsingCertificateWithSubject("JAAK-KRISTJAN", "JÕEORG");
+        assertThat(authentication.getPrincipal()).isEqualTo("JAAK-KRISTJAN JÕEORG");
+    }
+
+    @Test
+    void whenPersonHasOnlyOneNameAsGivenName_thenGivenNameIsReturned() throws Exception {
+        final Authentication authentication = createMockAuthenticationUsingCertificateWithSubject("JÕEORG", "-");
+        assertThat(authentication.getPrincipal()).isEqualTo("JÕEORG");
+    }
+
+    @Test
+    void whenPersonHasOnlyOneNameAsSurname_thenSurnameIsReturned() throws Exception {
+        final Authentication authentication = createMockAuthenticationUsingCertificateWithSubject(null, "JÕEORG");
+        assertThat(authentication.getPrincipal()).isEqualTo("JÕEORG");
+    }
+
+    private Authentication createMockAuthenticationUsingCertificateWithSubject(String givenName, String surname) throws Exception {
+        return WebEidAuthentication.fromCertificate(createMockCertificateForSubject(givenName, surname), Collections.emptyList());
+    }
+
+    private X509Certificate createMockCertificateForSubject(String givenName, String surname) throws Exception {
+        KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
+        keyGen.initialize(2048);
+        KeyPair keyPair = keyGen.generateKeyPair();
+
+        X500NameBuilder x500NameBuilder = new X500NameBuilder(BCStyle.INSTANCE)
+            .addRDN(BCStyle.SERIALNUMBER, "38001085718")
+            .addRDN(BCStyle.SURNAME, surname);
+        if (givenName != null) {
+            x500NameBuilder
+                .addRDN(BCStyle.GIVENNAME, givenName)
+                .addRDN(BCStyle.CN, "%s,%s,38001085718".formatted(surname, givenName));
+        } else {
+            x500NameBuilder
+                .addRDN(BCStyle.CN, "%s,38001085718".formatted(surname));
+        }
+        X500Name subject = x500NameBuilder.build();
+
+        LocalDate start = LocalDate.now().minusDays(1);
+        LocalDate end  = LocalDate.now().plusDays(1);
+
+        return new JcaX509CertificateConverter()
+            .getCertificate(
+                new JcaX509v3CertificateBuilder(
+                    subject,
+                    BigInteger.ONE,
+                    Date.from(start.atStartOfDay(ZoneId.of("Europe/Tallinn")).toInstant()),
+                    Date.from(end.atStartOfDay(ZoneId.of("Europe/Tallinn")).toInstant()),
+                    subject,
+                    keyPair.getPublic()
+                ).build(new JcaContentSignerBuilder("SHA256withRSA").build(keyPair.getPrivate()))
+            );
     }
 
 }
