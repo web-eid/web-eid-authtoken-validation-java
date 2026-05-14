@@ -18,6 +18,7 @@ import java.security.GeneralSecurityException;
 import java.security.cert.CertStore;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.Date;
 import java.util.Objects;
 import java.util.Optional;
@@ -37,6 +38,8 @@ public class AiaOcspService implements OcspService {
     private final URI url;
     private final boolean supportsNonce;
     private final FallbackOcspService fallbackOcspService;
+    private final Duration maxThisUpdateAge;
+    private final Duration maxNextUpdateAge;
 
     public AiaOcspService(AiaOcspServiceConfiguration configuration, X509Certificate certificate, FallbackOcspService fallbackOcspService) throws UserCertificateOCSPException {
         Objects.requireNonNull(configuration);
@@ -46,6 +49,8 @@ public class AiaOcspService implements OcspService {
         this.fallbackOcspService = fallbackOcspService;
         X500Name issuerDN = getIssuerDistinguishedName(certificate);
         this.supportsNonce = !configuration.getNonceDisabledIssuerDNs().contains(issuerDN);
+        this.maxThisUpdateAge = configuration.getMaxThisUpdateAge();
+        this.maxNextUpdateAge = configuration.getMaxNextUpdateAge();
     }
 
     @Override
@@ -56,6 +61,16 @@ public class AiaOcspService implements OcspService {
     @Override
     public URI getAccessLocation() {
         return url;
+    }
+
+    @Override
+    public Duration getMaxThisUpdateAge() {
+        return maxThisUpdateAge;
+    }
+
+    @Override
+    public Duration getMaxNextUpdateAge() {
+        return maxNextUpdateAge;
     }
 
     @Override

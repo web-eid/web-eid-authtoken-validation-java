@@ -102,7 +102,7 @@ public final class OcspResponseValidator {
         }
     }
 
-    public static void validateCertificateStatusUpdateTime(SingleResp certStatusResponse, Duration allowedTimeSkew, Duration maxThisupdateAge, URI ocspResponderUri) throws UserCertificateOCSPCheckFailedException {
+    public static void validateCertificateStatusUpdateTime(SingleResp certStatusResponse, Duration allowedTimeSkew, Duration maxThisUpdateAge, Duration maxNextUpdateAge, URI ocspResponderUri) throws UserCertificateOCSPCheckFailedException {
         // From RFC 2560, https://www.ietf.org/rfc/rfc2560.txt:
         // 4.2.2.  Notes on OCSP Responses
         // 4.2.2.1.  Time
@@ -113,9 +113,9 @@ public final class OcspResponseValidator {
         //   If nextUpdate is not set, the responder is indicating that newer
         //   revocation information is available all the time.
         final Instant now = DateAndTime.DefaultClock.getInstance().now().toInstant();
-        final Instant earliestAcceptableTimeSkew = now.minus(allowedTimeSkew);
         final Instant latestAcceptableTimeSkew = now.plus(allowedTimeSkew);
-        final Instant minimumValidThisUpdateTime = now.minus(maxThisupdateAge);
+        final Instant minimumValidThisUpdateTime = now.minus(maxThisUpdateAge);
+        final Instant minimumValidNextUpdateTime = now.minus(maxNextUpdateAge);
 
         final Instant thisUpdate = certStatusResponse.getThisUpdate().toInstant();
         if (thisUpdate.isAfter(latestAcceptableTimeSkew)) {
@@ -133,9 +133,10 @@ public final class OcspResponseValidator {
             return;
         }
         final Instant nextUpdate = certStatusResponse.getNextUpdate().toInstant();
-        if (nextUpdate.isBefore(earliestAcceptableTimeSkew)) {
+        if (nextUpdate.isBefore(minimumValidNextUpdateTime)) {
             throw new UserCertificateOCSPCheckFailedException(ERROR_PREFIX +
-                "nextUpdate '" + nextUpdate + "' is in the past", ocspResponderUri);
+                "nextUpdate '" + nextUpdate + "' is too old, " +
+                "minimum time allowed: '" + minimumValidNextUpdateTime + "'", ocspResponderUri);
         }
         if (nextUpdate.isBefore(thisUpdate)) {
             throw new UserCertificateOCSPCheckFailedException(ERROR_PREFIX +

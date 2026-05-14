@@ -38,6 +38,8 @@ import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Set;
 
+import static eu.webeid.ocsp.OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE;
+import static eu.webeid.ocsp.OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE;
 import static eu.webeid.security.testutil.Certificates.getTestEsteid2018CA;
 import static eu.webeid.security.testutil.TestCertificateBuilder.buildCertificate;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -138,14 +140,16 @@ class OcspServiceConfigurationTest {
 
     private static void newDesignatedOcspServiceConfiguration(X509Certificate responder) throws Exception {
         new DesignatedOcspServiceConfiguration(
-            OCSP_URL, responder, List.of(getTestEsteid2018CA()), true);
+            OCSP_URL, responder, List.of(getTestEsteid2018CA()), true,
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
     }
 
     private static void newFallbackOcspServiceConfiguration(X509Certificate responder) throws Exception {
         final List<X509Certificate> trustedCAs = List.of(getTestEsteid2018CA());
         final Set<TrustAnchor> trustAnchors = CertificateValidator.buildTrustAnchorsFromCertificates(trustedCAs);
         final CertStore certStore = CertificateValidator.buildCertStoreFromCertificates(trustedCAs);
-        new FallbackOcspServiceConfiguration(OCSP_URL, responder, true, null, null, trustAnchors, certStore);
+        new FallbackOcspServiceConfiguration(OCSP_URL, responder, true, null, null, trustAnchors, certStore,
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
     }
 
 }

@@ -34,6 +34,8 @@ import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Set;
 
+import static eu.webeid.ocsp.OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE;
+import static eu.webeid.ocsp.OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE;
 import static eu.webeid.ocsp.protocol.IssuerDistinguishedName.getIssuerDistinguishedName;
 import static eu.webeid.security.testutil.Certificates.getJaakKristjanEsteid2018Cert;
 import static eu.webeid.security.testutil.Certificates.getMariliisEsteid2015Cert;
@@ -73,7 +75,8 @@ class AiaOcspServiceTest {
     }
 
     private static AiaOcspServiceConfiguration configurationWithNonceDisabledFor(X500Name... nonceDisabledIssuerDNs) {
-        return new AiaOcspServiceConfiguration(Set.of(nonceDisabledIssuerDNs), trustedCaAnchors, trustedCaCertStore);
+        return new AiaOcspServiceConfiguration(Set.of(nonceDisabledIssuerDNs), trustedCaAnchors, trustedCaCertStore,
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
     }
 
     @Test
@@ -102,7 +105,8 @@ class AiaOcspServiceTest {
         AiaOcspServiceConfiguration configuration = configurationWithNonceDisabledFor();
         FallbackOcspServiceConfiguration fallbackConfiguration = new FallbackOcspServiceConfiguration(
             FALLBACK_URI, getDemoEsteidSk2018AiaOcspResponder(), true,
-            null, esteid2018IssuerDN, trustedCaAnchors, trustedCaCertStore);
+            null, esteid2018IssuerDN, trustedCaAnchors, trustedCaCertStore,
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
         FallbackOcspService fallback = new FallbackOcspService(fallbackConfiguration);
 
         AiaOcspService service = new AiaOcspService(configuration, esteid2018UserCert, fallback);

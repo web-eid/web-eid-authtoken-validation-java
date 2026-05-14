@@ -3,6 +3,7 @@
 
 package eu.webeid.ocsp.service;
 
+import eu.webeid.ocsp.OcspCertificateRevocationChecker;
 import eu.webeid.ocsp.exceptions.OCSPCertificateException;
 import eu.webeid.security.certificate.CertificateValidator;
 import org.bouncycastle.asn1.x500.X500Name;
@@ -19,6 +20,7 @@ import java.net.URI;
 import java.security.cert.CertStore;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -47,6 +49,8 @@ class OcspServiceProviderTest {
         final OcspService service = ocspServiceProvider.getService(getJaakKristjanEsteid2018Cert(), getTestEsteid2018CA());
         assertThat(service.getAccessLocation()).isEqualTo(new URI("http://demo.sk.ee/ocsp"));
         assertThat(service.doesSupportNonce()).isTrue();
+        assertThat(service.getMaxThisUpdateAge()).isEqualTo(Duration.ofMinutes(3));
+        assertThat(service.getMaxNextUpdateAge()).isEqualTo(Duration.ofMinutes(20));
         assertThatCode(() ->
             service.validateResponderCertificate(new X509CertificateHolder(getTestSelfSignedOcspResponder().getEncoded()), getTestEsteid2018CA(), new Date(1630000000000L)))
             .doesNotThrowAnyException();
@@ -66,6 +70,8 @@ class OcspServiceProviderTest {
         final OcspService service2015 = ocspServiceProvider.getService(getMariliisEsteid2015Cert(), getTestEsteid2015CA());
         assertThat(service2015.getAccessLocation()).isEqualTo(new URI("http://aia.demo.sk.ee/esteid2015"));
         assertThat(service2015.doesSupportNonce()).isFalse();
+        assertThat(service2018.getMaxThisUpdateAge()).isEqualTo(Duration.ofMinutes(3));
+        assertThat(service2018.getMaxNextUpdateAge()).isEqualTo(Duration.ofMinutes(20));
         assertThatCode(() ->
             service2018.validateResponderCertificate(new X509CertificateHolder(getDemoEsteidSk2018AiaOcspResponder().getEncoded()), getTestEsteid2018CA(), new Date(1630000000000L)))
             .doesNotThrowAnyException();
@@ -90,10 +96,12 @@ class OcspServiceProviderTest {
             second.start();
             final var authorities = List.of(first.issuer(), second.issuer());
             final var designated = new DesignatedOcspServiceConfiguration(
-                    first.designatedUri(), first.responderCertificate(), List.of(first.issuer()), true);
+                    first.designatedUri(), first.responderCertificate(), List.of(first.issuer()), true,
+                    OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE, OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE);
             final var aia = new AiaOcspServiceConfiguration(Set.of(),
                     CertificateValidator.buildTrustAnchorsFromCertificates(authorities),
-                    CertificateValidator.buildCertStoreFromCertificates(authorities));
+                    CertificateValidator.buildCertStoreFromCertificates(authorities),
+                    OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE, OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE);
             final var provider = new OcspServiceProvider(designated, aia);
 
             assertThat(first.issuer().getSubjectX500Principal()).isEqualTo(second.issuer().getSubjectX500Principal());
@@ -199,7 +207,9 @@ class OcspServiceProviderTest {
         final Set<TrustAnchor> trustAnchors = CertificateValidator.buildTrustAnchorsFromCertificates(trustedCAs);
         final CertStore certStore = CertificateValidator.buildCertStoreFromCertificates(trustedCAs);
         final FallbackOcspServiceConfiguration configuration = new FallbackOcspServiceConfiguration(
-            URI.create("http://fallback.demo.sk.ee/ocsp"), null, true, null, new X500Name("CN=TEST ISSUER"), trustAnchors, certStore);
+            URI.create("http://fallback.demo.sk.ee/ocsp"), null, true, null, new X500Name("CN=TEST ISSUER"), trustAnchors, certStore,
+            OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
+            OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE);
         return new FallbackOcspService(configuration);
     }
 
@@ -215,7 +225,9 @@ class OcspServiceProviderTest {
         URI fallbackUri = URI.create("http://fallback.test/ocsp");
         FallbackOcspServiceConfiguration fallbackConfiguration = new FallbackOcspServiceConfiguration(
             fallbackUri, getDemoEsteidSk2018AiaOcspResponder(), true,
-            null, issuerDN, trustedAnchors, trustedStore);
+            null, issuerDN, trustedAnchors, trustedStore,
+            OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
+            OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE);
 
         OcspServiceProvider provider = new OcspServiceProvider(null, getAiaOcspServiceProvider2018Configuration(),
             List.of(fallbackConfiguration));
@@ -248,7 +260,9 @@ class OcspServiceProviderTest {
         X500Name unrelatedIssuerDN = new X500Name("CN=Unrelated CA");
         FallbackOcspServiceConfiguration fallbackConfiguration = new FallbackOcspServiceConfiguration(
             URI.create("http://fallback.test/ocsp"), null, true,
-            null, unrelatedIssuerDN, trustedAnchors, trustedStore);
+            null, unrelatedIssuerDN, trustedAnchors, trustedStore,
+            OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
+            OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE);
 
         OcspServiceProvider provider = new OcspServiceProvider(null, getAiaOcspServiceProvider2018Configuration(),
             List.of(fallbackConfiguration));
@@ -291,7 +305,9 @@ class OcspServiceProviderTest {
             CertificateValidator.buildCertStoreFromCertificates(trustedCertificates);
         FallbackOcspServiceConfiguration fallbackConfiguration = new FallbackOcspServiceConfiguration(
             URI.create("http://fallback.test/ocsp"), getDemoEsteidSk2018AiaOcspResponder(), true,
-            null, issuerDN, trustedAnchors, trustedStore);
+            null, issuerDN, trustedAnchors, trustedStore,
+            OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
+            OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE);
 
         OcspServiceProvider provider = new OcspServiceProvider(getDesignatedOcspServiceConfiguration(),
             getAiaOcspServiceProvider2018Configuration(), List.of(fallbackConfiguration));
@@ -315,10 +331,14 @@ class OcspServiceProviderTest {
         URI lastFallbackUri = URI.create("http://fallback-last.test/ocsp");
         FallbackOcspServiceConfiguration firstConfiguration = new FallbackOcspServiceConfiguration(
             firstFallbackUri, getDemoEsteidSk2018AiaOcspResponder(), true,
-            null, issuerDN, trustedAnchors, trustedStore);
+            null, issuerDN, trustedAnchors, trustedStore,
+            OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
+            OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE);
         FallbackOcspServiceConfiguration lastConfiguration = new FallbackOcspServiceConfiguration(
             lastFallbackUri, getDemoEsteidSk2018AiaOcspResponder(), true,
-            null, issuerDN, trustedAnchors, trustedStore);
+            null, issuerDN, trustedAnchors, trustedStore,
+            OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
+            OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE);
 
         OcspServiceProvider provider = new OcspServiceProvider(null, getAiaOcspServiceProvider2018Configuration(),
             List.of(firstConfiguration, lastConfiguration));
@@ -334,7 +354,9 @@ class OcspServiceProviderTest {
         return new AiaOcspServiceConfiguration(
             Set.of(),
             CertificateValidator.buildTrustAnchorsFromCertificates(trustedCertificates),
-            CertificateValidator.buildCertStoreFromCertificates(trustedCertificates));
+            CertificateValidator.buildCertStoreFromCertificates(trustedCertificates),
+            OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
+            OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE);
     }
 }
 

@@ -11,6 +11,7 @@ import eu.webeid.security.exceptions.AuthTokenException;
 import java.net.URI;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.Date;
 import java.util.Objects;
 
@@ -36,6 +37,16 @@ public class DesignatedOcspService implements OcspService {
     @Override
     public URI getAccessLocation() {
         return configuration.getOcspServiceAccessLocation();
+    }
+
+    @Override
+    public Duration getMaxThisUpdateAge() {
+        return configuration.getMaxThisUpdateAge();
+    }
+
+    @Override
+    public Duration getMaxNextUpdateAge() {
+        return configuration.getMaxNextUpdateAge();
     }
 
     @Override
