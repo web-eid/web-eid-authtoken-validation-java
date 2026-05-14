@@ -288,16 +288,9 @@ class OcspCertificateRevocationCheckerTest extends AbstractTestWithValidator {
 
     @Test
     void whenInvalidOcspResponseTimeSkew_thenThrows() {
-        assertThatThrownBy(() -> getOcspCertificateRevocationCheckerWithTimeSkewAndUpdateAge(Duration.ofMinutes(-1), Duration.ofMinutes(1)))
+        assertThatThrownBy(() -> new OcspCertificateRevocationChecker(ocspClient, getAiaOcspServiceProvider(), Duration.ofMinutes(-1)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageStartingWith("allowedOcspResponseTimeSkew must be greater than zero");
-    }
-
-    @Test
-    void whenInvalidMaxOcspResponseThisUpdateAge_thenThrows() {
-        assertThatThrownBy(() -> getOcspCertificateRevocationCheckerWithTimeSkewAndUpdateAge(Duration.ofMinutes(1), Duration.ZERO))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("maxOcspResponseThisUpdateAge must be greater than zero");
     }
 
     private static AuthTokenValidator getAuthTokenValidatorWithOcspCertificateRevocationChecker() throws CertificateException, JceException, IOException {
@@ -305,8 +298,7 @@ class OcspCertificateRevocationCheckerTest extends AbstractTestWithValidator {
                 .withCertificateRevocationChecker(new OcspCertificateRevocationChecker(
                         OcspClientImpl.build(Duration.ofSeconds(5)),
                         getAiaOcspServiceProvider(),
-                        OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW,
-                        OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE
+                        OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW
                 )).build();
     }
 
@@ -365,11 +357,7 @@ class OcspCertificateRevocationCheckerTest extends AbstractTestWithValidator {
     }
 
     private OcspCertificateRevocationChecker getOcspCertificateRevocationChecker(OcspClient client, OcspServiceProvider ocspServiceProvider) {
-        return new OcspCertificateRevocationChecker(client, ocspServiceProvider, OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW, OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE);
-    }
-
-    private void getOcspCertificateRevocationCheckerWithTimeSkewAndUpdateAge(Duration timeSkew, Duration updateAge) throws JceException {
-        new OcspCertificateRevocationChecker(ocspClient, getAiaOcspServiceProvider(), timeSkew, updateAge);
+        return new OcspCertificateRevocationChecker(client, ocspServiceProvider, OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW);
     }
 
     private HttpResponse<byte[]> getMockedResponse(byte[] bodyContent) throws URISyntaxException {

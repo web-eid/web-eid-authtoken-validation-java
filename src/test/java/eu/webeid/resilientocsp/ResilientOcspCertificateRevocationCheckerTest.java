@@ -45,8 +45,6 @@ import org.bouncycastle.cert.ocsp.RevokedStatus;
 import org.bouncycastle.cert.ocsp.SingleResp;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -67,7 +65,6 @@ import static eu.webeid.security.testutil.Certificates.getTestEsteid2018CA;
 import static eu.webeid.security.testutil.DateMocker.mockDate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static eu.webeid.security.testutil.ResourceUtil.bytesFromResource;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
@@ -86,6 +83,7 @@ class ResilientOcspCertificateRevocationCheckerTest {
     private static final URI SECOND_FALLBACK_URI = URI.create("http://second-fallback.ocsp.test");
 
     private static final Duration LONG_THIS_UPDATE_AGE = Duration.ofDays(365 * 10);
+    private static final Duration LONG_NEXT_UPDATE_AGE = Duration.ofDays(365 * 10);
 
     // The OCSP DER fixtures do not share one thisUpdate. Each fixture carries its own:
     //   ocsp_response.der          2021-09-17T18:25:24
@@ -457,31 +455,17 @@ class ResilientOcspCertificateRevocationCheckerTest {
     }
 
     @Test
-    void whenRejectUnknownStatusIsTrueAndPrimaryReturnsUnknown_thenFallbackHandlesTheCall() throws Exception {
-        OcspClient ocspClient = mock(OcspClient.class);
-        when(ocspClient.request(eq(PRIMARY_URI), any())).thenReturn(ocspRespUnknown);
-        when(ocspClient.request(eq(FALLBACK_URI), any())).thenReturn(ocspRespGood);
-        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient).withRejectUnknownOcspResponseStatus().build();
-
-        try (var mockedClock = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
-            List<RevocationInfo> revocationInfoList = checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
-
-            assertThat(revocationInfoList).hasSize(2);
-            verify(ocspClient).request(eq(FALLBACK_URI), any());
-        }
-    }
-
-    @Test
-    void whenRejectUnknownStatusIsFalseAndPrimaryReturnsUnknown_thenRevokedShortCircuits() throws Exception {
+    void whenPrimaryReturnsUnknown_thenFallbackHandlesTheCall() throws Exception {
         OcspClient ocspClient = mock(OcspClient.class);
         when(ocspClient.request(eq(PRIMARY_URI), any())).thenReturn(ocspRespUnknown);
         when(ocspClient.request(eq(FALLBACK_URI), any())).thenReturn(ocspRespGood);
         ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient).build();
 
         try (var mockedClock = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
-            assertThatExceptionOfType(ResilientUserCertificateRevokedException.class)
-                .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA));
-            verify(ocspClient, never()).request(eq(FALLBACK_URI), any());
+            List<RevocationInfo> revocationInfoList = checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
+
+            assertThat(revocationInfoList).hasSize(2);
+            verify(ocspClient).request(eq(FALLBACK_URI), any());
         }
     }
 
@@ -562,22 +546,6 @@ class ResilientOcspCertificateRevocationCheckerTest {
                 assertThat(attributes.get(RevocationInfo.KEY_HTTP_STATUS_CODE)).isEqualTo(503);
                 assertThat(attributes.get(RevocationInfo.KEY_OCSP_RESPONSE)).isEqualTo(responseBody);
             });
-    }
-
-    @ParameterizedTest
-    @ValueSource(ints = {0, -1})
-    void whenFallbackMaxOcspResponseThisUpdateAgeIsNotPositive_thenThrows(int minutes) {
-        assertThatThrownBy(() -> new ResilientOcspCertificateRevocationChecker(
-            mock(OcspClient.class),
-            mock(OcspServiceProvider.class),
-            CircuitBreakerConfig.ofDefaults(),
-            null,
-            OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW,
-            OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
-            Duration.ofMinutes(minutes),
-            false))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageStartingWith("fallbackMaxOcspResponseThisUpdateAge must be greater than zero");
     }
 
     @Test
@@ -768,16 +736,16 @@ class ResilientOcspCertificateRevocationCheckerTest {
     void whenPrimaryResponseIsTooOldForPrimaryAgeLimit_thenFallbackAcceptsItUnderFallbackAgeLimit() throws Exception {
         // The same response (thisUpdate 2021-09-17T18:25:24) is served by both responders and the clock is mocked
         // 5 minutes later. The primary applies the stricter 2-minute limit and rejects it as too old, while the
-        // fallback applies the more lenient 10-minute limit and accepts it. This proves the primary uses
-        // primaryMaxOcspResponseThisUpdateAge and the fallback uses fallbackMaxOcspResponseThisUpdateAge; swapping
-        // the two parameters would flip the outcome and fail this test.
+        // fallback applies the more lenient 10-minute limit and accepts it. This proves that each responder
+        // applies the maxThisUpdateAge of its own OCSP service; swapping the two values would flip the outcome
+        // and fail this test.
         OcspClient ocspClient = mock(OcspClient.class);
         when(ocspClient.request(eq(PRIMARY_URI), any())).thenReturn(ocspRespGood);
         when(ocspClient.request(eq(FALLBACK_URI), any())).thenReturn(ocspRespGood);
         ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient)
             .withFallbacks(FALLBACK_URI)
-            .withPrimaryMaxOcspResponseThisUpdateAge(Duration.ofMinutes(2))
-            .withFallbackMaxOcspResponseThisUpdateAge(Duration.ofMinutes(10))
+            .withPrimaryMaxThisUpdateAge(Duration.ofMinutes(2))
+            .withFallbackMaxThisUpdateAge(Duration.ofMinutes(10))
             .build();
 
         try (var ignored = mockStaticClockAt(FIVE_MIN_AFTER_THIS_UPDATE)) {
@@ -846,22 +814,6 @@ class ResilientOcspCertificateRevocationCheckerTest {
     }
 
     @Test
-    void whenNoFallbackConfiguredAndRejectUnknownAndPrimaryReturnsUnknown_thenOcspCheckFails() throws Exception {
-        OcspClient ocspClient = mock(OcspClient.class);
-        when(ocspClient.request(eq(PRIMARY_URI), any())).thenReturn(ocspRespUnknown);
-        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient)
-            .withoutFallbacks()
-            .withRejectUnknownOcspResponseStatus()
-            .build();
-
-        try (var ignored = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
-            assertThatExceptionOfType(ResilientUserCertificateOCSPCheckFailedException.class)
-                .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
-                .satisfies(ex -> assertThat(ex.getValidationInfo().revocationInfoList()).hasSize(1));
-        }
-    }
-
-    @Test
     void whenNoFallbackConfiguredAndPrimaryReturnsUnknown_thenCheckFailedPropagates() throws Exception {
         // The unknown status fails the OCSP check.
         OcspClient ocspClient = mock(OcspClient.class);
@@ -921,13 +873,13 @@ class ResilientOcspCertificateRevocationCheckerTest {
     void whenFallbackResponseIsTooOldForFallbackAgeLimit_thenOcspCheckFails() throws Exception {
         // The response thisUpdate is 2021-09-17T18:25:24 and the clock is mocked 5 minutes later, while the fallback
         // age limit is only 2 minutes, so the fallback rejects the response as too old. This exercises the failure
-        // direction of fallbackMaxOcspResponseThisUpdateAge (the accepting direction is covered elsewhere).
+        // direction of the fallback service maxThisUpdateAge (the accepting direction is covered elsewhere).
         OcspClient ocspClient = mock(OcspClient.class);
         when(ocspClient.request(eq(PRIMARY_URI), any())).thenThrow(new OCSPClientException("Primary OCSP service unavailable"));
         when(ocspClient.request(eq(FALLBACK_URI), any())).thenReturn(ocspRespGood);
         ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient)
             .withFallbacks(FALLBACK_URI)
-            .withFallbackMaxOcspResponseThisUpdateAge(Duration.ofMinutes(2))
+            .withFallbackMaxThisUpdateAge(Duration.ofMinutes(2))
             .build();
 
         try (var ignored = mockStaticClockAt(FIVE_MIN_AFTER_THIS_UPDATE)) {
@@ -948,9 +900,9 @@ class ResilientOcspCertificateRevocationCheckerTest {
     }
 
     /**
-     * Builds a {@link ResilientOcspCertificateRevocationChecker} with relaxed thisUpdate age limits and,
-     * by default, a primary OCSP service with two chained fallbacks:
-     * PRIMARY_URI -> FALLBACK_URI -> SECOND_FALLBACK_URI.
+     * Builds a {@link ResilientOcspCertificateRevocationChecker} with, by default, a primary OCSP service
+     * with two chained fallbacks: PRIMARY_URI -> FALLBACK_URI -> SECOND_FALLBACK_URI. The age limits are
+     * per OCSP service, so they are stubbed on the mocked services and are relaxed by default.
      */
     private static final class CheckerBuilder {
 
@@ -960,8 +912,8 @@ class ResilientOcspCertificateRevocationCheckerTest {
         private boolean primarySupportsNonce;
         private CircuitBreakerConfig circuitBreakerConfig = CircuitBreakerConfig.ofDefaults();
         private RetryConfig retryConfig;
-        private Duration primaryMaxOcspResponseThisUpdateAge = LONG_THIS_UPDATE_AGE;
-        private Duration fallbackMaxOcspResponseThisUpdateAge = LONG_THIS_UPDATE_AGE;
+        private Duration primaryMaxThisUpdateAge = LONG_THIS_UPDATE_AGE;
+        private Duration fallbackMaxThisUpdateAge = LONG_THIS_UPDATE_AGE;
 
         private CheckerBuilder(OcspClient ocspClient) {
             this.ocspClient = ocspClient;
@@ -996,13 +948,13 @@ class ResilientOcspCertificateRevocationCheckerTest {
             return this;
         }
 
-        private CheckerBuilder withPrimaryMaxOcspResponseThisUpdateAge(Duration primaryMaxOcspResponseThisUpdateAge) {
-            this.primaryMaxOcspResponseThisUpdateAge = primaryMaxOcspResponseThisUpdateAge;
+        private CheckerBuilder withPrimaryMaxThisUpdateAge(Duration primaryMaxThisUpdateAge) {
+            this.primaryMaxThisUpdateAge = primaryMaxThisUpdateAge;
             return this;
         }
 
-        private CheckerBuilder withFallbackMaxOcspResponseThisUpdateAge(Duration fallbackMaxOcspResponseThisUpdateAge) {
-            this.fallbackMaxOcspResponseThisUpdateAge = fallbackMaxOcspResponseThisUpdateAge;
+        private CheckerBuilder withFallbackMaxThisUpdateAge(Duration fallbackMaxThisUpdateAge) {
+            this.fallbackMaxThisUpdateAge = fallbackMaxThisUpdateAge;
             return this;
         }
 
@@ -1013,9 +965,7 @@ class ResilientOcspCertificateRevocationCheckerTest {
                 serviceProvider,
                 circuitBreakerConfig,
                 retryConfig,
-                OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW,
-                primaryMaxOcspResponseThisUpdateAge,
-                fallbackMaxOcspResponseThisUpdateAge
+                OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW
             );
         }
 
@@ -1026,6 +976,8 @@ class ResilientOcspCertificateRevocationCheckerTest {
                 when(fallbackService.getAccessLocation()).thenReturn(fallbackUris[i]);
                 when(fallbackService.doesSupportNonce()).thenReturn(false);
                 when(fallbackService.getNextFallback()).thenReturn(nextFallback);
+                when(fallbackService.getMaxThisUpdateAge()).thenReturn(fallbackMaxThisUpdateAge);
+                when(fallbackService.getMaxNextUpdateAge()).thenReturn(LONG_NEXT_UPDATE_AGE);
                 nextFallback = fallbackService;
             }
 
@@ -1033,6 +985,8 @@ class ResilientOcspCertificateRevocationCheckerTest {
             when(primaryService.getAccessLocation()).thenReturn(PRIMARY_URI);
             when(primaryService.doesSupportNonce()).thenReturn(primarySupportsNonce);
             when(primaryService.getFallbackService()).thenReturn(Optional.ofNullable(nextFallback));
+            when(primaryService.getMaxThisUpdateAge()).thenReturn(primaryMaxThisUpdateAge);
+            when(primaryService.getMaxNextUpdateAge()).thenReturn(LONG_NEXT_UPDATE_AGE);
 
             OcspServiceProvider serviceProvider = mock(OcspServiceProvider.class);
             when(serviceProvider.getService(any())).thenReturn(primaryService);

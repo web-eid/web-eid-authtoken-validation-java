@@ -64,7 +64,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static eu.webeid.security.util.DateAndTime.requirePositiveDuration;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -79,17 +78,13 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
 
     private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final RetryRegistry retryRegistry;
-    private final Duration fallbackMaxOcspResponseThisUpdateAge;
 
     public ResilientOcspCertificateRevocationChecker(OcspClient ocspClient,
                                                      OcspServiceProvider ocspServiceProvider,
                                                      CircuitBreakerConfig circuitBreakerConfig,
                                                      RetryConfig retryConfig,
-                                                     Duration allowedOcspResponseTimeSkew,
-                                                     Duration primaryMaxOcspResponseThisUpdateAge,
-                                                     Duration fallbackMaxOcspResponseThisUpdateAge) {
-        super(ocspClient, ocspServiceProvider, allowedOcspResponseTimeSkew, primaryMaxOcspResponseThisUpdateAge);
-        this.fallbackMaxOcspResponseThisUpdateAge = requirePositiveDuration(fallbackMaxOcspResponseThisUpdateAge, "fallbackMaxOcspResponseThisUpdateAge");
+                                                     Duration allowedOcspResponseTimeSkew) {
+        super(ocspClient, ocspServiceProvider, allowedOcspResponseTimeSkew);
         this.circuitBreakerRegistry = CircuitBreakerRegistry.custom()
             .withCircuitBreakerConfig(getCircuitBreakerConfig(circuitBreakerConfig))
             .build();
@@ -116,7 +111,7 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         Optional<FallbackOcspService> firstFallbackServiceOpt = primaryService.getFallbackService();
         if (firstFallbackServiceOpt.isEmpty()) {
             // Without a configured fallback, use the primary service directly without retry or circuit breaker.
-            return List.of(request(primaryService, subjectCertificate, certificateId, getMaxOcspResponseThisUpdateAge()));
+            return List.of(request(primaryService, subjectCertificate, certificateId));
         }
 
         CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(primaryService.getAccessLocation().toASCIIString());
@@ -155,7 +150,7 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
                                                                   List<RevocationInfo> revocationInfoList) {
         CheckedSupplier<RevocationInfo> firstFallbackSupplier = () -> {
             try {
-                return request(firstFallbackService, subjectCertificate, certificateId, fallbackMaxOcspResponseThisUpdateAge);
+                return request(firstFallbackService, subjectCertificate, certificateId);
             } catch (Exception e) {
                 createAndAddRevocationInfoToList(e, revocationInfoList);
                 throw e;
@@ -169,7 +164,7 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         }
         CheckedSupplier<RevocationInfo> secondFallbackSupplier = () -> {
             try {
-                return request(secondFallbackService, subjectCertificate, certificateId, fallbackMaxOcspResponseThisUpdateAge);
+                return request(secondFallbackService, subjectCertificate, certificateId);
             } catch (Exception e) {
                 createAndAddRevocationInfoToList(e, revocationInfoList);
                 throw e;
@@ -197,7 +192,7 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
                                                                    CircuitBreaker circuitBreaker) {
         CheckedSupplier<RevocationInfo> primarySupplier = () -> {
             try {
-                return request(primaryService, subjectCertificate, certificateId, getMaxOcspResponseThisUpdateAge());
+                return request(primaryService, subjectCertificate, certificateId);
             } catch (Exception e) {
                 createAndAddRevocationInfoToList(e, revocationInfoList);
                 throw e;
@@ -259,13 +254,14 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         ))));
     }
 
-    private RevocationInfo request(OcspService ocspService, X509Certificate subjectCertificate, CertificateID certificateId, Duration maxOcspResponseThisUpdateAge) throws UserCertificateOCSPCheckFailedException, ResilientUserCertificateRevokedException, UserCertificateOCSPException {
+    private RevocationInfo request(OcspService ocspService, X509Certificate subjectCertificate, CertificateID certificateId) throws UserCertificateOCSPCheckFailedException, ResilientUserCertificateRevokedException, UserCertificateOCSPException {
         final URI ocspResponderUri = ocspService.getAccessLocation();
         final OCSPReq request = getOcspRequest(certificateId, ocspService);
 
         if (!ocspService.doesSupportNonce()) {
             LOG.debug("Disabling OCSP nonce extension");
         }
+
 
         OCSPResp response = null;
         Duration requestDuration = null;
@@ -298,7 +294,7 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
             }
             LOG.debug("OCSP response received successfully");
 
-            verifyOcspResponse(basicResponse, ocspService, certificateId, maxOcspResponseThisUpdateAge);
+            verifyOcspResponse(basicResponse, ocspService, certificateId);
             if (ocspService.doesSupportNonce()) {
                 checkNonce(request, basicResponse, ocspResponderUri);
             }

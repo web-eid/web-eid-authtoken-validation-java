@@ -51,13 +51,13 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
 
     public static final Duration DEFAULT_TIME_SKEW = Duration.ofMinutes(15);
     public static final Duration DEFAULT_THIS_UPDATE_AGE = Duration.ofMinutes(2);
+    public static final Duration DEFAULT_NEXT_UPDATE_AGE = Duration.ofMinutes(15);
 
     private static final Logger LOG = LoggerFactory.getLogger(OcspCertificateRevocationChecker.class);
 
     private final OcspClient ocspClient;
     private final OcspServiceProvider ocspServiceProvider;
     private final Duration allowedOcspResponseTimeSkew;
-    private final Duration maxOcspResponseThisUpdateAge;
 
     static {
         if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
@@ -67,12 +67,10 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
 
     public OcspCertificateRevocationChecker(OcspClient ocspClient,
                                             OcspServiceProvider ocspServiceProvider,
-                                            Duration allowedOcspResponseTimeSkew,
-                                            Duration maxOcspResponseThisUpdateAge) {
+                                            Duration allowedOcspResponseTimeSkew) {
         this.ocspClient = requireNonNull(ocspClient, "ocspClient");
         this.ocspServiceProvider = requireNonNull(ocspServiceProvider, "ocspServiceProvider");
         this.allowedOcspResponseTimeSkew = requirePositiveDuration(allowedOcspResponseTimeSkew, "allowedOcspResponseTimeSkew");
-        this.maxOcspResponseThisUpdateAge = requirePositiveDuration(maxOcspResponseThisUpdateAge, "maxOcspResponseThisUpdateAge");
     }
 
     /**
@@ -107,7 +105,7 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
             }
             LOG.debug("OCSP response received successfully");
 
-            verifyOcspResponse(basicResponse, ocspService, certificateId, maxOcspResponseThisUpdateAge);
+            verifyOcspResponse(basicResponse, ocspService, certificateId);
             if (ocspService.doesSupportNonce()) {
                 checkNonce(request, basicResponse, ocspResponderUri);
             }
@@ -133,7 +131,7 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
         return request;
     }
 
-    protected void verifyOcspResponse(BasicOCSPResp basicResponse, OcspService ocspService, CertificateID requestCertificateId, Duration maxOcspResponseThisUpdateAge) throws AuthTokenException, OCSPException, CertificateException, OperatorCreationException {
+    protected void verifyOcspResponse(BasicOCSPResp basicResponse, OcspService ocspService, CertificateID requestCertificateId) throws AuthTokenException, OCSPException, CertificateException, OperatorCreationException {
         // The verification algorithm follows RFC 2560, https://www.ietf.org/rfc/rfc2560.txt.
         //
         // 3.2.  Signed Response Acceptance Requirements
@@ -184,7 +182,7 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
         //      be available about the status of the certificate (nextUpdate) is
         //      greater than the current time.
 
-        OcspResponseValidator.validateCertificateStatusUpdateTime(certStatusResponse, allowedOcspResponseTimeSkew, maxOcspResponseThisUpdateAge, ocspService.getAccessLocation());
+        OcspResponseValidator.validateCertificateStatusUpdateTime(certStatusResponse, allowedOcspResponseTimeSkew, ocspService.getMaxThisUpdateAge(), ocspService.getMaxNextUpdateAge(), ocspService.getAccessLocation());
 
         // Now we can accept the signed response as valid and validate the certificate status.
         OcspResponseValidator.validateSubjectCertificateStatus(certStatusResponse, ocspService.getAccessLocation());
@@ -232,9 +230,5 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
 
     protected OcspServiceProvider getOcspServiceProvider() {
         return ocspServiceProvider;
-    }
-
-    protected Duration getMaxOcspResponseThisUpdateAge() {
-        return maxOcspResponseThisUpdateAge;
     }
 }
