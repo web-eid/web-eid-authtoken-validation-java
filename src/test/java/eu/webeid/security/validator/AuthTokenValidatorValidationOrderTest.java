@@ -58,7 +58,7 @@ class AuthTokenValidatorValidationOrderTest {
     void setUp() {
         mockedClock = mockStatic(DateAndTime.DefaultClock.class);
         // Ensure that the certificates do not expire.
-        mockDate("2021-07-23", mockedClock);
+        mockDate("2025-07-01", mockedClock);
     }
 
     @AfterEach

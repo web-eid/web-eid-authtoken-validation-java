@@ -11,6 +11,7 @@ import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
 import eu.webeid.security.testutil.AuthTokenValidators;
+import eu.webeid.security.testutil.ResourceUtil;
 import eu.webeid.security.util.DateAndTime;
 import eu.webeid.ocsp.client.OcspClient;
 import eu.webeid.ocsp.client.OcspClientImpl;
@@ -25,7 +26,6 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.ConnectException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -47,13 +47,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
-public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValidator {
+class OcspCertificateRevocationCheckerTest extends AbstractTestWithValidator {
 
     private final OcspClient ocspClient = OcspClientImpl.build(Duration.ofSeconds(5));
     private X509Certificate estEid2018Cert;
@@ -117,11 +115,13 @@ public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValida
     void whenOcspRequestFails_thenThrows() throws Exception {
         final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider("http://demo.sk.ee/ocsps");
         final OcspCertificateRevocationChecker validator = getOcspCertificateRevocationChecker(ocspServiceProvider);
-        UserCertificateOCSPCheckFailedException ex = assertThrows(UserCertificateOCSPCheckFailedException.class, () ->
-            validator.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA));
-        OCSPClientException ocspClientException = assertInstanceOf(OCSPClientException.class, ex.getCause());
-        assertThat(ocspClientException).hasMessageStartingWith("OCSP request was not successful");
-        assertThat(ocspClientException.getStatusCode()).isEqualTo(404);
+        assertThatThrownBy(() ->
+            validator.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
+            .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
+            .cause()
+            .isInstanceOf(OCSPClientException.class)
+            .hasMessageStartingWith("OCSP request was not successful")
+            .satisfies(cause -> assertThat(((OCSPClientException) cause).getStatusCode()).isEqualTo(404));
     }
 
     @Test
@@ -356,10 +356,8 @@ public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValida
         return getOcspResponseBytesFromResources("ocsp_response.der");
     }
 
-    public static byte[] getOcspResponseBytesFromResources(String resource) throws IOException {
-        try (final InputStream resourceAsStream = ClassLoader.getSystemResourceAsStream(resource)) {
-            return toByteArray(resourceAsStream);
-        }
+    private static byte[] getOcspResponseBytesFromResources(String resource) throws IOException {
+        return ResourceUtil.bytesFromResource(resource);
     }
 
     private OcspCertificateRevocationChecker getOcspCertificateRevocationCheckerWithAiaOcsp(HttpResponse<byte[]> response) throws JceException {
@@ -403,17 +401,6 @@ public class OcspCertificateRevocationCheckerTest extends AbstractTestWithValida
                 throw new OCSPClientException(e);
             }
         };
-    }
-
-    private static byte[] toByteArray(InputStream resourceAsStream) throws IOException {
-        Objects.requireNonNull(resourceAsStream);
-        int bytesAvailable = resourceAsStream.available();
-        byte[] result = new byte[bytesAvailable];
-        int bytesRead = resourceAsStream.read(result);
-        if (bytesRead != bytesAvailable) {
-            throw new RuntimeException("Short read while loading resources");
-        }
-        return result;
     }
 
 }
