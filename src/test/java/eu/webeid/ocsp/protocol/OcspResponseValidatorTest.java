@@ -14,7 +14,9 @@ import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.KeyPurposeId;
 import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.cert.ocsp.BasicOCSPResp;
+import org.bouncycastle.cert.ocsp.CertificateStatus;
 import org.bouncycastle.cert.ocsp.OCSPResp;
+import org.bouncycastle.cert.ocsp.RevokedStatus;
 import org.bouncycastle.cert.ocsp.SingleResp;
 import org.junit.jupiter.api.Test;
 
@@ -25,8 +27,8 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
-import static eu.webeid.ocsp.OcspCertificateRevocationCheckerTest.getOcspResponseBytesFromResources;
 import static eu.webeid.ocsp.protocol.OcspResponseValidator.validateBasicConstraintsNotCA;
+import static eu.webeid.security.testutil.ResourceUtil.bytesFromResource;
 import static eu.webeid.ocsp.protocol.OcspResponseValidator.validateCertificateStatusUpdateTime;
 import static eu.webeid.ocsp.protocol.OcspResponseValidator.validateExtendedKeyUsageOcspSigning;
 import static eu.webeid.ocsp.protocol.OcspResponseValidator.validateKeyUsageDigitalSignature;
@@ -279,14 +281,37 @@ class OcspResponseValidatorTest {
             .withMessage("certificate");
     }
 
+    @Test
+    void whenRevokedStatusHasNoReason_thenThrows() {
+        final SingleResp mockResponse = mock(SingleResp.class);
+        when(mockResponse.getCertStatus()).thenReturn(new RevokedStatus(new Date()));
+        assertThatExceptionOfType(UserCertificateRevokedException.class)
+            .isThrownBy(() ->
+                validateSubjectCertificateStatus(mockResponse, OCSP_URL))
+            .withMessage("User certificate has been revoked (OCSP responder: https://example.org)");
+    }
+
+    @Test
+    void whenStatusIsNeitherGoodRevokedNorUnknown_thenThrowsUserCertificateOCSPCheckFailedException() {
+        final SingleResp mockResponse = mock(SingleResp.class);
+        when(mockResponse.getCertStatus()).thenReturn(new UnexpectedCertificateStatus());
+        assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
+            .isThrownBy(() ->
+                validateSubjectCertificateStatus(mockResponse, OCSP_URL))
+            .withMessage("User certificate revocation check has failed: Status is neither good, revoked nor unknown (OCSP responder: https://example.org)");
+    }
+
     private static Date getThisUpdateWithinAgeLimit(Instant now) {
         return Date.from(now.minus(THIS_UPDATE_AGE.minusSeconds(1)));
     }
 
     private static SingleResp getUnknownCertStatusResponse() throws Exception {
-        final OCSPResp ocspRespUnknown = new OCSPResp(getOcspResponseBytesFromResources("ocsp_response_unknown.der"));
+        final OCSPResp ocspRespUnknown = new OCSPResp(bytesFromResource("ocsp_response_unknown.der"));
         final BasicOCSPResp basicResponse = (BasicOCSPResp) ocspRespUnknown.getResponseObject();
         return basicResponse.getResponses()[0];
+    }
+
+    private static class UnexpectedCertificateStatus implements CertificateStatus {
     }
 
 }
