@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>eu.webeid.example</groupId>
 	<artifactId>web-eid-springboot-example</artifactId>
-	<version>3.2.1</version>
+	<version>3.2.2</version>
 	<name>web-eid-springboot-example</name>
 	<description>Example Spring Boot application that demonstrates how to use Web eID for authentication and digital
 		signing
@@ -23,7 +23,10 @@
 		<digidoc4j.version>6.1.1</digidoc4j.version>
 		<jmockit.version>1.44</jmockit.version> <!-- Keep version 1.44, otherwise mocking will fail. -->
 		<jib.version>3.5.1</jib.version>
-	</properties>
+
+        <!-- Remove in next spring-boot version when tomcat is >= 10.1.55: CVE-2026-4193, CVE-2026-4512, CVE-2026-4315 -->
+        <tomcat.version>10.1.55</tomcat.version>
+    </properties>
 
 	<dependencies>
 		<dependency>
