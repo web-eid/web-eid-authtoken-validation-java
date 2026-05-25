@@ -33,7 +33,9 @@ web-eid-auth-token:
         local-origin: "https://<<NGROK HOSTNAME HERE>>"
 ```
 
-**Note that the origin URL must not end with a slash `/`**.
+**Note that the origin URL must not end with a slash `/`**. For internationalized
+domain names, use the ASCII/Punycode origin form in `local-origin`, for example
+`https://xn--pike-loa.ee` for `https://päike.ee`.
 
 ### 3. Configure the trusted certificate authority certificates
 
@@ -262,4 +264,3 @@ When running the application with the `dev` profile in test mode, you need to up
 ### Why do I get the `401 Unauthorized "Authentication failed: Web eID token validation failed"` response during authentication?
 
 One possible reason is that you are using the test ID card on a site that is running in production mode or, vice-versa, a real ID card on a site that is running in test mode; or any other ID card whose certificate authority has not been added to the list of trusted certificate authorities. There will be a `CertificateNotTrustedException` in the logs in this case.
-
