@@ -23,7 +23,6 @@
 package eu.webeid.example.security.ajax;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import tools.jackson.core.JsonProcessingException;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.ObjectWriter;
 import jakarta.servlet.http.HttpServletRequest;
@@ -70,7 +69,7 @@ public class AjaxAuthenticationSuccessHandler extends SimpleUrlAuthenticationSuc
         @JsonProperty("auth")
         private String auth;
 
-        public static String asJson(Authentication authentication) throws JsonProcessingException {
+        public static String asJson(Authentication authentication) {
             final AuthSuccessDTO dto = new AuthSuccessDTO();
             dto.sub = authentication.getName();
             dto.auth = authentication.getAuthorities().toString();
