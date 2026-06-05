@@ -22,7 +22,7 @@
 
 package eu.webeid.security.validator;
 
-import com.fasterxml.jackson.databind.exc.MismatchedInputException;
+import tools.jackson.databind.exc.MismatchedInputException;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.AuthTokenParseException;

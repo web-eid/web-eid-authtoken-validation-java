@@ -20,14 +20,14 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: zulu
-          java-version: 11
+          java-version: 17
 
       - name: Cache Maven packages
         uses: actions/cache@v4
         with:
           path: ~/.m2
-          key: ${{ runner.os }}-m2-v8-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2-v8
+          key: ${{ runner.os }}-m2-v17-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2-v17
 
       - name: Download Coverity Build Tool
         run: |

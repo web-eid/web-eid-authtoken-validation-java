@@ -22,7 +22,7 @@
 
 package eu.webeid.security.testutil;
 
-import com.fasterxml.jackson.databind.util.StdDateFormat;
+import tools.jackson.databind.util.StdDateFormat;
 import eu.webeid.security.util.DateAndTime;
 import io.jsonwebtoken.Clock;
 import org.mockito.MockedStatic;
