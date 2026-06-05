@@ -33,9 +33,9 @@ jobs:
           key: ${{ runner.os }}-m2-v17-${{ secrets.CACHE_VERSION }}-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2-v17-${{ secrets.CACHE_VERSION }}
 
-      - name: Build
-        run: mvn --batch-mode compile
+      - name: Install current state of web-eid-authtoken-validation-java locally for web-eid-springboot-example build
+        working-directory: .
+        run: mvn --batch-mode install
 
       - name: Test and package
         run: mvn --batch-mode package
-
