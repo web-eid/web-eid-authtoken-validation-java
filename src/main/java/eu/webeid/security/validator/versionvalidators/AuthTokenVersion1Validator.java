@@ -40,7 +40,7 @@ import java.util.Set;
 class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
 
     private static final String V1_SUPPORTED_TOKEN_FORMAT_PREFIX = "web-eid:1";
-
+    private static final Set<String> SUPPORTED_TOKEN_FORMATS = Set.of(V1_SUPPORTED_TOKEN_FORMAT_PREFIX, "web-eid:1.0");
     private final SubjectCertificateValidatorBatch simpleSubjectCertificateValidators;
     private final Set<TrustAnchor> trustedCACertificateAnchors;
     private final CertStore trustedCACertificateCertStore;
@@ -69,11 +69,7 @@ class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
 
     @Override
     public boolean supports(String format) {
-        return format != null && format.startsWith(getSupportedFormatPrefix());
-    }
-
-    protected String getSupportedFormatPrefix() {
-        return V1_SUPPORTED_TOKEN_FORMAT_PREFIX;
+        return format != null && SUPPORTED_TOKEN_FORMATS.contains(format);
     }
 
     @Override

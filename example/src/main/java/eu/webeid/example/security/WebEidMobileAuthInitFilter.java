@@ -25,6 +25,7 @@ package eu.webeid.example.security;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import eu.webeid.example.config.WebEidAuthTokenProperties;
 import eu.webeid.example.config.WebEidMobileProperties;
 import eu.webeid.security.challenge.ChallengeNonceGenerator;
 import jakarta.servlet.FilterChain;
@@ -51,12 +52,15 @@ public final class WebEidMobileAuthInitFilter extends OncePerRequestFilter {
     private final ChallengeNonceGenerator nonceGenerator;
     private final String mobileLoginPath;
     private final WebEidMobileProperties webEidMobileProperties;
+    private final WebEidAuthTokenProperties webEidAuthTokenProperties;
 
-    public WebEidMobileAuthInitFilter(String path, String mobileLoginPath, ChallengeNonceGenerator nonceGenerator, WebEidMobileProperties webEidMobileProperties) {
+    public WebEidMobileAuthInitFilter(String path, String mobileLoginPath, ChallengeNonceGenerator nonceGenerator,
+            WebEidMobileProperties webEidMobileProperties, WebEidAuthTokenProperties webEidAuthTokenProperties) {
         this.requestMatcher = PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, path);
         this.nonceGenerator = nonceGenerator;
         this.mobileLoginPath = mobileLoginPath;
         this.webEidMobileProperties = webEidMobileProperties;
+        this.webEidAuthTokenProperties = webEidAuthTokenProperties;
     }
 
     @Override
@@ -70,8 +74,11 @@ public final class WebEidMobileAuthInitFilter extends OncePerRequestFilter {
 
         var challenge = nonceGenerator.generateAndStoreNonce();
 
-        String loginUri = ServletUriComponentsBuilder.fromCurrentContextPath()
-            .path(mobileLoginPath).build().toUriString();
+        String loginUri = UriComponentsBuilder
+                .fromUriString(webEidAuthTokenProperties.validation().localOrigin())
+                .path(mobileLoginPath)
+                .build()
+                .toUriString();
 
         String payloadJson = OBJECT_WRITER.writeValueAsString(
             new AuthPayload(challenge.getBase64EncodedNonce(), loginUri,

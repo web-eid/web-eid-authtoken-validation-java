@@ -25,6 +25,7 @@ package eu.webeid.example.service;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import eu.webeid.example.config.WebEidAuthTokenProperties;
 import eu.webeid.example.config.WebEidMobileProperties;
 import eu.webeid.example.security.WebEidAuthentication;
 import eu.webeid.example.service.dto.CertificateDTO;
@@ -54,10 +55,13 @@ public class MobileSigningService {
     private static final ObjectWriter OBJECT_WRITER = new ObjectMapper().writerFor(RequestObject.class);
     private final SigningService signingService;
     private final WebEidMobileProperties webEidMobileProperties;
+    private final WebEidAuthTokenProperties webEidAuthTokenProperties;
 
-    public MobileSigningService(SigningService signingService, WebEidMobileProperties webEidMobileProperties) {
+    public MobileSigningService(SigningService signingService, WebEidMobileProperties webEidMobileProperties,
+                                WebEidAuthTokenProperties webEidAuthTokenProperties) {
         this.signingService = signingService;
         this.webEidMobileProperties = webEidMobileProperties;
+        this.webEidAuthTokenProperties = webEidAuthTokenProperties;
     }
 
     public MobileInitRequest initCertificateOrSigningRequest(WebEidAuthentication authentication) throws IOException, CertificateException, NoSuchAlgorithmException {
@@ -75,7 +79,8 @@ public class MobileSigningService {
     public MobileInitRequest initSigningRequest(WebEidAuthentication authentication, CertificateDTO certificateDTO) throws IOException, CertificateException, NoSuchAlgorithmException {
         Objects.requireNonNull(authentication, "authentication must not be null");
         Objects.requireNonNull(certificateDTO, "certificateDTO must not be null");
-        final String responseUri = ServletUriComponentsBuilder.fromCurrentContextPath()
+        final String responseUri = UriComponentsBuilder
+            .fromUriString(webEidAuthTokenProperties.validation().localOrigin())
             .path(SIGNATURE_RESPONSE_PATH)
             .build()
             .toUriString();
@@ -95,7 +100,8 @@ public class MobileSigningService {
     }
 
     private MobileInitRequest initCertificateRequest() throws IOException {
-        final String responseUri = ServletUriComponentsBuilder.fromCurrentContextPath()
+        final String responseUri = UriComponentsBuilder
+            .fromUriString(webEidAuthTokenProperties.validation().localOrigin())
             .path(CERTIFICATE_RESPONSE_PATH)
             .build()
             .toUriString();
