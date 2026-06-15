@@ -41,9 +41,13 @@ import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
 
 import javax.security.auth.x500.X500Principal;
+import java.security.cert.CertPath;
+import java.security.cert.CertPathValidator;
 import java.security.cert.CertStore;
 import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateFactory;
 import java.security.cert.CertificateNotYetValidException;
+import java.security.cert.PKIXParameters;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -55,7 +59,7 @@ import static eu.webeid.security.util.Strings.isNullOrEmpty;
 
 class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements AuthTokenVersionValidator {
 
-    private static final String V11_SUPPORTED_TOKEN_FORMAT_PREFIX = "web-eid:1.1";
+    private static final Set<String> V11_SUPPORTED_TOKEN_FORMAT = Set.of("web-eid:1.1");
     private static final Set<String> SUPPORTED_SIGNING_CRYPTO_ALGORITHMS = Set.of("ECC", "RSA");
     private static final Set<String> SUPPORTED_SIGNING_PADDING_SCHEMES = Set.of("NONE", "PKCS1.5", "PSS");
     private static final Set<String> SUPPORTED_SIGNING_HASH_FUNCTIONS = Set.of(
@@ -63,6 +67,9 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
         "SHA3-224", "SHA3-256", "SHA3-384", "SHA3-512"
     );
     private static final int KEY_USAGE_NON_REPUDIATION = 1;
+
+    private final Set<TrustAnchor> trustedCACertificateAnchors;
+    private final CertStore trustedCACertificateCertStore;
 
     public AuthTokenVersion11Validator(
         SubjectCertificateValidatorBatch simpleSubjectCertificateValidators,
@@ -82,11 +89,13 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
             ocspClient,
             ocspServiceProvider
         );
+        this.trustedCACertificateAnchors = trustedCACertificateAnchors;
+        this.trustedCACertificateCertStore = trustedCACertificateCertStore;
     }
 
     @Override
-    protected String getSupportedFormatPrefix() {
-        return V11_SUPPORTED_TOKEN_FORMAT_PREFIX;
+    public boolean supports(String format) {
+        return format != null && V11_SUPPORTED_TOKEN_FORMAT.contains(format);
     }
 
     @Override
@@ -98,6 +107,7 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
             validateSameIssuer(subjectCertificate, signingCertificate);
             validateSigningCertificateValidity(signingCertificate);
             validateKeyUsage(signingCertificate);
+            validateSigningCertificateChain(signingCertificate);
         }
 
         return subjectCertificate;
@@ -181,6 +191,24 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
         boolean[] keyUsage = signingCertificate.getKeyUsage();
         if (keyUsage == null || keyUsage.length <= KEY_USAGE_NON_REPUDIATION || !keyUsage[KEY_USAGE_NON_REPUDIATION]) {
             throw new AuthTokenParseException("Signing certificate key usage extension missing or does not contain non-repudiation bit required for digital signatures");
+        }
+    }
+
+    private void validateSigningCertificateChain(X509Certificate signingCertificate)
+            throws AuthTokenParseException {
+        try {
+            CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+
+            CertPath certPath = certificateFactory.generateCertPath(List.of(signingCertificate));
+
+            PKIXParameters parameters = new PKIXParameters(trustedCACertificateAnchors);
+            parameters.addCertStore(trustedCACertificateCertStore);
+            parameters.setRevocationEnabled(false);
+
+            CertPathValidator validator = CertPathValidator.getInstance("PKIX");
+            validator.validate(certPath, parameters);
+        } catch (Exception e) {
+            throw new AuthTokenParseException("Signing certificate chain validation failed", e);
         }
     }
 
