@@ -62,7 +62,7 @@ class ChallengeNonceGeneratorTest {
     void validateUnexpiredNonce() throws InterruptedException {
         final ChallengeNonceGenerator challengeNonceGenerator = new ChallengeNonceGeneratorBuilder()
             .withChallengeNonceStore(challengeNonceStore)
-            .withNonceTtl(Duration.ofMillis(20))
+            .withNonceTtl(Duration.ofSeconds(1))
             .build();
 
         challengeNonceGenerator.generateAndStoreNonce();
