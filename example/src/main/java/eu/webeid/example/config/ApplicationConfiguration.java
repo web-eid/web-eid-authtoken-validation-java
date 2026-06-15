@@ -56,7 +56,8 @@ public class ApplicationConfiguration {
         AuthenticationConfiguration authConfig,
         ChallengeNonceGenerator challengeNonceGenerator,
         ITemplateEngine templateEngine,
-        WebEidMobileProperties webEidMobileProperties
+        WebEidMobileProperties webEidMobileProperties,
+        WebEidAuthTokenProperties webEidAuthTokenProperties
     ) throws Exception {
         return http
             .authorizeHttpRequests(auth -> auth
@@ -65,7 +66,7 @@ public class ApplicationConfiguration {
                 .anyRequest().authenticated()
             )
             .authenticationProvider(webEidAuthenticationProvider)
-            .addFilterBefore(new WebEidMobileAuthInitFilter("/auth/mobile/init", "/auth/mobile/login", challengeNonceGenerator, webEidMobileProperties), UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(new WebEidMobileAuthInitFilter("/auth/mobile/init", "/auth/mobile/login", challengeNonceGenerator, webEidMobileProperties, webEidAuthTokenProperties), UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new WebEidChallengeNonceFilter("/auth/challenge", challengeNonceGenerator), UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new WebEidLoginPageGeneratingFilter("/auth/mobile/login", "/auth/login", templateEngine), UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new WebEidAjaxLoginProcessingFilter("/auth/login", authConfig.getAuthenticationManager()), UsernamePasswordAuthenticationFilter.class)
