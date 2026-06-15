@@ -65,7 +65,7 @@ final class AuthTokenValidatorManager implements AuthTokenValidator {
             return parseToken(authToken);
         } catch (Exception e) {
             // Generally "log and rethrow" is an antipattern, but it fits with the surrounding logging style.
-            LOG.warn("Token parsing was interrupted:", e);
+            LOG.warn("Token parsing failed: {}: {}", e.getClass().getName(), e.getMessage());
             throw e;
         }
     }
@@ -80,7 +80,7 @@ final class AuthTokenValidatorManager implements AuthTokenValidator {
                 .validate(authToken, currentChallengeNonce);
         } catch (Exception e) {
             // Generally "log and rethrow" is an antipattern, but it fits with the surrounding logging style.
-            LOG.warn("Token validation was interrupted:", e);
+            LOG.warn("Token validation failed: {}: {}", e.getClass().getName(), e.getMessage());
             throw e;
         }
     }
