@@ -54,12 +54,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import static eu.webeid.security.util.Strings.isNullOrEmpty;
 
 class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements AuthTokenVersionValidator {
 
-    private static final Set<String> V11_SUPPORTED_TOKEN_FORMAT = Set.of("web-eid:1.1");
+    private static final Pattern V11_SUPPORTED_TOKEN_FORMAT_PATTERN = Pattern.compile("^web-eid:1\\.1$");
     private static final Set<String> SUPPORTED_SIGNING_CRYPTO_ALGORITHMS = Set.of("ECC", "RSA");
     private static final Set<String> SUPPORTED_SIGNING_PADDING_SCHEMES = Set.of("NONE", "PKCS1.5", "PSS");
     private static final Set<String> SUPPORTED_SIGNING_HASH_FUNCTIONS = Set.of(
@@ -94,8 +95,8 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
     }
 
     @Override
-    public boolean supports(String format) {
-        return format != null && V11_SUPPORTED_TOKEN_FORMAT.contains(format);
+    protected Pattern getSupportedFormatPattern() {
+        return V11_SUPPORTED_TOKEN_FORMAT_PATTERN;
     }
 
     @Override
