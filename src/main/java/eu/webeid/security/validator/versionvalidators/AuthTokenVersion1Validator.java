@@ -36,11 +36,12 @@ import java.security.cert.CertStore;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
 
     private static final String V1_SUPPORTED_TOKEN_FORMAT_PREFIX = "web-eid:1";
-    private static final Set<String> SUPPORTED_TOKEN_FORMATS = Set.of(V1_SUPPORTED_TOKEN_FORMAT_PREFIX, "web-eid:1.0");
+    private static final Pattern V1_SUPPORTED_TOKEN_FORMAT_PATTERN = Pattern.compile("^web-eid:1(?:\\.\\d+)?$");
     private final SubjectCertificateValidatorBatch simpleSubjectCertificateValidators;
     private final Set<TrustAnchor> trustedCACertificateAnchors;
     private final CertStore trustedCACertificateCertStore;
@@ -69,7 +70,11 @@ class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
 
     @Override
     public boolean supports(String format) {
-        return format != null && SUPPORTED_TOKEN_FORMATS.contains(format);
+        return format != null && getSupportedFormatPattern().matcher(format).matches();
+    }
+
+    protected Pattern getSupportedFormatPattern() {
+        return V1_SUPPORTED_TOKEN_FORMAT_PATTERN;
     }
 
     @Override
