@@ -35,6 +35,8 @@ web-eid-auth-token:
 
 **Note that the origin URL must not end with a slash `/`**.
 
+The mobile authentication and signing example uses the configured web-eid-auth-token.validation.local-origin value when constructing mobile callback URIs. The example assumes that the application is deployed under the root context path (/). If deploying under a non-root context path, adjust the callback URI construction accordingly.
+
 ### 3. Configure the trusted certificate authority certificates
 
 The algorithm, which performs the validation of the Web eID authentication token, needs to know which intermediate certificate authorities (CA) are trusted to issue the eID authentication certificates. CA certificates are loaded either from `.cer` files in the profile-specific subdirectory of the [`certs` resource directory](src/main/resources/certs) or the [truststore file](src/main/resources/certs/prod/trusted_certificates.jks). By default, Estonian eID test CA certificates are included in the `dev` profile and production CA certificates in the `prod` profile.
