@@ -26,7 +26,10 @@ import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.exceptions.AuthTokenParseException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AuthTokenStructureTest extends AbstractTestWithValidator {
@@ -58,9 +61,18 @@ class AuthTokenStructureTest extends AbstractTestWithValidator {
     @Test
     void whenTokenTooLong_thenParsingFails() {
         assertThatThrownBy(() -> validator
-            .parse(new String(new char[10001])))
+            .parse(new String(new char[65537])))
             .isInstanceOf(AuthTokenParseException.class)
             .hasMessage("Auth token is too long");
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {10001, 65536})
+    void whenTokenIsWithinIncreasedLengthLimit_thenParsingSucceeds(int tokenLength) throws Exception {
+        final String token = VALID_AUTH_TOKEN + " ".repeat(tokenLength - VALID_AUTH_TOKEN.length());
+
+        assertThat(validator.parse(token).getFormat())
+            .isEqualTo("web-eid:1.0");
     }
 
     @Test
