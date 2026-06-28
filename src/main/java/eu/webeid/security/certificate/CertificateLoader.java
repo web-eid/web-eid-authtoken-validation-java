@@ -63,6 +63,17 @@ public final class CertificateLoader {
         }
     }
 
+    public static List<X509Certificate> decodeCertificatesFromBase64(List<String> certificatesInBase64) throws CertificateDecodingException {
+        if (certificatesInBase64 == null || certificatesInBase64.isEmpty()) {
+            return List.of();
+        }
+        final List<X509Certificate> decodedCertificates = new ArrayList<>();
+        for (final String certificateInBase64 : certificatesInBase64) {
+            decodedCertificates.add(decodeCertificateFromBase64(certificateInBase64));
+        }
+        return decodedCertificates;
+    }
+
     private CertificateLoader() {
         throw new IllegalStateException("Utility class");
     }
