@@ -34,6 +34,7 @@ public class WebEidAuthToken {
     private String algorithm;
     private String format;
 
+    private List<String> unverifiedIntermediateCertificates;
     private List<UnverifiedSigningCertificate> unverifiedSigningCertificates;
 
     public String getUnverifiedCertificate() {
@@ -42,6 +43,14 @@ public class WebEidAuthToken {
 
     public void setUnverifiedCertificate(String unverifiedCertificate) {
         this.unverifiedCertificate = unverifiedCertificate;
+    }
+
+    public List<String> getUnverifiedIntermediateCertificates() {
+        return unverifiedIntermediateCertificates;
+    }
+
+    public void setUnverifiedIntermediateCertificates(List<String> unverifiedIntermediateCertificates) {
+        this.unverifiedIntermediateCertificates = unverifiedIntermediateCertificates;
     }
 
     public String getSignature() {
