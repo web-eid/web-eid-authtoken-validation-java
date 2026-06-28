@@ -30,6 +30,7 @@ import java.util.List;
 public class UnverifiedSigningCertificate {
 
     private String certificate;
+    private List<String> intermediateCertificates;
     private List<SupportedSignatureAlgorithm> supportedSignatureAlgorithms;
 
     public String getCertificate() {
@@ -38,6 +39,14 @@ public class UnverifiedSigningCertificate {
 
     public void setCertificate(String certificate) {
         this.certificate = certificate;
+    }
+
+    public List<String> getIntermediateCertificates() {
+        return intermediateCertificates;
+    }
+
+    public void setIntermediateCertificates(List<String> intermediateCertificates) {
+        this.intermediateCertificates = intermediateCertificates;
     }
 
     public List<SupportedSignatureAlgorithm> getSupportedSignatureAlgorithms() {
