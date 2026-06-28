@@ -48,7 +48,7 @@ final class AuthTokenValidatorManager implements AuthTokenValidator {
 
     // Use human-readable meaningful names for token length limits.
     private static final int TOKEN_MIN_LENGTH = 100;
-    private static final int TOKEN_MAX_LENGTH = 10000;
+    private static final int TOKEN_MAX_LENGTH = 65536;
 
     private static final ObjectReader TOKEN_READER = new ObjectMapper().readerFor(WebEidAuthToken.class);
 
