@@ -62,6 +62,14 @@ public final class CertificateValidator {
                                                               Set<TrustAnchor> trustedCACertificateAnchors,
                                                               CertStore trustedCACertificateCertStore,
                                                               Date now) throws CertificateNotTrustedException, JceException, CertificateNotYetValidException, CertificateExpiredException {
+        return validateIsSignedByTrustedCA(certificate, trustedCACertificateAnchors, trustedCACertificateCertStore, List.of(), now);
+    }
+
+    public static X509Certificate validateIsSignedByTrustedCA(X509Certificate certificate,
+                                                              Set<TrustAnchor> trustedCACertificateAnchors,
+                                                              CertStore trustedCACertificateCertStore,
+                                                              List<X509Certificate> additionalIntermediateCertificates,
+                                                              Date now) throws CertificateNotTrustedException, JceException, CertificateNotYetValidException, CertificateExpiredException {
         certificateIsValidOnDate(certificate, now, "User");
 
         final X509CertSelector selector = new X509CertSelector();
@@ -73,6 +81,9 @@ public final class CertificateValidator {
             pkixBuilderParameters.setRevocationEnabled(false);
             pkixBuilderParameters.setDate(now);
             pkixBuilderParameters.addCertStore(trustedCACertificateCertStore);
+            if (additionalIntermediateCertificates != null && !additionalIntermediateCertificates.isEmpty()) {
+                pkixBuilderParameters.addCertStore(buildCertStoreFromCertificates(additionalIntermediateCertificates));
+            }
 
             // See the comment in buildCertStoreFromCertificates() below why we use the default JCE provider.
             final CertPathBuilder certPathBuilder = CertPathBuilder.getInstance(CertPathBuilder.getDefaultType());

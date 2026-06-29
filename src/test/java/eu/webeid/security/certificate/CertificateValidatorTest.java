@@ -42,9 +42,9 @@ import java.security.PublicKey;
 import java.security.cert.CertStore;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -89,13 +89,13 @@ class CertificateValidatorTest {
     }
 
     @Test
-    void whenChainHasIntermediate_thenReturnsDirectIssuerNotTrustAnchor() throws Exception {
+    void whenChainHasTokenSuppliedIntermediate_thenReturnsDirectIssuerNotTrustAnchor() throws Exception {
         final Set<TrustAnchor> anchors = Collections.singleton(new TrustAnchor(rootCertificate, null));
-        final CertStore certStore = CertificateValidator.buildCertStoreFromCertificates(
-            Arrays.asList(intermediateCertificateA, intermediateCertificateB, intermediateCertificateC));
+        final CertStore emptyStore = CertificateValidator.buildCertStoreFromCertificates(Collections.emptyList());
 
         final X509Certificate issuer = CertificateValidator.validateIsSignedByTrustedCA(
-            leafCertificate, anchors, certStore, NOW);
+            leafCertificate, anchors, emptyStore,
+            List.of(intermediateCertificateA, intermediateCertificateB, intermediateCertificateC), NOW);
 
         // The leaf is issued by intermediate A, whose chain (A -> B -> C) leads to the root trust anchor. The issuer
         // used for OCSP must be the direct issuer (intermediate A), not the trust anchor (the root).
@@ -108,9 +108,23 @@ class CertificateValidatorTest {
         final CertStore emptyStore = CertificateValidator.buildCertStoreFromCertificates(Collections.emptyList());
 
         final X509Certificate issuer = CertificateValidator.validateIsSignedByTrustedCA(
-            leafCertificate, anchors, emptyStore, NOW);
+            leafCertificate, anchors, emptyStore, Collections.emptyList(), NOW);
 
         // Single-hop chain: the direct issuer is the trust anchor itself.
+        assertThat(issuer).isEqualTo(intermediateCertificateA);
+    }
+
+    @Test
+    void whenChainHasMultipleTokenSuppliedIntermediatesAndGrandparentIsPinned_thenValidationSucceeds() throws Exception {
+        // Token supplies the full A -> B -> C intermediate chain; the top (C) is configured as the trust anchor.
+        // The path builds leaf -> A -> B -> C, and the issuer returned for OCSP is the direct issuer (A).
+        final Set<TrustAnchor> anchors = Collections.singleton(new TrustAnchor(intermediateCertificateC, null));
+        final CertStore emptyStore = CertificateValidator.buildCertStoreFromCertificates(Collections.emptyList());
+
+        final X509Certificate issuer = CertificateValidator.validateIsSignedByTrustedCA(
+            leafCertificate, anchors, emptyStore,
+            List.of(intermediateCertificateA, intermediateCertificateB, intermediateCertificateC), NOW);
+
         assertThat(issuer).isEqualTo(intermediateCertificateA);
     }
 

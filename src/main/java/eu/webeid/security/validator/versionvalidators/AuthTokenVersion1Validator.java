@@ -35,6 +35,7 @@ import eu.webeid.security.validator.ocsp.OcspServiceProvider;
 import java.security.cert.CertStore;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
+import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -79,10 +80,21 @@ class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
 
     @Override
     public X509Certificate validate(WebEidAuthToken token, String currentChallengeNonce) throws AuthTokenException {
-        if (isExactV10Format(token.getFormat()) && token.getUnverifiedSigningCertificates() != null) {
-            throw new AuthTokenParseException(
-                "'unverifiedSigningCertificates' field is not allowed for format '" + token.getFormat() + "'"
-            );
+        return validate(token, currentChallengeNonce, null);
+    }
+
+    protected X509Certificate validate(WebEidAuthToken token, String currentChallengeNonce, List<X509Certificate> intermediateCertificates) throws AuthTokenException {
+        if (isExactV10Format(token.getFormat())) {
+            if (token.getUnverifiedSigningCertificates() != null) {
+                throw new AuthTokenParseException(
+                    "'unverifiedSigningCertificates' field is not allowed for format '" + token.getFormat() + "'"
+                );
+            }
+            if (token.getUnverifiedIntermediateCertificates() != null) {
+                throw new AuthTokenParseException(
+                    "'unverifiedIntermediateCertificates' field is not allowed for format '" + token.getFormat() + "'"
+                );
+            }
         }
 
         if (token.getUnverifiedCertificate() == null || token.getUnverifiedCertificate().isEmpty()) {
@@ -97,6 +109,7 @@ class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
             configuration,
             trustedCACertificateAnchors,
             trustedCACertificateCertStore,
+            intermediateCertificates,
             ocspClient,
             ocspServiceProvider
         ).executeFor(subjectCertificate);
@@ -115,5 +128,13 @@ class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
 
     private static boolean isExactV10Format(String format) {
         return V1_SUPPORTED_TOKEN_FORMAT_PREFIX.equals(format) || "web-eid:1.0".equals(format);
+    }
+
+    protected Set<TrustAnchor> getTrustedCACertificateAnchors() {
+        return trustedCACertificateAnchors;
+    }
+
+    protected CertStore getTrustedCACertificateCertStore() {
+        return trustedCACertificateCertStore;
     }
 }
