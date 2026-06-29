@@ -24,6 +24,7 @@ package eu.webeid.security.validator.ocsp.service;
 
 import eu.webeid.security.certificate.CertificateValidator;
 import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.exceptions.CertificateNotTrustedException;
 import eu.webeid.security.exceptions.OCSPCertificateException;
 import eu.webeid.security.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.security.validator.ocsp.OcspResponseValidator;
@@ -35,6 +36,7 @@ import java.security.cert.CertStore;
 import java.security.cert.CertificateException;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
@@ -73,6 +75,7 @@ public class AiaOcspService implements OcspService {
 
     @Override
     public void validateResponderCertificate(X509CertificateHolder cert,
+                                             X509Certificate subjectCertificateIssuerCertificate,
                                              List<X509Certificate> additionalIntermediateCertificates,
                                              Date now) throws AuthTokenException {
         try {
@@ -82,16 +85,28 @@ public class AiaOcspService implements OcspService {
             OcspResponseValidator.validateHasSigningExtension(certificate);
             // A CA-designated responder may be issued by a token-supplied intermediate that is not itself trusted, so
             // the intermediates are offered as path candidates; the path must still terminate at a trusted anchor.
-            CertificateValidator.validateIsSignedByTrustedCA(
+            final X509Certificate responderIssuerCertificate = CertificateValidator.validateIsSignedByTrustedCA(
                 certificate,
                 trustedCACertificateAnchors,
                 trustedCACertificateCertStore,
                 additionalIntermediateCertificates,
                 now
             );
+            // RFC 6960: the responder must be the issuing CA itself or be directly delegated by it. CA identity is
+            // compared by subject and public key so that equivalent cross-certificates for the same CA are accepted.
+            if (!representsSameCA(certificate, subjectCertificateIssuerCertificate)
+                && !representsSameCA(responderIssuerCertificate, subjectCertificateIssuerCertificate)) {
+                throw new CertificateNotTrustedException(certificate,
+                    new CertificateException("OCSP responder is not authorized by the subject certificate issuer"));
+            }
         } catch (CertificateException e) {
             throw new OCSPCertificateException("Invalid responder certificate", e);
         }
+    }
+
+    private static boolean representsSameCA(X509Certificate first, X509Certificate second) {
+        return first.getSubjectX500Principal().equals(second.getSubjectX500Principal())
+            && Arrays.equals(first.getPublicKey().getEncoded(), second.getPublicKey().getEncoded());
     }
 
     private static URI getOcspAiaUrlFromCertificate(X509Certificate certificate) throws AuthTokenException {

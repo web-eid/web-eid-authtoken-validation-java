@@ -37,14 +37,16 @@ public interface OcspService {
     URI getAccessLocation();
 
     /**
-     * Validates that the OCSP responder certificate is trusted.
+     * Validates that the OCSP responder certificate is trusted and authorized to answer for the subject certificate.
      *
      * @param cert the responder certificate from the OCSP response
+     * @param subjectCertificateIssuerCertificate the certificate that directly issued the subject certificate
      * @param additionalIntermediateCertificates untrusted, token-supplied intermediate certificates that may be needed
      *     to build the responder's certification path to a trusted CA; may be empty
      * @param now validation date
      */
     void validateResponderCertificate(X509CertificateHolder cert,
+                                      X509Certificate subjectCertificateIssuerCertificate,
                                       List<X509Certificate> additionalIntermediateCertificates,
                                       Date now) throws AuthTokenException;
 

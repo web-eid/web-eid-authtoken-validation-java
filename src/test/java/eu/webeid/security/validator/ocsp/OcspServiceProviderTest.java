@@ -52,11 +52,11 @@ class OcspServiceProviderTest {
         assertThat(service.doesSupportNonce()).isTrue();
         assertThatCode(() ->
             service.validateResponderCertificate(new X509CertificateHolder(getTestSkOcspResponder2020().getEncoded()),
-                Collections.emptyList(), new Date(1630000000000L)))
+                getTestEsteid2018CA(), Collections.emptyList(), new Date(1630000000000L)))
             .doesNotThrowAnyException();
         assertThatCode(() ->
             service.validateResponderCertificate(new X509CertificateHolder(getTestEsteid2018CA().getEncoded()),
-                Collections.emptyList(), new Date(1630000000000L)))
+                getTestEsteid2018CA(), Collections.emptyList(), new Date(1630000000000L)))
             .isInstanceOf(OCSPCertificateException.class)
             .hasMessage("Responder certificate from the OCSP response is not equal to the configured designated OCSP responder certificate");
     }
@@ -70,7 +70,7 @@ class OcspServiceProviderTest {
         assertThatCode(() ->
             // Use the CA certificate instead of responder certificate for convenience.
             service2018.validateResponderCertificate(new X509CertificateHolder(getTestEsteid2018CA().getEncoded()),
-                Collections.emptyList(), new Date(1630000000000L)))
+                getTestEsteid2018CA(), Collections.emptyList(), new Date(1630000000000L)))
             .doesNotThrowAnyException();
 
         final OcspService service2015 = ocspServiceProvider.getService(getMariliisEsteid2015Cert());
@@ -79,7 +79,7 @@ class OcspServiceProviderTest {
         assertThatCode(() ->
             // Use the CA certificate instead of responder certificate for convenience.
             service2015.validateResponderCertificate(new X509CertificateHolder(getTestEsteid2015CA().getEncoded()),
-                Collections.emptyList(), new Date(1630000000000L)))
+                getTestEsteid2015CA(), Collections.emptyList(), new Date(1630000000000L)))
             .doesNotThrowAnyException();
     }
 
@@ -90,8 +90,8 @@ class OcspServiceProviderTest {
         final X509CertificateHolder wrongResponderCert = new X509CertificateHolder(getMariliisEsteid2015Cert().getEncoded());
         assertThatExceptionOfType(OCSPCertificateException.class)
             .isThrownBy(() ->
-                service2018.validateResponderCertificate(wrongResponderCert, Collections.emptyList(),
-                    new Date(1630000000000L)));
+                service2018.validateResponderCertificate(wrongResponderCert, getTestEsteid2018CA(),
+                    Collections.emptyList(), new Date(1630000000000L)));
     }
 
 }

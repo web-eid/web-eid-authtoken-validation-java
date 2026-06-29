@@ -47,10 +47,12 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PublicKey;
 import java.security.cert.CertStore;
+import java.security.cert.CertificateException;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -70,7 +72,10 @@ class AiaOcspServiceTest {
     private static final String OCSP_URL = "http://ocsp.example/responder";
 
     private static X509Certificate intermediateCertificate;
+    private static X509Certificate crossIntermediateCertificate;
     private static X509Certificate responderCertificate;
+    private static X509Certificate siblingIntermediateCertificate;
+    private static X509Certificate siblingResponderCertificate;
     private static AiaOcspService aiaOcspService;
 
     @BeforeAll
@@ -78,15 +83,26 @@ class AiaOcspServiceTest {
         final KeyPair rootKeyPair = generateKeyPair();
         final KeyPair intermediateKeyPair = generateKeyPair();
         final KeyPair responderKeyPair = generateKeyPair();
+        final KeyPair siblingIntermediateKeyPair = generateKeyPair();
+        final KeyPair siblingResponderKeyPair = generateKeyPair();
         final KeyPair subjectKeyPair = generateKeyPair();
 
         final X509Certificate rootCertificate = generateCertificate(
             "Test Root CA", rootKeyPair.getPublic(), "Test Root CA", rootKeyPair, 1, true, false, null);
         intermediateCertificate = generateCertificate(
             "Test Intermediate CA", intermediateKeyPair.getPublic(), "Test Root CA", rootKeyPair, 2, true, false, null);
+        // An equivalent cross-certificate for the intermediate CA: same subject and public key as
+        // intermediateCertificate, but a distinct certificate (different serial). RFC 6960 authorization must accept it.
+        crossIntermediateCertificate = generateCertificate(
+            "Test Intermediate CA", intermediateKeyPair.getPublic(), "Test Root CA", rootKeyPair, 7, true, false, null);
         // The OCSP responder is delegated by the intermediate CA (RFC 6960 CA-designated responder).
         responderCertificate = generateCertificate(
             "Test OCSP Responder", responderKeyPair.getPublic(), "Test Intermediate CA", intermediateKeyPair, 3, false, true, null);
+        siblingIntermediateCertificate = generateCertificate(
+            "Sibling Intermediate CA", siblingIntermediateKeyPair.getPublic(), "Test Root CA", rootKeyPair, 5, true, false, null);
+        siblingResponderCertificate = generateCertificate(
+            "Sibling OCSP Responder", siblingResponderKeyPair.getPublic(), "Sibling Intermediate CA",
+            siblingIntermediateKeyPair, 6, false, true, null);
         // The subject certificate is only needed so that AiaOcspService can read the AIA OCSP URL from it.
         final X509Certificate subjectCertificate = generateCertificate(
             "Test Subject", subjectKeyPair.getPublic(), "Test Intermediate CA", intermediateKeyPair, 4, false, false, OCSP_URL);
@@ -103,7 +119,7 @@ class AiaOcspServiceTest {
     void whenResponderChainsViaTokenIntermediate_thenValidationSucceeds() throws Exception {
         final X509CertificateHolder responderHolder = new X509CertificateHolder(responderCertificate.getEncoded());
         assertThatCode(() -> aiaOcspService.validateResponderCertificate(
-            responderHolder, Collections.singletonList(intermediateCertificate), NOW))
+            responderHolder, intermediateCertificate, Collections.singletonList(intermediateCertificate), NOW))
             .doesNotThrowAnyException();
     }
 
@@ -113,7 +129,30 @@ class AiaOcspServiceTest {
         // Without the token-supplied intermediate, the responder -> intermediate -> root path cannot be built.
         assertThatExceptionOfType(CertificateNotTrustedException.class)
             .isThrownBy(() -> aiaOcspService.validateResponderCertificate(
-                responderHolder, Collections.emptyList(), NOW));
+                responderHolder, intermediateCertificate, Collections.emptyList(), NOW));
+    }
+
+    @Test
+    void whenResponderIssuerIsEquivalentCrossCertificate_thenValidationSucceeds() throws Exception {
+        final X509CertificateHolder responderHolder = new X509CertificateHolder(responderCertificate.getEncoded());
+        // The responder still chains to the root via the real intermediate, so its issuer in the built path is
+        // intermediateCertificate. The subject issuer is passed as the equivalent cross-certificate (same subject and
+        // public key, different certificate), which representsSameCA must treat as the same CA.
+        assertThatCode(() -> aiaOcspService.validateResponderCertificate(
+            responderHolder, crossIntermediateCertificate, Collections.singletonList(intermediateCertificate), NOW))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenResponderIsIssuedBySiblingIntermediate_thenValidationFails() throws Exception {
+        final X509CertificateHolder responderHolder =
+            new X509CertificateHolder(siblingResponderCertificate.getEncoded());
+
+        assertThatExceptionOfType(CertificateNotTrustedException.class)
+            .isThrownBy(() -> aiaOcspService.validateResponderCertificate(
+                responderHolder, intermediateCertificate,
+                List.of(intermediateCertificate, siblingIntermediateCertificate), NOW))
+            .withCauseInstanceOf(CertificateException.class);
     }
 
     private static KeyPair generateKeyPair() throws Exception {

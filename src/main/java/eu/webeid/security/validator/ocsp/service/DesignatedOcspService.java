@@ -61,10 +61,11 @@ public class DesignatedOcspService implements OcspService {
 
     @Override
     public void validateResponderCertificate(X509CertificateHolder cert,
+                                             X509Certificate subjectCertificateIssuerCertificate,
                                              List<X509Certificate> additionalIntermediateCertificates,
                                              Date now) throws AuthTokenException {
-        // The designated responder is pinned by equality below, so no certification path is built and the
-        // token-supplied intermediate certificates are not needed here.
+        // The designated responder is pinned by equality below, so no certification path is built and the subject
+        // issuer and token-supplied intermediate certificates are not needed here.
         try {
             final X509Certificate responderCertificate = certificateConverter.getCertificate(cert);
             // Certificate pinning is implemented simply by comparing the certificates or their public keys,
