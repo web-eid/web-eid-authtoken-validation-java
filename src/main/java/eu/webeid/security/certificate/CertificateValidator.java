@@ -33,6 +33,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertPathBuilder;
 import java.security.cert.CertPathBuilderException;
 import java.security.cert.CertStore;
+import java.security.cert.Certificate;
 import java.security.cert.CollectionCertStoreParameters;
 import java.security.cert.PKIXBuilderParameters;
 import java.security.cert.PKIXCertPathBuilderResult;
@@ -41,6 +42,7 @@ import java.security.cert.X509CertSelector;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
 import java.util.Date;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -81,13 +83,20 @@ public final class CertificateValidator {
             // Verify that the trusted CA cert is presently valid before returning the result.
             certificateIsValidOnDate(trustedCACert, now, "Trusted CA");
 
-            return trustedCACert;
+            return getIssuerCertificate(result, trustedCACert);
 
         } catch (InvalidAlgorithmParameterException | NoSuchAlgorithmException e) {
             throw new JceException(e);
         } catch (CertPathBuilderException e) {
             throw new CertificateNotTrustedException(certificate, e);
         }
+    }
+
+    private static X509Certificate getIssuerCertificate(PKIXCertPathBuilderResult path, X509Certificate trustedCACert) {
+        // The built path is ordered from the subject towards the anchor and excludes the anchor, so index 1 (when
+        // present) is the subject's direct issuer; otherwise the subject was issued directly by the trust anchor.
+        final List<? extends Certificate> certificatePath = path.getCertPath().getCertificates();
+        return certificatePath.size() > 1 ? (X509Certificate) certificatePath.get(1) : trustedCACert;
     }
 
     public static Set<TrustAnchor> buildTrustAnchorsFromCertificates(Collection<X509Certificate> certificates) {
