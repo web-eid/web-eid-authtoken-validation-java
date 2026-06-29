@@ -32,6 +32,7 @@ import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Date;
+import java.util.List;
 import java.util.Objects;
 
 import static eu.webeid.security.certificate.CertificateValidator.certificateIsValidOnDate;
@@ -59,7 +60,11 @@ public class DesignatedOcspService implements OcspService {
     }
 
     @Override
-    public void validateResponderCertificate(X509CertificateHolder cert, Date now) throws AuthTokenException {
+    public void validateResponderCertificate(X509CertificateHolder cert,
+                                             List<X509Certificate> additionalIntermediateCertificates,
+                                             Date now) throws AuthTokenException {
+        // The designated responder is pinned by equality below, so no certification path is built and the
+        // token-supplied intermediate certificates are not needed here.
         try {
             final X509Certificate responderCertificate = certificateConverter.getCertificate(cert);
             // Certificate pinning is implemented simply by comparing the certificates or their public keys,

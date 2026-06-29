@@ -165,7 +165,12 @@ public final class SubjectCertificateNotRevokedValidator {
 
         // Use the clock instance so that the date can be mocked in tests.
         final Date now = DateAndTime.DefaultClock.getInstance().now();
-        ocspService.validateResponderCertificate(responderCert, now);
+        // Pass the token-supplied intermediate certificates so that a responder issued by a token-supplied
+        // intermediate (not configured as trusted) can still have its certification path built.
+        ocspService.validateResponderCertificate(
+            responderCert,
+            trustValidator.getAdditionalIntermediateCertificates(),
+            now);
 
         //   5. The time at which the status being indicated is known to be
         //      correct (thisUpdate) is sufficiently recent.

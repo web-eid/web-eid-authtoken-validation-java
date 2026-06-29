@@ -36,6 +36,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
 import java.util.Date;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -71,13 +72,23 @@ public class AiaOcspService implements OcspService {
     }
 
     @Override
-    public void validateResponderCertificate(X509CertificateHolder cert, Date now) throws AuthTokenException {
+    public void validateResponderCertificate(X509CertificateHolder cert,
+                                             List<X509Certificate> additionalIntermediateCertificates,
+                                             Date now) throws AuthTokenException {
         try {
             final X509Certificate certificate = certificateConverter.getCertificate(cert);
             CertificateValidator.certificateIsValidOnDate(certificate, now, "AIA OCSP responder");
             // Trusted certificates' validity has been already verified in validateCertificateExpiry().
             OcspResponseValidator.validateHasSigningExtension(certificate);
-            CertificateValidator.validateIsSignedByTrustedCA(certificate, trustedCACertificateAnchors, trustedCACertificateCertStore, now);
+            // A CA-designated responder may be issued by a token-supplied intermediate that is not itself trusted, so
+            // the intermediates are offered as path candidates; the path must still terminate at a trusted anchor.
+            CertificateValidator.validateIsSignedByTrustedCA(
+                certificate,
+                trustedCACertificateAnchors,
+                trustedCACertificateCertStore,
+                additionalIntermediateCertificates,
+                now
+            );
         } catch (CertificateException e) {
             throw new OCSPCertificateException("Invalid responder certificate", e);
         }
