@@ -22,10 +22,13 @@
 
 package eu.webeid.security.certificate;
 
+import eu.webeid.security.exceptions.CertificateNotTrustedException;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.KeyUsage;
+import org.bouncycastle.cert.X509v2CRLBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509CRLConverter;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
@@ -39,8 +42,11 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.CertPathValidatorException;
 import java.security.cert.CertStore;
+import java.security.cert.CollectionCertStoreParameters;
 import java.security.cert.TrustAnchor;
+import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.Date;
@@ -48,6 +54,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CertificateValidatorTest {
 
@@ -60,6 +67,10 @@ class CertificateValidatorTest {
     private static X509Certificate intermediateCertificateB; // signed by C
     private static X509Certificate intermediateCertificateA; // signed by B, direct issuer of the leaf
     private static X509Certificate leafCertificate;          // signed by A
+    private static X509CRL rootCrl;
+    private static X509CRL intermediateCCrl;
+    private static X509CRL intermediateBCrl;
+    private static X509CRL intermediateBRevokingACrl;
 
     @BeforeAll
     static void setUp() throws Exception {
@@ -86,15 +97,21 @@ class CertificateValidatorTest {
             intermediateBName, intermediateBKeyPair.getPrivate(), intermediateBKeyPair.getPublic(), true, BigInteger.valueOf(4));
         leafCertificate = generateCertificate(leafName, leafKeyPair.getPublic(),
             intermediateAName, intermediateAKeyPair.getPrivate(), intermediateAKeyPair.getPublic(), false, BigInteger.valueOf(5));
+
+        rootCrl = generateCrl(rootName, rootKeyPair.getPrivate());
+        intermediateCCrl = generateCrl(intermediateCName, intermediateCKeyPair.getPrivate());
+        intermediateBCrl = generateCrl(intermediateBName, intermediateBKeyPair.getPrivate());
+        intermediateBRevokingACrl = generateCrl(
+            intermediateBName, intermediateBKeyPair.getPrivate(), intermediateCertificateA.getSerialNumber());
     }
 
     @Test
     void whenChainHasTokenSuppliedIntermediate_thenReturnsDirectIssuerNotTrustAnchor() throws Exception {
         final Set<TrustAnchor> anchors = Collections.singleton(new TrustAnchor(rootCertificate, null));
-        final CertStore emptyStore = CertificateValidator.buildCertStoreFromCertificates(Collections.emptyList());
+        final CertStore revocationStore = buildCrlStore(rootCrl, intermediateCCrl, intermediateBCrl);
 
         final X509Certificate issuer = CertificateValidator.validateIsSignedByTrustedCA(
-            leafCertificate, anchors, emptyStore,
+            leafCertificate, anchors, revocationStore,
             List.of(intermediateCertificateA, intermediateCertificateB, intermediateCertificateC), NOW);
 
         // The leaf is issued by intermediate A, whose chain (A -> B -> C) leads to the root trust anchor. The issuer
@@ -119,13 +136,46 @@ class CertificateValidatorTest {
         // Token supplies the full A -> B -> C intermediate chain; the top (C) is configured as the trust anchor.
         // The path builds leaf -> A -> B -> C, and the issuer returned for OCSP is the direct issuer (A).
         final Set<TrustAnchor> anchors = Collections.singleton(new TrustAnchor(intermediateCertificateC, null));
-        final CertStore emptyStore = CertificateValidator.buildCertStoreFromCertificates(Collections.emptyList());
+        final CertStore revocationStore = buildCrlStore(intermediateCCrl, intermediateBCrl);
 
         final X509Certificate issuer = CertificateValidator.validateIsSignedByTrustedCA(
-            leafCertificate, anchors, emptyStore,
+            leafCertificate, anchors, revocationStore,
             List.of(intermediateCertificateA, intermediateCertificateB, intermediateCertificateC), NOW);
 
         assertThat(issuer).isEqualTo(intermediateCertificateA);
+    }
+
+    @Test
+    void whenTokenSuppliedIntermediateIsRevoked_thenRejectsCertificateChain() throws Exception {
+        final Set<TrustAnchor> anchors = Collections.singleton(new TrustAnchor(rootCertificate, null));
+        final CertStore revocationStore = buildCrlStore(
+            rootCrl, intermediateCCrl, intermediateBRevokingACrl);
+
+        assertThat(intermediateBRevokingACrl.isRevoked(intermediateCertificateA)).isTrue();
+
+        assertThatThrownBy(() -> CertificateValidator.validateIsSignedByTrustedCA(
+            leafCertificate, anchors, revocationStore,
+            List.of(intermediateCertificateA, intermediateCertificateB, intermediateCertificateC), NOW))
+            .isInstanceOf(CertificateNotTrustedException.class)
+            .satisfies(exception -> {
+                assertThat(exception.getCause()).isInstanceOf(CertPathValidatorException.class);
+                final CertPathValidatorException validationException =
+                    (CertPathValidatorException) exception.getCause();
+                assertThat(validationException.getReason())
+                    .isEqualTo(CertPathValidatorException.BasicReason.REVOKED);
+            });
+    }
+
+    @Test
+    void whenTokenSuppliedIntermediateRevocationStatusIsUnknown_thenRejectsCertificateChain() throws Exception {
+        final Set<TrustAnchor> anchors = Collections.singleton(new TrustAnchor(rootCertificate, null));
+        final CertStore emptyStore = CertificateValidator.buildCertStoreFromCertificates(Collections.emptyList());
+
+        assertThatThrownBy(() -> CertificateValidator.validateIsSignedByTrustedCA(
+            leafCertificate, anchors, emptyStore,
+            List.of(intermediateCertificateA, intermediateCertificateB, intermediateCertificateC), NOW))
+            .isInstanceOf(CertificateNotTrustedException.class)
+            .hasCauseInstanceOf(CertPathValidatorException.class);
     }
 
     private static KeyPair generateKeyPair() throws Exception {
@@ -148,5 +198,20 @@ class CertificateValidatorTest {
         }
         final ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA").build(issuerPrivateKey);
         return new JcaX509CertificateConverter().getCertificate(builder.build(signer));
+    }
+
+    private static X509CRL generateCrl(X500Name issuer, PrivateKey issuerPrivateKey,
+                                       BigInteger... revokedCertificateSerials) throws Exception {
+        final X509v2CRLBuilder builder = new X509v2CRLBuilder(issuer, NOT_BEFORE);
+        builder.setNextUpdate(NOT_AFTER);
+        for (final BigInteger serial : revokedCertificateSerials) {
+            builder.addCRLEntry(serial, NOT_BEFORE, 0);
+        }
+        final ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA").build(issuerPrivateKey);
+        return new JcaX509CRLConverter().getCRL(builder.build(signer));
+    }
+
+    private static CertStore buildCrlStore(X509CRL... crls) throws Exception {
+        return CertStore.getInstance("Collection", new CollectionCertStoreParameters(List.of(crls)));
     }
 }

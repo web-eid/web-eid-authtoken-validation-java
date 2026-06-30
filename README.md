@@ -343,13 +343,13 @@ Starting from format version `web-eid:1.1`, the authentication token may additio
 
 In addition to the fields described above, the `web-eid:1.1` format defines the following additional fields:
 
-- `unverifiedIntermediateCertificates`: an array of base64-encoded DER intermediate CA certificates that make up the trust chain of the authentication certificate in `unverifiedCertificate`. Like the authentication certificate, these certificates are received from the client side and cannot be trusted; they are only used as candidate certificates when building the certification path, which must still terminate at a trusted certificate authority. The field is optional, but when present it must not be empty. When it is present, `unverifiedSigningCertificates` may be omitted.
+- `unverifiedIntermediateCertificates`: an array of base64-encoded DER intermediate CA certificates that make up the trust chain of the authentication certificate in `unverifiedCertificate`. Like the authentication certificate, these certificates are received from the client side and cannot be trusted; they are only used as candidate certificates when building the certification path, which must still terminate at a trusted certificate authority. Every intermediate selected for the path is revocation-checked with OCSP or CRLs and the token is rejected if its status cannot be determined. The field is optional, but when present it must not be empty. When it is present, `unverifiedSigningCertificates` may be omitted.
 
 - `unverifiedSigningCertificates`: an array of the eID user's signing certificates, presented alongside the authentication certificate. For `web-eid:1.1` tokens this field is required unless `unverifiedIntermediateCertificates` is present, and when present it must not be empty. Each entry contains:
 
     - `certificate`: the base64-encoded DER signing certificate. During validation it must have the same subject and issuer as the authentication certificate, be valid, contain the non-repudiation key usage bit and be signed by a trusted certificate authority.
 
-    - `intermediateCertificates`: an optional array of base64-encoded DER intermediate CA certificates that make up the trust chain of this signing certificate. When present it must not be empty and, as with `unverifiedIntermediateCertificates`, the certificates are only used as candidates when building the certification path to a trusted CA.
+    - `intermediateCertificates`: an optional array of base64-encoded DER intermediate CA certificates that make up the trust chain of this signing certificate. When present it must not be empty and, as with `unverifiedIntermediateCertificates`, the certificates are only used as candidates when building the certification path to a trusted CA and every selected intermediate is revocation-checked.
 
     - `supportedSignatureAlgorithms`: the signature algorithms that the signing certificate's key supports. Each entry has a `cryptoAlgorithm` (`ECC` or `RSA`), a `hashFunction` (one of `SHA-224`, `SHA-256`, `SHA-384`, `SHA-512`, `SHA3-224`, `SHA3-256`, `SHA3-384`, `SHA3-512`) and a `paddingScheme` (`NONE`, `PKCS1.5` or `PSS`).
 

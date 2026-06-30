@@ -22,8 +22,8 @@
 
 package eu.webeid.security.validator.ocsp.service;
 
-import eu.webeid.security.certificate.CertificateValidator;
 import eu.webeid.security.exceptions.CertificateNotTrustedException;
+import eu.webeid.security.validator.ocsp.OcspServiceProvider;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.AccessDescription;
 import org.bouncycastle.asn1.x509.AuthorityInformationAccess;
@@ -34,6 +34,8 @@ import org.bouncycastle.asn1.x509.GeneralName;
 import org.bouncycastle.asn1.x509.KeyPurposeId;
 import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.X509v2CRLBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509CRLConverter;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
@@ -43,26 +45,29 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
+import java.net.URI;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.CertStore;
 import java.security.cert.CertificateException;
+import java.security.cert.CollectionCertStoreParameters;
 import java.security.cert.TrustAnchor;
+import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 /**
- * Verifies that an AIA OCSP responder certificate that only chains to a trusted root through a token-supplied
- * intermediate certificate (one that is not configured as a trusted CA) is validated correctly. This mirrors the
- * NFC-128 deployment where the root is trusted and the issuing intermediate is delivered in the authentication token's
- * {@code unverifiedIntermediateCertificates} field.
+ * Verifies AIA responder path building through token-supplied intermediates and the authorization boundary between
+ * CA-delegated AIA responders and explicitly configured designated responders.
  */
 class AiaOcspServiceTest {
 
@@ -74,8 +79,11 @@ class AiaOcspServiceTest {
     private static X509Certificate intermediateCertificate;
     private static X509Certificate crossIntermediateCertificate;
     private static X509Certificate responderCertificate;
+    private static X509Certificate rootIssuedResponderCertificate;
     private static X509Certificate siblingIntermediateCertificate;
     private static X509Certificate siblingResponderCertificate;
+    private static X509Certificate subjectCertificate;
+    private static AiaOcspServiceConfiguration aiaOcspServiceConfiguration;
     private static AiaOcspService aiaOcspService;
 
     @BeforeAll
@@ -83,6 +91,7 @@ class AiaOcspServiceTest {
         final KeyPair rootKeyPair = generateKeyPair();
         final KeyPair intermediateKeyPair = generateKeyPair();
         final KeyPair responderKeyPair = generateKeyPair();
+        final KeyPair rootIssuedResponderKeyPair = generateKeyPair();
         final KeyPair siblingIntermediateKeyPair = generateKeyPair();
         final KeyPair siblingResponderKeyPair = generateKeyPair();
         final KeyPair subjectKeyPair = generateKeyPair();
@@ -98,21 +107,29 @@ class AiaOcspServiceTest {
         // The OCSP responder is delegated by the intermediate CA (RFC 6960 CA-designated responder).
         responderCertificate = generateCertificate(
             "Test OCSP Responder", responderKeyPair.getPublic(), "Test Intermediate CA", intermediateKeyPair, 3, false, true, null);
+        // This responder is trusted through the same root, but it is not delegated by the subject certificate's issuer.
+        // It can only be used as a locally configured trusted responder (RFC 6960 section 4.2.2.2, criterion 1).
+        rootIssuedResponderCertificate = generateCertificate(
+            "Root-Issued OCSP Responder", rootIssuedResponderKeyPair.getPublic(), "Test Root CA",
+            rootKeyPair, 8, false, true, null);
         siblingIntermediateCertificate = generateCertificate(
             "Sibling Intermediate CA", siblingIntermediateKeyPair.getPublic(), "Test Root CA", rootKeyPair, 5, true, false, null);
         siblingResponderCertificate = generateCertificate(
             "Sibling OCSP Responder", siblingResponderKeyPair.getPublic(), "Sibling Intermediate CA",
             siblingIntermediateKeyPair, 6, false, true, null);
         // The subject certificate is only needed so that AiaOcspService can read the AIA OCSP URL from it.
-        final X509Certificate subjectCertificate = generateCertificate(
+        subjectCertificate = generateCertificate(
             "Test Subject", subjectKeyPair.getPublic(), "Test Intermediate CA", intermediateKeyPair, 4, false, false, OCSP_URL);
 
         // Trust only the root. The intermediate that issued both the subject and the responder is NOT configured as
         // trusted, exactly like a deployment that relies on the token-supplied intermediate to build the chain.
         final Set<TrustAnchor> anchors = Collections.singleton(new TrustAnchor(rootCertificate, null));
-        final CertStore emptyStore = CertificateValidator.buildCertStoreFromCertificates(Collections.emptyList());
-        aiaOcspService = new AiaOcspService(
-            new AiaOcspServiceConfiguration(Collections.emptySet(), anchors, emptyStore), subjectCertificate);
+        final X509CRL rootCrl = generateCrl(new X500Name("CN=Test Root CA"), rootKeyPair.getPrivate());
+        final CertStore storeWithIntermediateRevocationData = CertStore.getInstance("Collection",
+            new CollectionCertStoreParameters(List.of(rootCrl)));
+        aiaOcspServiceConfiguration = new AiaOcspServiceConfiguration(
+            Collections.emptySet(), anchors, storeWithIntermediateRevocationData);
+        aiaOcspService = new AiaOcspService(aiaOcspServiceConfiguration, subjectCertificate);
     }
 
     @Test
@@ -155,6 +172,34 @@ class AiaOcspServiceTest {
             .withCauseInstanceOf(CertificateException.class);
     }
 
+    @Test
+    void whenResponderIsIssuedByRootInsteadOfSubjectIssuer_thenAiaValidationFails() throws Exception {
+        final X509CertificateHolder responderHolder =
+            new X509CertificateHolder(rootIssuedResponderCertificate.getEncoded());
+
+        assertThatExceptionOfType(CertificateNotTrustedException.class)
+            .isThrownBy(() -> aiaOcspService.validateResponderCertificate(
+                responderHolder, intermediateCertificate, Collections.emptyList(), NOW))
+            .withCauseInstanceOf(CertificateException.class);
+    }
+
+    @Test
+    void whenRootIssuedResponderIsExplicitlyDesignatedForSubjectIssuer_thenValidationSucceeds() throws Exception {
+        final DesignatedOcspServiceConfiguration designatedConfiguration =
+            new DesignatedOcspServiceConfiguration(
+                URI.create(OCSP_URL), rootIssuedResponderCertificate, List.of(intermediateCertificate), true);
+        final OcspServiceProvider provider =
+            new OcspServiceProvider(designatedConfiguration, aiaOcspServiceConfiguration);
+        final OcspService service = provider.getService(subjectCertificate);
+        final X509CertificateHolder responderHolder =
+            new X509CertificateHolder(rootIssuedResponderCertificate.getEncoded());
+
+        assertThat(service).isInstanceOf(DesignatedOcspService.class);
+        assertThatCode(() -> service.validateResponderCertificate(
+            responderHolder, intermediateCertificate, Collections.emptyList(), NOW))
+            .doesNotThrowAnyException();
+    }
+
     private static KeyPair generateKeyPair() throws Exception {
         final KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
         keyPairGenerator.initialize(2048);
@@ -184,5 +229,12 @@ class AiaOcspServiceTest {
         }
         final ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA").build(issuerKeyPair.getPrivate());
         return new JcaX509CertificateConverter().getCertificate(builder.build(signer));
+    }
+
+    private static X509CRL generateCrl(X500Name issuer, PrivateKey issuerPrivateKey) throws Exception {
+        final X509v2CRLBuilder builder = new X509v2CRLBuilder(issuer, NOT_BEFORE);
+        builder.setNextUpdate(NOT_AFTER);
+        final ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA").build(issuerPrivateKey);
+        return new JcaX509CRLConverter().getCRL(builder.build(signer));
     }
 }

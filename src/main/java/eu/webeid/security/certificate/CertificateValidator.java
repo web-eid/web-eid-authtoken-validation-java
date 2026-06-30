@@ -30,13 +30,20 @@ import eu.webeid.security.exceptions.JceException;
 import java.security.GeneralSecurityException;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertPath;
 import java.security.cert.CertPathBuilder;
 import java.security.cert.CertPathBuilderException;
+import java.security.cert.CertPathValidator;
+import java.security.cert.CertPathValidatorException;
 import java.security.cert.CertStore;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
 import java.security.cert.CollectionCertStoreParameters;
 import java.security.cert.PKIXBuilderParameters;
 import java.security.cert.PKIXCertPathBuilderResult;
+import java.security.cert.PKIXParameters;
+import java.security.cert.PKIXRevocationChecker;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509CertSelector;
 import java.security.cert.X509Certificate;
@@ -89,6 +96,14 @@ public final class CertificateValidator {
             final CertPathBuilder certPathBuilder = CertPathBuilder.getInstance(CertPathBuilder.getDefaultType());
             final PKIXCertPathBuilderResult result = (PKIXCertPathBuilderResult) certPathBuilder.build(pkixBuilderParameters);
 
+            validateIntermediateCertificatesNotRevoked(
+                result,
+                trustedCACertificateAnchors,
+                trustedCACertificateCertStore,
+                additionalIntermediateCertificates,
+                now
+            );
+
             final X509Certificate trustedCACert = result.getTrustAnchor().getTrustedCert();
 
             // Verify that the trusted CA cert is presently valid before returning the result.
@@ -96,11 +111,47 @@ public final class CertificateValidator {
 
             return getIssuerCertificate(result, trustedCACert);
 
-        } catch (InvalidAlgorithmParameterException | NoSuchAlgorithmException e) {
+        } catch (InvalidAlgorithmParameterException | NoSuchAlgorithmException | CertificateException e) {
             throw new JceException(e);
-        } catch (CertPathBuilderException e) {
+        } catch (CertPathBuilderException | CertPathValidatorException e) {
             throw new CertificateNotTrustedException(certificate, e);
         }
+    }
+
+    private static void validateIntermediateCertificatesNotRevoked(
+        PKIXCertPathBuilderResult pathBuilderResult,
+        Set<TrustAnchor> trustedCACertificateAnchors,
+        CertStore trustedCACertificateCertStore,
+        List<X509Certificate> additionalIntermediateCertificates,
+        Date now
+    ) throws InvalidAlgorithmParameterException, NoSuchAlgorithmException, CertificateException,
+        CertPathValidatorException {
+        final List<? extends Certificate> certificatePath = pathBuilderResult.getCertPath().getCertificates();
+        if (certificatePath.size() <= 1) {
+            return; // leaf chains directly to a trust anchor; no non-anchor intermediate to validate
+        }
+
+        // The existing application OCSP flow checks the end-entity certificate. Validate only the CA suffix here,
+        // excluding both the end entity at index 0 and the trust anchor, which is not part of the built path.
+        final CertPath intermediateCertificatePath = CertificateFactory.getInstance("X.509")
+            .generateCertPath(certificatePath.subList(1, certificatePath.size()));
+        final PKIXParameters revocationCheckingParameters = new PKIXParameters(trustedCACertificateAnchors);
+        revocationCheckingParameters.setDate(now);
+        // An explicitly added checker is active regardless of this flag and avoids installing a second default checker.
+        revocationCheckingParameters.setRevocationEnabled(false);
+        revocationCheckingParameters.addCertStore(trustedCACertificateCertStore);
+        if (additionalIntermediateCertificates != null && !additionalIntermediateCertificates.isEmpty()) {
+            revocationCheckingParameters.addCertStore(CertStore.getInstance(
+                "Collection", new CollectionCertStoreParameters(additionalIntermediateCertificates)));
+        }
+
+        final CertPathValidator certPathValidator = CertPathValidator.getInstance(CertPathValidator.getDefaultType());
+        final PKIXRevocationChecker revocationChecker =
+            (PKIXRevocationChecker) certPathValidator.getRevocationChecker();
+        // The default checker prefers OCSP and falls back to CRLs. SOFT_FAIL is deliberately not enabled: a token-
+        // supplied intermediate whose revocation status cannot be established must not become part of a trusted path.
+        revocationCheckingParameters.addCertPathChecker(revocationChecker);
+        certPathValidator.validate(intermediateCertificatePath, revocationCheckingParameters);
     }
 
     private static X509Certificate getIssuerCertificate(PKIXCertPathBuilderResult path, X509Certificate trustedCACert) {
