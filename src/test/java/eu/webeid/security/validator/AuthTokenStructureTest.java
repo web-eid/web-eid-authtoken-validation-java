@@ -58,7 +58,7 @@ class AuthTokenStructureTest extends AbstractTestWithValidator {
     @Test
     void whenTokenTooLong_thenParsingFails() {
         assertThatThrownBy(() -> validator
-            .parse(new String(new char[10001])))
+            .parse(new String(new char[65537])))
             .isInstanceOf(AuthTokenParseException.class)
             .hasMessage("Auth token is too long");
     }

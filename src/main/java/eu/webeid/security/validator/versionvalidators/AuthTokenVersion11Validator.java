@@ -26,9 +26,11 @@ import eu.webeid.security.authtoken.SupportedSignatureAlgorithm;
 import eu.webeid.security.authtoken.UnverifiedSigningCertificate;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.certificate.CertificateLoader;
+import eu.webeid.security.certificate.CertificateValidator;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.AuthTokenParseException;
-import eu.webeid.security.exceptions.CertificateDecodingException;
+import eu.webeid.security.util.DateAndTime;
+import eu.webeid.security.util.Strings;
 import eu.webeid.security.validator.AuthTokenSignatureValidator;
 import eu.webeid.security.validator.AuthTokenValidationConfiguration;
 import eu.webeid.security.validator.certvalidators.SubjectCertificateValidatorBatch;
@@ -41,17 +43,11 @@ import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
 
 import javax.security.auth.x500.X500Principal;
-import java.security.cert.CertPath;
-import java.security.cert.CertPathValidator;
 import java.security.cert.CertStore;
-import java.security.cert.CertificateExpiredException;
-import java.security.cert.CertificateFactory;
-import java.security.cert.CertificateNotYetValidException;
-import java.security.cert.PKIXParameters;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -68,9 +64,6 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
         "SHA3-224", "SHA3-256", "SHA3-384", "SHA3-512"
     );
     private static final int KEY_USAGE_NON_REPUDIATION = 1;
-
-    private final Set<TrustAnchor> trustedCACertificateAnchors;
-    private final CertStore trustedCACertificateCertStore;
 
     public AuthTokenVersion11Validator(
         SubjectCertificateValidatorBatch simpleSubjectCertificateValidators,
@@ -90,8 +83,6 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
             ocspClient,
             ocspServiceProvider
         );
-        this.trustedCACertificateAnchors = trustedCACertificateAnchors;
-        this.trustedCACertificateCertStore = trustedCACertificateCertStore;
     }
 
     @Override
@@ -101,16 +92,16 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
 
     @Override
     public X509Certificate validate(WebEidAuthToken token, String currentChallengeNonce) throws AuthTokenException {
-        final X509Certificate subjectCertificate = validateV1(token, currentChallengeNonce);
-        final List<X509Certificate> signingCertificates = validateSigningCertificates(token);
-        for (X509Certificate signingCertificate : signingCertificates) {
-            validateSameSubject(subjectCertificate, signingCertificate);
-            validateSameIssuer(subjectCertificate, signingCertificate);
-            validateSigningCertificateValidity(signingCertificate);
-            validateKeyUsage(signingCertificate);
-            validateSigningCertificateChain(signingCertificate);
+        validateUnverifiedIntermediateCertificates(token.getUnverifiedIntermediateCertificates(), "unverifiedIntermediateCertificates");
+        List<X509Certificate> intermediateCertificates = CertificateLoader.decodeCertificatesFromBase64(token.getUnverifiedIntermediateCertificates());
+        final X509Certificate subjectCertificate = validateV1(token, currentChallengeNonce, intermediateCertificates);
+        for (final UnverifiedSigningCertificate signingCertificate : validateSigningCertificates(token)) {
+            final X509Certificate certificate = CertificateLoader.decodeCertificateFromBase64(signingCertificate.getCertificate());
+            validateSameSubject(subjectCertificate, certificate);
+            validateSameIssuer(subjectCertificate, certificate);
+            validateKeyUsage(certificate);
+            validateSigningCertificateChain(certificate, CertificateLoader.decodeCertificatesFromBase64(signingCertificate.getIntermediateCertificates()));
         }
-
         return subjectCertificate;
     }
 
@@ -136,24 +127,38 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
         }
     }
 
-    private static List<X509Certificate> validateSigningCertificates(WebEidAuthToken token) throws AuthTokenParseException, CertificateDecodingException {
-        List<UnverifiedSigningCertificate> signingCertificates = token.getUnverifiedSigningCertificates();
+    private static List<UnverifiedSigningCertificate> validateSigningCertificates(WebEidAuthToken token) throws AuthTokenParseException {
+        final List<UnverifiedSigningCertificate> signingCertificates = token.getUnverifiedSigningCertificates();
+        final List<String> intermediateCertificates = token.getUnverifiedIntermediateCertificates();
 
+        // When the authentication certificate's intermediate certificates are present, signing certificates are optional.
+        if (signingCertificates == null && intermediateCertificates != null && !intermediateCertificates.isEmpty()) {
+            return List.of();
+        }
         if (signingCertificates == null || signingCertificates.isEmpty()) {
             throw new AuthTokenParseException("'unverifiedSigningCertificates' field is missing, null or empty for format 'web-eid:1.1'");
         }
 
-        List<X509Certificate> result = new ArrayList<>();
-
-        for (UnverifiedSigningCertificate certificate : signingCertificates) {
+        for (final UnverifiedSigningCertificate certificate : signingCertificates) {
             if (certificate == null || isNullOrEmpty(certificate.getCertificate())) {
-                throw new AuthTokenParseException("'unverifiedSigningCertificates' contains a null or empty entry for format 'web-eid:1.1'");
+                throw new AuthTokenParseException("'unverifiedSigningCertificates' must not contain null or empty entries for format 'web-eid:1.1'");
             }
             validateSupportedSignatureAlgorithms(certificate);
-            result.add(CertificateLoader.decodeCertificateFromBase64(certificate.getCertificate()));
+            validateUnverifiedIntermediateCertificates(certificate.getIntermediateCertificates(), "intermediateCertificates");
         }
+        return signingCertificates;
+    }
 
-        return result;
+    private static void validateUnverifiedIntermediateCertificates(List<String> intermediateCertificates, String fieldName) throws AuthTokenParseException {
+        if (intermediateCertificates == null) {
+            return;
+        }
+        if (intermediateCertificates.isEmpty()) {
+            throw new AuthTokenParseException("'" + fieldName + "' must not be empty for format 'web-eid:1.1'");
+        }
+        if (intermediateCertificates.stream().anyMatch(Strings::isNullOrEmpty)) {
+            throw new AuthTokenParseException("'" + fieldName + "' must not contain null or empty entries for format 'web-eid:1.1'");
+        }
     }
 
     private static void validateSameSubject(X509Certificate subjectCertificate, X509Certificate signingCertificate)
@@ -178,38 +183,27 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
         }
     }
 
-    private static void validateSigningCertificateValidity(X509Certificate signingCertificate)
-            throws AuthTokenParseException {
-        try {
-            signingCertificate.checkValidity();
-        } catch (CertificateExpiredException | CertificateNotYetValidException e) {
-            throw new AuthTokenParseException("Signing certificate is not valid: " + e.getMessage(), e);
-        }
-    }
-
-    private static void validateKeyUsage(X509Certificate signingCertificate)
-            throws AuthTokenParseException {
+    private static void validateKeyUsage(X509Certificate signingCertificate) throws AuthTokenParseException {
         boolean[] keyUsage = signingCertificate.getKeyUsage();
         if (keyUsage == null || keyUsage.length <= KEY_USAGE_NON_REPUDIATION || !keyUsage[KEY_USAGE_NON_REPUDIATION]) {
             throw new AuthTokenParseException("Signing certificate key usage extension missing or does not contain non-repudiation bit required for digital signatures");
         }
     }
 
-    private void validateSigningCertificateChain(X509Certificate signingCertificate)
-            throws AuthTokenParseException {
+    private void validateSigningCertificateChain(X509Certificate signingCertificate, List<X509Certificate> intermediateCertificates)
+        throws AuthTokenException {
+        // Use the clock instance so that the date can be mocked in tests.
+        final Date now = DateAndTime.DefaultClock.getInstance().now();
         try {
-            CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
-
-            CertPath certPath = certificateFactory.generateCertPath(List.of(signingCertificate));
-
-            PKIXParameters parameters = new PKIXParameters(trustedCACertificateAnchors);
-            parameters.addCertStore(trustedCACertificateCertStore);
-            parameters.setRevocationEnabled(false);
-
-            CertPathValidator validator = CertPathValidator.getInstance("PKIX");
-            validator.validate(certPath, parameters);
+            CertificateValidator.validateIsSignedByTrustedCA(
+                signingCertificate,
+                getTrustedCACertificateAnchors(),
+                getTrustedCACertificateCertStore(),
+                intermediateCertificates,
+                now
+            );
         } catch (Exception e) {
-            throw new AuthTokenParseException("Signing certificate chain validation failed", e);
+            throw new AuthTokenParseException("Signing certificate validation failed", e);
         }
     }
 
@@ -235,7 +229,7 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
         }
     }
 
-    protected X509Certificate validateV1(WebEidAuthToken token, String currentChallengeNonce) throws AuthTokenException {
-        return super.validate(token, currentChallengeNonce);
+    protected X509Certificate validateV1(WebEidAuthToken token, String currentChallengeNonce, List<X509Certificate> intermediateCertificates) throws AuthTokenException {
+        return super.validate(token, currentChallengeNonce, intermediateCertificates);
     }
 }

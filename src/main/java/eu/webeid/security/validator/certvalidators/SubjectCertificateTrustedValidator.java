@@ -35,6 +35,7 @@ import java.security.cert.CertStore;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
 import java.util.Date;
+import java.util.List;
 import java.util.Set;
 
 public final class SubjectCertificateTrustedValidator {
@@ -43,11 +44,17 @@ public final class SubjectCertificateTrustedValidator {
 
     private final Set<TrustAnchor> trustedCACertificateAnchors;
     private final CertStore trustedCACertificateCertStore;
+    private final List<X509Certificate> additionalIntermediateCertificates;
     private X509Certificate subjectCertificateIssuerCertificate;
 
     public SubjectCertificateTrustedValidator(Set<TrustAnchor> trustedCACertificateAnchors, CertStore trustedCACertificateCertStore) {
+        this(trustedCACertificateAnchors, trustedCACertificateCertStore, List.of());
+    }
+
+    public SubjectCertificateTrustedValidator(Set<TrustAnchor> trustedCACertificateAnchors, CertStore trustedCACertificateCertStore, List<X509Certificate> additionalIntermediateCertificates) {
         this.trustedCACertificateAnchors = trustedCACertificateAnchors;
         this.trustedCACertificateCertStore = trustedCACertificateCertStore;
+        this.additionalIntermediateCertificates = additionalIntermediateCertificates;
     }
 
     /**
@@ -67,6 +74,7 @@ public final class SubjectCertificateTrustedValidator {
             subjectCertificate,
             trustedCACertificateAnchors,
             trustedCACertificateCertStore,
+            additionalIntermediateCertificates,
             now
         );
         LOG.debug("Subject certificate is valid and signed by a trusted CA");
@@ -74,5 +82,9 @@ public final class SubjectCertificateTrustedValidator {
 
     public X509Certificate getSubjectCertificateIssuerCertificate() {
         return subjectCertificateIssuerCertificate;
+    }
+
+    public List<X509Certificate> getAdditionalIntermediateCertificates() {
+        return additionalIntermediateCertificates;
     }
 }

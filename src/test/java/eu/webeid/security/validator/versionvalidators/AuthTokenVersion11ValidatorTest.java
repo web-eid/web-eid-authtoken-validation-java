@@ -23,9 +23,9 @@
 package eu.webeid.security.validator.versionvalidators;
 
 import eu.webeid.security.authtoken.SupportedSignatureAlgorithm;
+import eu.webeid.security.authtoken.UnverifiedSigningCertificate;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.certificate.CertificateLoader;
-import eu.webeid.security.authtoken.UnverifiedSigningCertificate;
 import eu.webeid.security.exceptions.AuthTokenParseException;
 import eu.webeid.security.validator.AuthTokenSignatureValidator;
 import eu.webeid.security.validator.AuthTokenValidationConfiguration;
@@ -49,6 +49,7 @@ import java.util.Collections;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
@@ -99,9 +100,10 @@ class AuthTokenVersion11ValidatorTest {
         WebEidAuthToken token = mock(WebEidAuthToken.class);
         when(token.getFormat()).thenReturn("web-eid:1.1");
         when(token.getUnverifiedSigningCertificates()).thenReturn(null);
+        when(token.getUnverifiedIntermediateCertificates()).thenReturn(null);
 
         AuthTokenVersion11Validator spyValidator = Mockito.spy(validator);
-        doReturn(mock(X509Certificate.class)).when(spyValidator).validateV1(any(), any());
+        doReturn(mock(X509Certificate.class)).when(spyValidator).validateV1(any(), any(), any());
 
         assertThatThrownBy(() -> spyValidator.validate(token, "nonce"))
             .isInstanceOf(AuthTokenParseException.class)
@@ -113,13 +115,14 @@ class AuthTokenVersion11ValidatorTest {
         WebEidAuthToken token = mock(WebEidAuthToken.class);
         when(token.getFormat()).thenReturn("web-eid:1.1");
         when(token.getUnverifiedSigningCertificates()).thenReturn(Collections.singletonList(null));
+        when(token.getUnverifiedIntermediateCertificates()).thenReturn(null);
 
         AuthTokenVersion11Validator spyValidator = Mockito.spy(validator);
-        doReturn(mock(X509Certificate.class)).when(spyValidator).validateV1(any(), any());
+        doReturn(mock(X509Certificate.class)).when(spyValidator).validateV1(any(), any(), any());
 
         assertThatThrownBy(() -> spyValidator.validate(token, "nonce"))
             .isInstanceOf(AuthTokenParseException.class)
-            .hasMessage("'unverifiedSigningCertificates' contains a null or empty entry for format 'web-eid:1.1'");
+            .hasMessage("'unverifiedSigningCertificates' must not contain null or empty entries for format 'web-eid:1.1'");
     }
 
     @Test
@@ -127,19 +130,21 @@ class AuthTokenVersion11ValidatorTest {
         WebEidAuthToken token = mock(WebEidAuthToken.class);
         when(token.getFormat()).thenReturn("web-eid:1.1");
         when(token.getUnverifiedSigningCertificates()).thenReturn(Collections.singletonList(new UnverifiedSigningCertificate()));
+        when(token.getUnverifiedIntermediateCertificates()).thenReturn(null);
 
         AuthTokenVersion11Validator spyValidator = Mockito.spy(validator);
-        doReturn(mock(X509Certificate.class)).when(spyValidator).validateV1(any(), any());
+        doReturn(mock(X509Certificate.class)).when(spyValidator).validateV1(any(), any(), any());
 
         assertThatThrownBy(() -> spyValidator.validate(token, "nonce"))
             .isInstanceOf(AuthTokenParseException.class)
-            .hasMessage("'unverifiedSigningCertificates' contains a null or empty entry for format 'web-eid:1.1'");
+            .hasMessage("'unverifiedSigningCertificates' must not contain null or empty entries for format 'web-eid:1.1'");
     }
 
     @Test
     void whenSupportedSignatureAlgorithmsMissing_thenValidationFails() throws Exception {
         WebEidAuthToken token = mock(WebEidAuthToken.class);
         when(token.getFormat()).thenReturn("web-eid:1.1");
+        when(token.getUnverifiedIntermediateCertificates()).thenReturn(null);
 
         UnverifiedSigningCertificate certificate = new UnverifiedSigningCertificate();
         certificate.setCertificate("abc");
@@ -148,7 +153,7 @@ class AuthTokenVersion11ValidatorTest {
         when(token.getUnverifiedSigningCertificates()).thenReturn(Collections.singletonList(certificate));
 
         AuthTokenVersion11Validator spyValidator = Mockito.spy(validator);
-        doReturn(mock(X509Certificate.class)).when(spyValidator).validateV1(any(), any());
+        doReturn(mock(X509Certificate.class)).when(spyValidator).validateV1(any(), any(), any());
 
         try (MockedStatic<CertificateLoader> mocked = mockStatic(CertificateLoader.class)) {
             mocked.when(() -> CertificateLoader.decodeCertificateFromBase64("abc"))
@@ -164,6 +169,7 @@ class AuthTokenVersion11ValidatorTest {
     void whenSigningCertificateChainValidationFails_thenValidationFails() throws Exception {
         WebEidAuthToken token = mock(WebEidAuthToken.class);
         when(token.getFormat()).thenReturn("web-eid:1.1");
+        when(token.getUnverifiedIntermediateCertificates()).thenReturn(null);
 
         SupportedSignatureAlgorithm algorithm = new SupportedSignatureAlgorithm();
         algorithm.setCryptoAlgorithm("RSA");
@@ -177,7 +183,7 @@ class AuthTokenVersion11ValidatorTest {
         when(token.getUnverifiedSigningCertificates()).thenReturn(Collections.singletonList(certificate));
 
         X500Principal subject = new X500Principal("CN=TEST");
-        byte[] authorityKeyIdentifier = new byte[] {
+        byte[] authorityKeyIdentifier = new byte[]{
             0x04, 0x18, 0x30, 0x16, (byte) 0x80, 0x14,
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
             11, 12, 13, 14, 15, 16, 17, 18, 19, 20
@@ -192,10 +198,10 @@ class AuthTokenVersion11ValidatorTest {
         when(signingCertificate.getSubjectX500Principal()).thenReturn(subject);
         when(signingCertificate.getExtensionValue(Extension.authorityKeyIdentifier.getId()))
             .thenReturn(authorityKeyIdentifier);
-        when(signingCertificate.getKeyUsage()).thenReturn(new boolean[] {false, true});
+        when(signingCertificate.getKeyUsage()).thenReturn(new boolean[]{false, true});
 
         AuthTokenVersion11Validator spyValidator = Mockito.spy(validator);
-        doReturn(subjectCertificate).when(spyValidator).validateV1(any(), any());
+        doReturn(subjectCertificate).when(spyValidator).validateV1(any(), any(), any());
 
         try (MockedStatic<CertificateLoader> mocked = mockStatic(CertificateLoader.class)) {
             mocked.when(() -> CertificateLoader.decodeCertificateFromBase64("abc"))
@@ -203,7 +209,104 @@ class AuthTokenVersion11ValidatorTest {
 
             assertThatThrownBy(() -> spyValidator.validate(token, "nonce"))
                 .isInstanceOf(AuthTokenParseException.class)
-                .hasMessage("Signing certificate chain validation failed");
+                .hasMessage("Signing certificate validation failed");
         }
+    }
+
+    @Test
+    void whenUnverifiedSigningCertificatesMissingButIntermediateCertificatesPresent_thenValidationSucceeds() throws Exception {
+        WebEidAuthToken token = mock(WebEidAuthToken.class);
+        when(token.getFormat()).thenReturn("web-eid:1.1");
+        when(token.getUnverifiedSigningCertificates()).thenReturn(null);
+        when(token.getUnverifiedIntermediateCertificates()).thenReturn(Collections.singletonList("intermediate"));
+
+        AuthTokenVersion11Validator spyValidator = Mockito.spy(validator);
+        doReturn(mock(X509Certificate.class)).when(spyValidator).validateV1(any(), any(), any());
+
+        try (MockedStatic<CertificateLoader> mocked = mockStatic(CertificateLoader.class)) {
+            mocked.when(() -> CertificateLoader.decodeCertificatesFromBase64(Collections.singletonList("intermediate")))
+                .thenReturn(Collections.emptyList());
+
+            assertThatCode(() -> spyValidator.validate(token, "nonce"))
+                .doesNotThrowAnyException();
+        }
+    }
+
+    @Test
+    void whenUnverifiedSigningCertificatesEmpty_thenValidationFails() throws Exception {
+        WebEidAuthToken token = mock(WebEidAuthToken.class);
+        when(token.getFormat()).thenReturn("web-eid:1.1");
+        when(token.getUnverifiedSigningCertificates()).thenReturn(Collections.emptyList());
+        when(token.getUnverifiedIntermediateCertificates()).thenReturn(Collections.singletonList("intermediate"));
+
+        AuthTokenVersion11Validator spyValidator = Mockito.spy(validator);
+        doReturn(mock(X509Certificate.class)).when(spyValidator).validateV1(any(), any(), any());
+
+        try (MockedStatic<CertificateLoader> mocked = mockStatic(CertificateLoader.class)) {
+            mocked.when(() -> CertificateLoader.decodeCertificatesFromBase64(Collections.singletonList("intermediate")))
+                .thenReturn(Collections.emptyList());
+
+            assertThatThrownBy(() -> spyValidator.validate(token, "nonce"))
+                .isInstanceOf(AuthTokenParseException.class)
+                .hasMessage("'unverifiedSigningCertificates' field is missing, null or empty for format 'web-eid:1.1'");
+        }
+    }
+
+    @Test
+    void whenSigningCertificateIntermediateCertificatesEmpty_thenValidationFails() throws Exception {
+        WebEidAuthToken token = mock(WebEidAuthToken.class);
+        when(token.getFormat()).thenReturn("web-eid:1.1");
+        when(token.getUnverifiedIntermediateCertificates()).thenReturn(null);
+
+        UnverifiedSigningCertificate certificate = new UnverifiedSigningCertificate();
+        certificate.setCertificate("abc");
+        certificate.setSupportedSignatureAlgorithms(Collections.singletonList(validSignatureAlgorithm()));
+        certificate.setIntermediateCertificates(Collections.emptyList());
+        when(token.getUnverifiedSigningCertificates()).thenReturn(Collections.singletonList(certificate));
+
+        AuthTokenVersion11Validator spyValidator = Mockito.spy(validator);
+        doReturn(mock(X509Certificate.class)).when(spyValidator).validateV1(any(), any(), any());
+
+        try (MockedStatic<CertificateLoader> mocked = mockStatic(CertificateLoader.class)) {
+            mocked.when(() -> CertificateLoader.decodeCertificateFromBase64("abc"))
+                .thenReturn(mock(X509Certificate.class));
+
+            assertThatThrownBy(() -> spyValidator.validate(token, "nonce"))
+                .isInstanceOf(AuthTokenParseException.class)
+                .hasMessage("'intermediateCertificates' must not be empty for format 'web-eid:1.1'");
+        }
+    }
+
+    @Test
+    void whenSigningCertificateIntermediateCertificatesContainsEmptyEntry_thenValidationFails() throws Exception {
+        WebEidAuthToken token = mock(WebEidAuthToken.class);
+        when(token.getFormat()).thenReturn("web-eid:1.1");
+        when(token.getUnverifiedIntermediateCertificates()).thenReturn(null);
+
+        UnverifiedSigningCertificate certificate = new UnverifiedSigningCertificate();
+        certificate.setCertificate("abc");
+        certificate.setSupportedSignatureAlgorithms(Collections.singletonList(validSignatureAlgorithm()));
+        certificate.setIntermediateCertificates(Collections.singletonList(""));
+        when(token.getUnverifiedSigningCertificates()).thenReturn(Collections.singletonList(certificate));
+
+        AuthTokenVersion11Validator spyValidator = Mockito.spy(validator);
+        doReturn(mock(X509Certificate.class)).when(spyValidator).validateV1(any(), any(), any());
+
+        try (MockedStatic<CertificateLoader> mocked = mockStatic(CertificateLoader.class)) {
+            mocked.when(() -> CertificateLoader.decodeCertificateFromBase64("abc"))
+                .thenReturn(mock(X509Certificate.class));
+
+            assertThatThrownBy(() -> spyValidator.validate(token, "nonce"))
+                .isInstanceOf(AuthTokenParseException.class)
+                .hasMessage("'intermediateCertificates' must not contain null or empty entries for format 'web-eid:1.1'");
+        }
+    }
+
+    private static SupportedSignatureAlgorithm validSignatureAlgorithm() {
+        SupportedSignatureAlgorithm algorithm = new SupportedSignatureAlgorithm();
+        algorithm.setCryptoAlgorithm("RSA");
+        algorithm.setHashFunction("SHA-256");
+        algorithm.setPaddingScheme("PKCS1.5");
+        return algorithm;
     }
 }

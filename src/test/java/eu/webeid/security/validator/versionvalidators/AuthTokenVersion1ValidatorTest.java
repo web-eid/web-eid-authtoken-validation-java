@@ -22,8 +22,8 @@
 
 package eu.webeid.security.validator.versionvalidators;
 
-import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.authtoken.UnverifiedSigningCertificate;
+import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.exceptions.AuthTokenParseException;
 import eu.webeid.security.validator.AuthTokenSignatureValidator;
 import eu.webeid.security.validator.AuthTokenValidationConfiguration;
@@ -78,6 +78,7 @@ class AuthTokenVersion1ValidatorTest {
         WebEidAuthToken token = mock(WebEidAuthToken.class);
         when(token.getFormat()).thenReturn("web-eid:1");
         when(token.getUnverifiedSigningCertificates()).thenReturn(null);
+        when(token.getUnverifiedIntermediateCertificates()).thenReturn(null);
         when(token.getUnverifiedCertificate()).thenReturn(null);
 
         assertThatThrownBy(() -> validator.validate(token, "nonce"))
@@ -94,5 +95,17 @@ class AuthTokenVersion1ValidatorTest {
         assertThatThrownBy(() -> validator.validate(token, "nonce"))
             .isInstanceOf(AuthTokenParseException.class)
             .hasMessageContaining("'unverifiedSigningCertificates' field is not allowed for format 'web-eid:1'");
+    }
+
+    @Test
+    void whenUnverifiedIntermediateCertificatesPresentForV1_thenValidationFails() {
+        WebEidAuthToken token = mock(WebEidAuthToken.class);
+        when(token.getFormat()).thenReturn("web-eid:1");
+        when(token.getUnverifiedSigningCertificates()).thenReturn(null);
+        when(token.getUnverifiedIntermediateCertificates()).thenReturn(List.of("intermediate"));
+
+        assertThatThrownBy(() -> validator.validate(token, "nonce"))
+            .isInstanceOf(AuthTokenParseException.class)
+            .hasMessageContaining("'unverifiedIntermediateCertificates' field is not allowed for format 'web-eid:1'");
     }
 }
