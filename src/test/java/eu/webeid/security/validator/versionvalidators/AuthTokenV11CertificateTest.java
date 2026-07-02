@@ -31,6 +31,8 @@ import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.certificate.CertificateLoader;
 import eu.webeid.security.exceptions.AuthTokenParseException;
 import eu.webeid.security.exceptions.CertificateDecodingException;
+import eu.webeid.security.exceptions.CertificateExpiredException;
+import eu.webeid.security.exceptions.CertificateNotYetValidException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
 import eu.webeid.security.util.DateAndTime;
 import eu.webeid.security.validator.AuthTokenSignatureValidator;
@@ -284,6 +286,62 @@ class AuthTokenV11CertificateTest extends AbstractTestWithValidator {
 
         assertThatThrownBy(() -> validator.validate(validV11AuthToken, VALID_CHALLENGE_NONCE))
             .isInstanceOf(CertificateDecodingException.class);
+    }
+
+    @Test
+    void whenUnverifiedSigningCertificatesAbsentButUnverifiedIntermediateCertificatesPresent_thenValidationSucceeds() throws Exception {
+        mockDate("2023-10-01", mockedClock);
+
+        validV11AuthToken.setUnverifiedSigningCertificates(null);
+        validV11AuthToken.setUnverifiedIntermediateCertificates(Arrays.asList(esteid2018CaCertificateInBase64()));
+
+        assertThatCode(() -> validator.validate(validV11AuthToken, VALID_CHALLENGE_NONCE))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenValidV11TokenWithSigningIntermediateCertificates_thenValidationSucceeds() throws Exception {
+        mockDate("2023-10-01", mockedClock);
+
+        validV11AuthToken.getUnverifiedSigningCertificates().get(0)
+            .setIntermediateCertificates(Arrays.asList(esteid2018CaCertificateInBase64()));
+
+        assertThatCode(() -> validator.validate(validV11AuthToken, VALID_CHALLENGE_NONCE))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenV11SigningCertificateExpired_thenValidationFails() throws Exception {
+        // Move the clock past the signing certificate's validity window so that
+        // CertificateValidator.validateIsSignedByTrustedCA() rejects it as expired.
+        mockDate("2099-01-01", mockedClock);
+        AuthTokenVersion11Validator spyValidator = spyAuthTokenVersion11Validator();
+        X509Certificate realSubjectCert = CertificateLoader.decodeCertificateFromBase64(validV11AuthToken.getUnverifiedCertificate());
+        doReturn(realSubjectCert).when(spyValidator).validateV1(any(), any());
+
+        assertThatThrownBy(() -> spyValidator.validate(validV11AuthToken, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(AuthTokenParseException.class)
+            .hasMessage("Signing certificate chain validation failed")
+            .cause()
+            .isInstanceOf(CertificateExpiredException.class)
+            .hasMessage("Signing certificate has expired");
+    }
+
+    @Test
+    void whenV11SigningCertificateNotYetValid_thenValidationFails() throws Exception {
+        // Move the clock before the signing certificate's validity window so that
+        // CertificateValidator.validateIsSignedByTrustedCA() rejects it as not yet valid.
+        mockDate("2000-01-01", mockedClock);
+        AuthTokenVersion11Validator spyValidator = spyAuthTokenVersion11Validator();
+        X509Certificate realSubjectCert = CertificateLoader.decodeCertificateFromBase64(validV11AuthToken.getUnverifiedCertificate());
+        doReturn(realSubjectCert).when(spyValidator).validateV1(any(), any());
+
+        assertThatThrownBy(() -> spyValidator.validate(validV11AuthToken, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(AuthTokenParseException.class)
+            .hasMessage("Signing certificate chain validation failed")
+            .cause()
+            .isInstanceOf(CertificateNotYetValidException.class)
+            .hasMessage("Signing certificate is not yet valid");
     }
 
     private static String esteid2018CaCertificateInBase64() throws Exception {
