@@ -26,9 +26,10 @@ import eu.webeid.security.authtoken.SupportedSignatureAlgorithm;
 import eu.webeid.security.authtoken.UnverifiedSigningCertificate;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.certificate.CertificateLoader;
+import eu.webeid.security.certificate.CertificateValidator;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.AuthTokenParseException;
-import eu.webeid.security.exceptions.CertificateDecodingException;
+import eu.webeid.security.util.DateAndTime;
 import eu.webeid.security.validator.AuthTokenSignatureValidator;
 import eu.webeid.security.validator.AuthTokenValidationConfiguration;
 import eu.webeid.security.validator.certvalidators.SubjectCertificateValidatorBatch;
@@ -41,17 +42,11 @@ import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
 
 import javax.security.auth.x500.X500Principal;
-import java.security.cert.CertPath;
-import java.security.cert.CertPathValidator;
 import java.security.cert.CertStore;
-import java.security.cert.CertificateExpiredException;
-import java.security.cert.CertificateFactory;
-import java.security.cert.CertificateNotYetValidException;
-import java.security.cert.PKIXParameters;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
@@ -101,13 +96,14 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
     @Override
     public X509Certificate validate(WebEidAuthToken token, String currentChallengeNonce) throws AuthTokenException {
         final X509Certificate subjectCertificate = validateV1(token, currentChallengeNonce);
-        final List<X509Certificate> signingCertificates = validateSigningCertificates(token);
-        for (X509Certificate signingCertificate : signingCertificates) {
+        for (final UnverifiedSigningCertificate unverifiedSigningCertificate : validateSigningCertificates(token)) {
+            final X509Certificate signingCertificate =
+                CertificateLoader.decodeCertificateFromBase64(unverifiedSigningCertificate.getCertificate());
             validateSameSubject(subjectCertificate, signingCertificate);
             validateSameIssuer(subjectCertificate, signingCertificate);
-            validateSigningCertificateValidity(signingCertificate);
             validateKeyUsage(signingCertificate);
-            validateSigningCertificateChain(signingCertificate);
+            validateSigningCertificateChain(signingCertificate,
+                CertificateLoader.decodeCertificatesFromBase64(unverifiedSigningCertificate.getIntermediateCertificates()));
         }
 
         return subjectCertificate;
@@ -135,24 +131,29 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
         }
     }
 
-    private static List<X509Certificate> validateSigningCertificates(WebEidAuthToken token) throws AuthTokenParseException, CertificateDecodingException {
+    private static List<UnverifiedSigningCertificate> validateSigningCertificates(WebEidAuthToken token) throws AuthTokenParseException {
         List<UnverifiedSigningCertificate> signingCertificates = token.getUnverifiedSigningCertificates();
+        List<String> intermediateCertificates = token.getUnverifiedIntermediateCertificates();
 
+        // When the authentication certificate's intermediate certificates are present, signing certificates
+        // are optional.
+        if (signingCertificates == null && intermediateCertificates != null && !intermediateCertificates.isEmpty()) {
+            return List.of();
+        }
         if (signingCertificates == null || signingCertificates.isEmpty()) {
             throw new AuthTokenParseException("'unverifiedSigningCertificates' field is missing, null or empty for format '" + token.getFormat() + "'");
         }
-
-        List<X509Certificate> result = new ArrayList<>();
 
         for (UnverifiedSigningCertificate certificate : signingCertificates) {
             if (certificate == null || isNullOrEmpty(certificate.getCertificate())) {
                 throw new AuthTokenParseException("'unverifiedSigningCertificates' contains a null or empty entry for format '" + token.getFormat() + "'");
             }
             validateSupportedSignatureAlgorithms(certificate);
-            result.add(CertificateLoader.decodeCertificateFromBase64(certificate.getCertificate()));
+            validateIntermediateCertificatesField(certificate.getIntermediateCertificates(),
+                "intermediateCertificates", token.getFormat());
         }
 
-        return result;
+        return signingCertificates;
     }
 
     private static void validateSameSubject(X509Certificate subjectCertificate, X509Certificate signingCertificate)
@@ -177,15 +178,6 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
         }
     }
 
-    private static void validateSigningCertificateValidity(X509Certificate signingCertificate)
-            throws AuthTokenParseException {
-        try {
-            signingCertificate.checkValidity();
-        } catch (CertificateExpiredException | CertificateNotYetValidException e) {
-            throw new AuthTokenParseException("Signing certificate is not valid: " + e.getMessage(), e);
-        }
-    }
-
     private static void validateKeyUsage(X509Certificate signingCertificate)
             throws AuthTokenParseException {
         boolean[] keyUsage = signingCertificate.getKeyUsage();
@@ -194,19 +186,23 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
         }
     }
 
-    private void validateSigningCertificateChain(X509Certificate signingCertificate)
+    private void validateSigningCertificateChain(X509Certificate signingCertificate, List<X509Certificate> intermediateCertificates)
             throws AuthTokenParseException {
+        // Use the clock instance so that the date can be mocked in tests.
+        final Date now = DateAndTime.DefaultClock.getInstance().now();
         try {
-            CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
-
-            CertPath certPath = certificateFactory.generateCertPath(List.of(signingCertificate));
-
-            PKIXParameters parameters = new PKIXParameters(trustedCACertificateAnchors);
-            parameters.addCertStore(trustedCACertificateCertStore);
-            parameters.setRevocationEnabled(false);
-
-            CertPathValidator validator = CertPathValidator.getInstance("PKIX");
-            validator.validate(certPath, parameters);
+            // The signing certificate itself deliberately gets no revocation check during authentication: its
+            // revocation status matters at signing time and is the signature validation service's concern.
+            // Token-supplied intermediate certificates in its path are checked for revocation.
+            CertificateValidator.validateIsSignedByTrustedCA(
+                signingCertificate,
+                "Signing",
+                trustedCACertificateAnchors,
+                trustedCACertificateCertStore,
+                intermediateCertificates,
+                CertificateValidator.IntermediateRevocationCheck.ENABLED,
+                now
+            );
         } catch (Exception e) {
             throw new AuthTokenParseException("Signing certificate chain validation failed", e);
         }

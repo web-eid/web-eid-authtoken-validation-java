@@ -63,7 +63,8 @@ public final class AuthTokenVersionValidatorFactory {
         // Copy the configuration object to make AuthTokenVersionValidatorFactory immutable and thread-safe.
         final AuthTokenValidationConfiguration validationConfig = configuration.copy();
 
-        // Create and cache trusted CA certificate JCA objects for SubjectCertificateTrustedValidator and AiaOcspService.
+        // Create and cache trusted CA certificate JCA objects for SubjectCertificateTrustedValidator,
+        // AiaOcspService and the signing certificate chain validation in AuthTokenVersion11Validator.
         final Set<TrustAnchor> trustedCACertificateAnchors = CertificateValidator.buildTrustAnchorsFromCertificates(validationConfig.getTrustedCACertificates());
         final CertStore trustedCACertificateCertStore = CertificateValidator.buildCertStoreFromCertificates(validationConfig.getTrustedCACertificates());
 
