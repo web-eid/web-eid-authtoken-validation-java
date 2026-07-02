@@ -108,6 +108,26 @@ public final class AuthTokenValidators {
             );
     }
 
+    public static AuthTokenValidator getAuthTokenValidatorForBelgianIdCardWithOcspCheck(OcspClient ocspClient) throws CertificateException, IOException, JceException {
+        return getAuthTokenValidatorBuilder(
+                "https://47f0-46-131-86-189.ngrok-free.app",
+                CertificateLoader.loadCertificatesFromResources("eID TEST EC Citizen CA.cer"))
+            // The recorded OCSP response used in tests was created without a nonce.
+            .withNonceDisabledOcspUrls(URI.create("http://eiddevcards.zetescards.be:8888"))
+            .withOcspClient(ocspClient)
+            .build();
+    }
+
+    public static AuthTokenValidator getAuthTokenValidatorForFinnishIdCardWithOcspCheck(OcspClient ocspClient) throws CertificateException, IOException, JceException {
+        return getAuthTokenValidatorBuilder(
+                "https://47f0-46-131-86-189.ngrok-free.app",
+                CertificateLoader.loadCertificatesFromResources("DVV TEST Certificates - G5E.crt", "VRK TEST CA for Test Purposes - G4.crt"))
+            // The recorded OCSP response used in tests was created without a nonce.
+            .withNonceDisabledOcspUrls(URI.create("http://ocsptest.fineid.fi/dvvtp5ec"))
+            .withOcspClient(ocspClient)
+            .build();
+    }
+
     public static AuthTokenValidatorBuilder getDefaultAuthTokenValidatorBuilder() throws CertificateException, IOException {
         return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, getCACertificates());
     }
