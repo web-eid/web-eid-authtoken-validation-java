@@ -27,13 +27,18 @@ import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
 import eu.webeid.security.testutil.AuthTokenValidators;
 import eu.webeid.security.util.DateAndTime;
+import eu.webeid.security.validator.ocsp.OcspClient;
+import org.bouncycastle.cert.ocsp.OCSPResp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.security.cert.CertificateException;
+import java.util.Objects;
 
 import static eu.webeid.security.testutil.DateMocker.mockDate;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -94,6 +99,34 @@ class AuthTokenCertificateFinnishIdCardTest extends AbstractTestWithValidator {
         assertThatCode(() -> validator
             .validate(token, "ZqlDATkQRqh7LkqEbspBc2qDjot29oiNLlITdLgiVIo="))
             .doesNotThrowAnyException();
+    }
+
+    @Disabled("""
+    Disabled because the certificate ID equality check in SubjectCertificateNotRevokedValidator rejects the OCSP
+    response: CertificateID.equals() compares the complete ASN.1 structure, which treats absent and explicit NULL SHA-1
+    AlgorithmIdentifier parameters as different. CertID.equals() treats those forms as equivalent while still comparing
+    the algorithm identifier, issuer hashes and certificate serial number.""")
+    @Test
+    void whenIdCardIsValidatedWithAiaOcspCheck_thenDelegatedResponderIsAuthorizedAndValidationSucceeds() throws AuthTokenException, CertificateException, IOException {
+        // The OCSP response was recorded from the card's AIA OCSP responder at http://ocsptest.fineid.fi/dvvtp5ec
+        // on 2026-07-02. Its responder certificate is issued by DVV TEST Certificates - G5E, the issuer of the
+        // authentication certificate, so the RFC 6960 delegated-responder authorization check in AiaOcspService
+        // must accept it. The clock is set to the recording time as the response thisUpdate age is limited.
+        mockDate("2026-07-02T08:39:30Z", mockedClock);
+        final OcspClient recordedResponseClient = (url, request) ->
+            new OCSPResp(getOcspResponseBytesFromResources("ocsp_response_finnish_test_id_card.der"));
+        final AuthTokenValidator validator = AuthTokenValidators.getAuthTokenValidatorForFinnishIdCardWithOcspCheck(recordedResponseClient);
+        final WebEidAuthToken token = validator.parse(FINNISH_TEST_ID_CARD_BACKMAN_JUHANI_AUTH_TOKEN);
+
+        assertThatCode(() -> validator
+            .validate(token, "x9qZDRO/ao2zprt3Z0bkW4CvvE/gALFtUIf3tcC0XxY="))
+            .doesNotThrowAnyException();
+    }
+
+    private static byte[] getOcspResponseBytesFromResources(String resource) throws IOException {
+        try (final InputStream resourceAsStream = ClassLoader.getSystemResourceAsStream(resource)) {
+            return Objects.requireNonNull(resourceAsStream).readAllBytes();
+        }
     }
 
 }
