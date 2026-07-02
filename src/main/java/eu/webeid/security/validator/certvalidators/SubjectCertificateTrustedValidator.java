@@ -65,6 +65,7 @@ public final class SubjectCertificateTrustedValidator {
         final Date now = DateAndTime.DefaultClock.getInstance().now();
         subjectCertificateIssuerCertificate = CertificateValidator.validateIsSignedByTrustedCA(
             subjectCertificate,
+            "User",
             trustedCACertificateAnchors,
             trustedCACertificateCertStore,
             now

@@ -22,6 +22,7 @@
 
 package eu.webeid.security.certificate;
 
+import eu.webeid.security.exceptions.CertificateExpiredException;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.Extension;
@@ -48,6 +49,7 @@ import java.util.Date;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 class CertificateValidatorTest {
 
@@ -112,6 +114,18 @@ class CertificateValidatorTest {
 
         // Single-hop chain: the direct issuer is the trust anchor itself.
         assertThat(issuer).isEqualTo(intermediateCertificateA);
+    }
+
+    @Test
+    void whenCertificateExpired_thenMessageUsesProvidedSubject() throws Exception {
+        final Set<TrustAnchor> anchors = Collections.singleton(new TrustAnchor(intermediateCertificateA, null));
+        final CertStore emptyStore = CertificateValidator.buildCertStoreFromCertificates(Collections.emptyList());
+        final Date afterExpiry = new Date(NOT_AFTER.getTime() + 86_400_000L);
+
+        assertThatExceptionOfType(CertificateExpiredException.class)
+            .isThrownBy(() -> CertificateValidator.validateIsSignedByTrustedCA(
+                leafCertificate, "Signing", anchors, emptyStore, afterExpiry))
+            .withMessage("Signing certificate has expired");
     }
 
     private static KeyPair generateKeyPair() throws Exception {
