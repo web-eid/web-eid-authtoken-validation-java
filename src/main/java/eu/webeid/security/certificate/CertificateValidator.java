@@ -30,13 +30,20 @@ import eu.webeid.security.exceptions.JceException;
 import java.security.GeneralSecurityException;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertPath;
 import java.security.cert.CertPathBuilder;
 import java.security.cert.CertPathBuilderException;
+import java.security.cert.CertPathValidator;
+import java.security.cert.CertPathValidatorException;
 import java.security.cert.CertStore;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
 import java.security.cert.CollectionCertStoreParameters;
 import java.security.cert.PKIXBuilderParameters;
 import java.security.cert.PKIXCertPathBuilderResult;
+import java.security.cert.PKIXParameters;
+import java.security.cert.PKIXRevocationChecker;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509CertSelector;
 import java.security.cert.X509Certificate;
@@ -47,6 +54,16 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 public final class CertificateValidator {
+
+    /**
+     * Selects whether the non-anchor intermediate CA certificates of the built certification path are checked
+     * for revocation. The revocation policy of the validated certificate itself is always the caller's
+     * responsibility.
+     */
+    public enum IntermediateRevocationCheck {
+        ENABLED,
+        DISABLED
+    }
 
     public static void certificateIsValidOnDate(X509Certificate cert, Date date, String subject) throws CertificateNotYetValidException, CertificateExpiredException {
         try {
@@ -62,7 +79,7 @@ public final class CertificateValidator {
                                                               Set<TrustAnchor> trustedCACertificateAnchors,
                                                               CertStore trustedCACertificateCertStore,
                                                               Date now) throws CertificateNotTrustedException, JceException, CertificateNotYetValidException, CertificateExpiredException {
-        return validateIsSignedByTrustedCA(certificate, "User", trustedCACertificateAnchors, trustedCACertificateCertStore, List.of(), now);
+        return validateIsSignedByTrustedCA(certificate, "User", trustedCACertificateAnchors, trustedCACertificateCertStore, List.of(), IntermediateRevocationCheck.DISABLED, now);
     }
 
     /**
@@ -76,6 +93,8 @@ public final class CertificateValidator {
      * @param trustedCACertificateCertStore trusted CA certificates as a certificate store
      * @param additionalIntermediateCertificates untrusted intermediate certificates offered as certification-path
      *     candidates only; the path must still terminate at one of the trust anchors
+     * @param intermediateRevocationCheck whether the non-anchor intermediate CA certificates of the built path
+     *     are checked for revocation
      * @param now validation date
      * @return the certificate that directly issued the given certificate; the trust anchor when the anchor
      *     is the direct issuer
@@ -85,6 +104,7 @@ public final class CertificateValidator {
                                                               Set<TrustAnchor> trustedCACertificateAnchors,
                                                               CertStore trustedCACertificateCertStore,
                                                               List<X509Certificate> additionalIntermediateCertificates,
+                                                              IntermediateRevocationCheck intermediateRevocationCheck,
                                                               Date now) throws CertificateNotTrustedException, JceException, CertificateNotYetValidException, CertificateExpiredException {
         certificateIsValidOnDate(certificate, now, certificateSubject);
 
@@ -106,6 +126,16 @@ public final class CertificateValidator {
             final CertPathBuilder certPathBuilder = CertPathBuilder.getInstance(CertPathBuilder.getDefaultType());
             final PKIXCertPathBuilderResult result = (PKIXCertPathBuilderResult) certPathBuilder.build(pkixBuilderParameters);
 
+            if (intermediateRevocationCheck == IntermediateRevocationCheck.ENABLED) {
+                validateIntermediateCertificatesNotRevoked(
+                    result,
+                    trustedCACertificateAnchors,
+                    trustedCACertificateCertStore,
+                    additionalIntermediateCertificates,
+                    now
+                );
+            }
+
             final X509Certificate trustedCACert = result.getTrustAnchor().getTrustedCert();
 
             // Verify that the trusted CA cert is presently valid before returning the result. The anchor is not part
@@ -119,6 +149,60 @@ public final class CertificateValidator {
         } catch (CertPathBuilderException e) {
             throw new CertificateNotTrustedException(certificate, e);
         }
+    }
+
+    /**
+     * Validates that the non-anchor intermediate CA certificates of the built certification path are not revoked.
+     */
+    private static void validateIntermediateCertificatesNotRevoked(
+        PKIXCertPathBuilderResult pathBuilderResult,
+        Set<TrustAnchor> trustedCACertificateAnchors,
+        CertStore trustedCACertificateCertStore,
+        List<X509Certificate> additionalIntermediateCertificates,
+        Date now
+    ) throws CertificateNotTrustedException, JceException {
+        final List<? extends Certificate> certificatePath = pathBuilderResult.getCertPath().getCertificates();
+        if (certificatePath.size() <= 1) {
+            return; // The leaf chains directly to a trust anchor; there is no non-anchor intermediate to validate.
+        }
+
+        // Validate only the CA suffix of the built path, excluding the leaf at index 0, whose revocation policy
+        // is role-specific and applied by the caller, and the trust anchor, which is not part of the built path.
+        final List<? extends Certificate> intermediateCertificates = certificatePath.subList(1, certificatePath.size());
+        try {
+            final CertPath intermediateCertificatePath = CertificateFactory.getInstance("X.509")
+                .generateCertPath(intermediateCertificates);
+            final PKIXParameters revocationCheckingParameters = new PKIXParameters(trustedCACertificateAnchors);
+            revocationCheckingParameters.setDate(now);
+            // An explicitly added checker is active regardless of this flag and avoids installing a second
+            // default checker.
+            revocationCheckingParameters.setRevocationEnabled(false);
+            revocationCheckingParameters.addCertStore(trustedCACertificateCertStore);
+            if (additionalIntermediateCertificates != null && !additionalIntermediateCertificates.isEmpty()) {
+                revocationCheckingParameters.addCertStore(buildCertStoreFromCertificates(additionalIntermediateCertificates));
+            }
+
+            final CertPathValidator certPathValidator = CertPathValidator.getInstance(CertPathValidator.getDefaultType());
+            final PKIXRevocationChecker revocationChecker =
+                (PKIXRevocationChecker) certPathValidator.getRevocationChecker();
+            // The default checker prefers OCSP and falls back to CRLs. SOFT_FAIL is deliberately not enabled: an
+            // intermediate whose revocation status cannot be established must not become part of a trusted path.
+            revocationCheckingParameters.addCertPathChecker(revocationChecker);
+            certPathValidator.validate(intermediateCertificatePath, revocationCheckingParameters);
+        } catch (CertPathValidatorException e) {
+            throw new CertificateNotTrustedException(getOffendingCertificate(certificatePath, e), e);
+        } catch (InvalidAlgorithmParameterException | NoSuchAlgorithmException | CertificateException e) {
+            throw new JceException(e);
+        }
+    }
+
+    /**
+     * Returns the intermediate certificate that failed the revocation check, or the leaf when the failing
+     * certificate cannot be determined.
+     */
+    private static X509Certificate getOffendingCertificate(List<? extends Certificate> certificatePath, CertPathValidatorException e) {
+        // The validated intermediate path starts at index 1 of the built certification path.
+        return (X509Certificate) (e.getIndex() >= 0 ? certificatePath.get(e.getIndex() + 1) : certificatePath.get(0));
     }
 
     /**
