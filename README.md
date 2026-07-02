@@ -314,16 +314,18 @@ It contains the following fields:
 
 The value that is signed by the user’s authentication private key and included in the `signature` field is `hash(origin)+hash(challenge)`. The hash function is used before concatenation to ensure field separation as the hash of a value is guaranteed to have a fixed length. Otherwise the origin `example.com` with challenge nonce `.eu1234` and another origin `example.com.eu` with challenge nonce `1234` would result in the same value after concatenation. The hash function `hash` is the same hash function that is used in the signature algorithm, for example SHA256 in case of RS256.
 
-A Web eID authentication token in **`web-eid:1.1`** format is a JSON data structure that looks like the following example:
+Starting from format version **`web-eid:1.1`**, the authentication token may additionally carry the intermediate CA certificates needed to build the trust chains of the certificates it contains, as well as the eID user's signing certificates. An extended token looks like the following example:
 
 ```json
 {
   "unverifiedCertificate": "MIIFozCCA4ugAwIBAgIQHFpdK-zCQsFW4...",
+  "unverifiedIntermediateCertificates": ["MIIFfhzYIBAAwIBAgIQHFHFp-AwIBFW4..."],
   "algorithm": "RS256",
   "signature": "HBjNXIaUskXbfhzYQHvwjKDUWfNu4yxXZha...",
   "unverifiedSigningCertificates": [
     {
-      "certificate": "MIIFikACB3ugAwASAgIHHFrtdZ-zeQsas1...",
+      "certificate": "MIIFoXIaUskXbfhzYIBAgIjKDUsdK-zQHFUKz...",
+      "intermediateCertificates": ["MIIFfhzYIBAAwIBAgIQHFHFp-AwIBFW4..."],
       "supportedSignatureAlgorithms": [
         {
           "cryptoAlgorithm": "ECC",
@@ -337,32 +339,21 @@ A Web eID authentication token in **`web-eid:1.1`** format is a JSON data struct
   "appVersion": "https://web-eid.eu/web-eid-app/releases/v2.0.0"
 }
 ```
-It contains the following fields:
 
-- `unverifiedSigningCertificates`: an array of objects containing signing certificate information.
+In addition to the fields described above, the `web-eid:1.1` format defines the following additional fields:
 
-Each object inside `unverifiedSigningCertificates` contains:
+- `unverifiedIntermediateCertificates`: an array of base64-encoded DER intermediate CA certificates that make up the trust chain of the authentication certificate in `unverifiedCertificate`. Like the authentication certificate, these certificates are received from the client side and cannot be trusted; they are only used as candidate certificates when building the certification path, which must still terminate at a trusted certificate authority. The field is optional, but when present it must not be empty. When it is present, `unverifiedSigningCertificates` may be omitted.
 
-- `certificate`: base64-encoded DER-encoded signing certificate,
+- `unverifiedSigningCertificates`: an array of the eID user's signing certificates, presented alongside the authentication certificate. For `web-eid:1.1` tokens this field is required unless `unverifiedIntermediateCertificates` is present, and when present it must not be empty. Each entry contains:
 
-- `supportedSignatureAlgorithms`: list of supported algorithms in the following format:
+    - `certificate`: the base64-encoded DER signing certificate. During validation it must have the same subject and issuer as the authentication certificate, be valid, contain the non-repudiation key usage bit and be signed by a trusted certificate authority.
 
-    - `cryptoAlgorithm`: the cryptographic algorithm used for the key,
+    - `intermediateCertificates`: an optional array of base64-encoded DER intermediate CA certificates that make up the trust chain of this signing certificate. When present it must not be empty and, as with `unverifiedIntermediateCertificates`, the certificates are only used as candidates when building the certification path to a trusted CA.
 
-    - `hashFunction`: the hashing algorithm used,
+    - `supportedSignatureAlgorithms`: the signature algorithms that the signing certificate's key supports. Each entry has a `cryptoAlgorithm` (`ECC` or `RSA`), a `hashFunction` (one of `SHA-224`, `SHA-256`, `SHA-384`, `SHA-512`, `SHA3-224`, `SHA3-256`, `SHA3-384`, `SHA3-512`) and a `paddingScheme` (`NONE`, `PKCS1.5` or `PSS`).
 
-    - `paddingScheme`: the padding scheme used (if applicable).
+The signature is always created with the authentication private key and verified using `unverifiedCertificate`; the signing certificates are not involved in the signature verification.
 
-
-Allowed values are:
-
-    cryptoAlgorithm: "ECC", "RSA"
-
-    hashFunction:
-      "SHA-224", "SHA-256", "SHA-384", "SHA-512",
-      "SHA3-224", "SHA3-256", "SHA3-384", "SHA3-512"
-
-    paddingScheme: "NONE", "PKCS1.5", "PSS"
 
 # Authentication token validation
 
@@ -370,12 +361,18 @@ The authentication token validation process consists of the following stages:
 
 - First, **user certificate validation**: the validator parses the token and extracts the user certificate from the *unverifiedCertificate* field. Then it checks the certificate expiration, purpose and policies. Next it checks that the certificate is signed by a trusted CA and checks the certificate status with OCSP.
 - Second, **token signature validation**: the validator validates that the token signature was created using the provided user certificate by reconstructing the signed data `hash(origin)+hash(challenge)` and using the public key from the certificate to verify the signature in the `signature` field. If the signature verification succeeds, then the origin and challenge nonce have been implicitly and correctly verified without the need to implement any additional security checks.
-- Additional validation for **Web eID authentication tokens (format v1.1)**: the token must contain the `unverifiedSigningCertificates` field with at least one signing certificate entry. Each entry's `supportedSignatureAlgorithms` are validated against the set of allowed cryptographic algorithms, hash functions, and padding schemes. For each signing certificate, the following checks are performed:
+- Additional validation for **Web eID authentication tokens (format v1.1)**: unless `unverifiedIntermediateCertificates` is present, the token must contain the `unverifiedSigningCertificates` field with at least one signing certificate entry. Each entry's `supportedSignatureAlgorithms` are validated against the set of allowed cryptographic algorithms, hash functions, and padding schemes. For each signing certificate, the following checks are performed:
     - The subject must match the subject of the authentication certificate, ensuring both certificates belong to the same user.
     - The issuing authority must match that of the authentication certificate, verified via the Authority Key Identifier (AKI) extension.
     - The certificate must be within its validity period.
     - The certificate must contain the non-repudiation key usage bit required for digital signatures.
-    - The certificate chain must validate against the configured trusted certificate authorities.
+    - The certificate chain must validate against the configured trusted certificate authorities, built through the certificate's `intermediateCertificates` when they are present.
+
+The signing certificate itself is deliberately not checked for revocation during authentication: its revocation status matters at signing time and is validated by the signature creation and validation services.
+
+When a token supplies intermediate CA certificates and a certification path is built through them, the validator checks the revocation status of the intermediate CA certificates in the path with the Java platform's revocation checker, which prefers OCSP and falls back to CRLs, and rejects the token when the status of an intermediate is revoked or cannot be established. This check runs during path validation for both the authentication and the signing certificate chains, independently of the user certificate OCSP check configuration, because token-supplied intermediates are untrusted input. Deployments that need to accept tokens with intermediate certificates must therefore allow the network access that OCSP or CRL fetching requires.
+
+When the user certificate OCSP check uses an AIA OCSP responder, the responder is authorized according to [RFC 6960 section 4.2.2.2](https://datatracker.ietf.org/doc/html/rfc6960#section-4.2.2.2): the response must be signed either by the CA that issued the user certificate, in which case the OCSP-signing extended key usage is not required, or by a responder whose certificate contains the id-kp-OCSPSigning extended key usage and chains to a trusted CA through the certificate that issued the user certificate. Responder certificates are deliberately not checked for revocation, following the id-pkix-ocsp-nocheck convention of RFC 6960 section 4.2.2.2.1 and because querying an OCSP service about its own signer would be circular.
 
 The website back end must look up the challenge nonce from its local store using an identifier specific to the browser session, to guarantee that the authentication token was received from the same browser to which the corresponding challenge nonce was issued. The website back end must guarantee that the challenge nonce lifetime is limited and that its expiration is checked, and that it can be used only once by removing it from the store during validation.
 
@@ -509,9 +506,11 @@ The Web eID authentication protocol defines two token formats currently supporte
 
 - **Format v1.0** – Used in desktop Web eID authentication flows with traditional smart card readers.
 
-- **Format v1.1** – An extended authentication token format that allows signing certificate information to be included in the authentication response.
+- **Format v1.1** – An extended authentication token format that allows signing certificate information and intermediate CA certificates to be included in the authentication response.
+  - `unverifiedIntermediateCertificates` – an optional array of intermediate CA certificates that make up the trust chain of the authentication certificate;
   - `unverifiedSigningCertificates` – an array of signing certificate entries. Each entry contains:
     - `certificate` – a base64-encoded DER-encoded signing certificate;
+    - `intermediateCertificates` – an optional array of intermediate CA certificates that make up the trust chain of the signing certificate;
     - `supportedSignatureAlgorithms` – a list of supported signature algorithms associated with that certificate;
 
 Both token formats follow the same validation principles, differing only in the structure of embedded certificates and the additional verification steps required for v1.1.
