@@ -24,6 +24,7 @@ package eu.webeid.security.validator.ocsp.service;
 
 import eu.webeid.security.certificate.CertificateValidator;
 import eu.webeid.security.exceptions.CertificateNotTrustedException;
+import eu.webeid.security.exceptions.OCSPCertificateException;
 import eu.webeid.security.validator.ocsp.OcspServiceProvider;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.AccessDescription;
@@ -76,6 +77,7 @@ class AiaOcspServiceTest {
     private static X509Certificate impostorIntermediateCertificate;
     private static X509Certificate impostorResponderCertificate;
     private static X509Certificate responderCertificate;
+    private static X509Certificate noEkuResponderCertificate;
     private static X509Certificate rootIssuedResponderCertificate;
     private static X509Certificate siblingIntermediateCertificate;
     private static X509Certificate siblingResponderCertificate;
@@ -111,6 +113,10 @@ class AiaOcspServiceTest {
         // The OCSP responder is delegated by the intermediate CA (RFC 6960 CA-designated responder).
         responderCertificate = generateCertificate(
             "Test OCSP Responder", responderKeyPair.getPublic(), "Test Intermediate CA", intermediateKeyPair, 3, false, true, null);
+        // A responder issued by the intermediate CA but without the OCSP-signing extended key usage; a delegated
+        // responder must carry it.
+        noEkuResponderCertificate = generateCertificate(
+            "No EKU OCSP Responder", generateKeyPair().getPublic(), "Test Intermediate CA", intermediateKeyPair, 9, false, false, null);
         // This responder is trusted through the same root, but it is not delegated by the subject certificate's issuer.
         // It can only be used as a locally configured trusted responder (RFC 6960 section 4.2.2.2, criterion 1).
         rootIssuedResponderCertificate = generateCertificate(
@@ -200,6 +206,28 @@ class AiaOcspServiceTest {
         assertThatExceptionOfType(CertificateNotTrustedException.class)
             .isThrownBy(() -> service.validateResponderCertificate(responderHolder, NOW))
             .withCauseInstanceOf(CertificateException.class);
+    }
+
+    @Test
+    void whenResponseSignedByIssuingCaWithoutOcspSigningEku_thenValidationSucceeds() throws Exception {
+        // RFC 6960 section 4.2.2.2: a response signed by the CA that issued the subject certificate is authorized
+        // by CA identity alone; the OCSP-signing extended key usage is required only for delegated responders.
+        // The intermediate CA certificate does not carry the extended key usage.
+        final AiaOcspService service = aiaServiceFor(intermediateCertificate, Collections.singletonList(intermediateCertificate));
+        final X509CertificateHolder responderHolder = new X509CertificateHolder(intermediateCertificate.getEncoded());
+
+        assertThatCode(() -> service.validateResponderCertificate(responderHolder, NOW))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenDelegatedResponderLacksOcspSigningEku_thenValidationFails() throws Exception {
+        final AiaOcspService service = aiaServiceFor(intermediateCertificate, Collections.singletonList(intermediateCertificate));
+        final X509CertificateHolder responderHolder = new X509CertificateHolder(noEkuResponderCertificate.getEncoded());
+
+        assertThatExceptionOfType(OCSPCertificateException.class)
+            .isThrownBy(() -> service.validateResponderCertificate(responderHolder, NOW))
+            .withMessageContaining("does not contain the extended key usage extension value for OCSP response signing");
     }
 
     @Test

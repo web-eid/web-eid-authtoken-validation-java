@@ -59,7 +59,7 @@ public final class OcspResponseValidator {
         try {
             if (certificate.getExtendedKeyUsage() == null || !certificate.getExtendedKeyUsage().contains(OID_OCSP_SIGNING)) {
                 throw new OCSPCertificateException("Certificate " + certificate.getSubjectX500Principal() +
-                    " does not contain the key usage extension for OCSP response signing");
+                    " does not contain the extended key usage extension value for OCSP response signing");
             }
         } catch (CertificateParsingException e) {
             throw new OCSPCertificateException("Certificate parsing failed:", e);
@@ -121,8 +121,7 @@ public final class OcspResponseValidator {
         if (status == null) {
             return;
         }
-        if (status instanceof RevokedStatus) {
-            RevokedStatus revokedStatus = (RevokedStatus) status;
+        if (status instanceof RevokedStatus revokedStatus) {
             throw (revokedStatus.hasRevocationReason() ?
                 new UserCertificateRevokedException("Revocation reason: " + revokedStatus.getRevocationReason()) :
                 new UserCertificateRevokedException());
