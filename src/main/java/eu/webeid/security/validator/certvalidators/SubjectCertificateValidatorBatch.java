@@ -88,7 +88,8 @@ public final class SubjectCertificateValidatorBatch {
                 certTrustedValidator,
                 ocspClient, ocspServiceProvider,
                 configuration.getAllowedOcspResponseTimeSkew(),
-                configuration.getMaxOcspResponseThisUpdateAge()
+                configuration.getMaxOcspResponseThisUpdateAge(),
+                additionalIntermediateCertificates
             )::validateCertificateNotRevoked
         );
     }

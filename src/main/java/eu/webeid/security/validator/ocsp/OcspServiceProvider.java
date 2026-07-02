@@ -31,6 +31,7 @@ import eu.webeid.security.validator.ocsp.service.OcspService;
 
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
+import java.util.List;
 import java.util.Objects;
 
 public class OcspServiceProvider {
@@ -48,17 +49,26 @@ public class OcspServiceProvider {
     /**
      * A static factory method that returns either the designated or AIA OCSP service instance depending on whether
      * the designated OCSP service is configured and supports the issuer of the certificate.
+     * <p>
+     * An AIA OCSP service instance is created for a single validation run of the given certificate.
      *
      * @param certificate subject certificate that is to be checked with OCSP
+     * @param certificateIssuerCertificate the certificate that directly issued the subject certificate
+     * @param additionalIntermediateCertificates untrusted, token-supplied intermediate certificates that may be
+     *     needed to build the OCSP responder's certification path to a trusted CA; may be empty
      * @return either the designated or AIA OCSP service instance
      * @throws AuthTokenException when AIA URL is not found in certificate
      * @throws CertificateEncodingException when certificate is invalid
      */
-    public OcspService getService(X509Certificate certificate) throws AuthTokenException, CertificateEncodingException {
+    public OcspService getService(X509Certificate certificate,
+                                  X509Certificate certificateIssuerCertificate,
+                                  List<X509Certificate> additionalIntermediateCertificates) throws AuthTokenException, CertificateEncodingException {
         if (designatedOcspService != null && designatedOcspService.supportsIssuerOf(certificate)) {
+            // The designated responder is pinned by equality, so the subject issuer and token-supplied
+            // intermediate certificates are not needed for its validation.
             return designatedOcspService;
         }
-        return new AiaOcspService(aiaOcspServiceConfiguration, certificate);
+        return new AiaOcspService(aiaOcspServiceConfiguration, certificate, certificateIssuerCertificate, additionalIntermediateCertificates);
     }
 
 }
