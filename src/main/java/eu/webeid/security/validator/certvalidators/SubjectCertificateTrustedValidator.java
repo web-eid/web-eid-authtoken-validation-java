@@ -70,6 +70,9 @@ public final class SubjectCertificateTrustedValidator {
             trustedCACertificateAnchors,
             trustedCACertificateCertStore,
             List.of(),
+            // Intermediate CA certificates require revocation checks here because they are not checked elsewhere.
+            // Subject certificate revocation is handled separately by SubjectCertificateNotRevokedValidator.
+            CertificateValidator.IntermediateRevocationCheck.ENABLED,
             now
         );
         LOG.debug("Subject certificate is valid and signed by a trusted CA");
