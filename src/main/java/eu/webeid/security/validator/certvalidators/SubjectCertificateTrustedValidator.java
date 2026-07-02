@@ -86,6 +86,10 @@ public final class SubjectCertificateTrustedValidator {
         LOG.debug("Subject certificate is valid and signed by a trusted CA");
     }
 
+    /**
+     * Returns the certificate that directly issued the subject certificate, or the trust anchor when the anchor
+     * is the direct issuer. Available after {@link #validateCertificateTrusted(X509Certificate)} has succeeded.
+     */
     public X509Certificate getSubjectCertificateIssuerCertificate() {
         return subjectCertificateIssuerCertificate;
     }

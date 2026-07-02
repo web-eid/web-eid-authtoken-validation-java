@@ -63,6 +63,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class SubjectCertificateNotRevokedValidatorTest {
@@ -151,6 +152,35 @@ class SubjectCertificateNotRevokedValidatorTest {
             .isThrownBy(() ->
                 validator.validateCertificateNotRevoked(estEid2018Cert))
             .withMessage("User certificate revocation check has failed: Response status: internal error");
+    }
+
+    @Test
+    void whenAdditionalIntermediateCertificatesProvided_thenForwardsThemToOcspServiceProvider() throws Exception {
+        final X509Certificate issuerCertificate = trustedValidator.getSubjectCertificateIssuerCertificate();
+        final List<X509Certificate> additionalIntermediateCertificates = List.of(getTestEsteid2018CA());
+        final OcspServiceProvider ocspServiceProvider = mock(OcspServiceProvider.class);
+        when(ocspServiceProvider.getService(
+            estEid2018Cert,
+            issuerCertificate,
+            additionalIntermediateCertificates
+        )).thenThrow(new UserCertificateOCSPCheckFailedException("stop after service selection"));
+        final SubjectCertificateNotRevokedValidator validator = new SubjectCertificateNotRevokedValidator(
+            trustedValidator,
+            ocspClient,
+            ocspServiceProvider,
+            CONFIGURATION.getAllowedOcspResponseTimeSkew(),
+            CONFIGURATION.getMaxOcspResponseThisUpdateAge(),
+            additionalIntermediateCertificates
+        );
+
+        assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
+            .isThrownBy(() -> validator.validateCertificateNotRevoked(estEid2018Cert))
+            .withMessage("User certificate revocation check has failed: stop after service selection");
+        verify(ocspServiceProvider).getService(
+            estEid2018Cert,
+            issuerCertificate,
+            additionalIntermediateCertificates
+        );
     }
 
     @Test

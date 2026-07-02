@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Test;
 
 import java.net.URI;
 import java.util.Date;
+import java.util.List;
 
 import static eu.webeid.security.testutil.Certificates.getJaakKristjanEsteid2018Cert;
 import static eu.webeid.security.testutil.Certificates.getMariliisEsteid2015Cert;
@@ -46,7 +47,7 @@ class OcspServiceProviderTest {
     @Test
     void whenDesignatedOcspServiceConfigurationProvided_thenCreatesDesignatedOcspService() throws Exception {
         final OcspServiceProvider ocspServiceProvider = getDesignatedOcspServiceProvider();
-        final OcspService service = ocspServiceProvider.getService(getJaakKristjanEsteid2018Cert());
+        final OcspService service = ocspServiceProvider.getService(getJaakKristjanEsteid2018Cert(), getTestEsteid2018CA(), List.of());
         assertThat(service.getAccessLocation()).isEqualTo(new URI("http://demo.sk.ee/ocsp"));
         assertThat(service.doesSupportNonce()).isTrue();
         assertThatCode(() ->
@@ -61,7 +62,7 @@ class OcspServiceProviderTest {
     @Test
     void whenAiaOcspServiceConfigurationProvided_thenCreatesAiaOcspService() throws Exception {
         final OcspServiceProvider ocspServiceProvider = getAiaOcspServiceProvider();
-        final OcspService service2018 = ocspServiceProvider.getService(getJaakKristjanEsteid2018Cert());
+        final OcspService service2018 = ocspServiceProvider.getService(getJaakKristjanEsteid2018Cert(), getTestEsteid2018CA(), List.of());
         assertThat(service2018.getAccessLocation()).isEqualTo(new URI("http://aia.demo.sk.ee/esteid2018"));
         assertThat(service2018.doesSupportNonce()).isTrue();
         assertThatCode(() ->
@@ -69,7 +70,7 @@ class OcspServiceProviderTest {
             service2018.validateResponderCertificate(new X509CertificateHolder(getTestEsteid2018CA().getEncoded()), new Date(1630000000000L)))
             .doesNotThrowAnyException();
 
-        final OcspService service2015 = ocspServiceProvider.getService(getMariliisEsteid2015Cert());
+        final OcspService service2015 = ocspServiceProvider.getService(getMariliisEsteid2015Cert(), getTestEsteid2015CA(), List.of());
         assertThat(service2015.getAccessLocation()).isEqualTo(new URI("http://aia.demo.sk.ee/esteid2015"));
         assertThat(service2015.doesSupportNonce()).isFalse();
         assertThatCode(() ->
@@ -81,7 +82,7 @@ class OcspServiceProviderTest {
     @Test
     void whenAiaOcspServiceConfigurationDoesNotHaveResponderCertTrustedCA_thenThrows() throws Exception {
         final OcspServiceProvider ocspServiceProvider = getAiaOcspServiceProvider();
-        final OcspService service2018 = ocspServiceProvider.getService(getJaakKristjanEsteid2018Cert());
+        final OcspService service2018 = ocspServiceProvider.getService(getJaakKristjanEsteid2018Cert(), getTestEsteid2018CA(), List.of());
         final X509CertificateHolder wrongResponderCert = new X509CertificateHolder(getMariliisEsteid2015Cert().getEncoded());
         assertThatExceptionOfType(OCSPCertificateException.class)
             .isThrownBy(() ->
