@@ -62,14 +62,36 @@ public final class CertificateValidator {
                                                               Set<TrustAnchor> trustedCACertificateAnchors,
                                                               CertStore trustedCACertificateCertStore,
                                                               Date now) throws CertificateNotTrustedException, JceException, CertificateNotYetValidException, CertificateExpiredException {
-        certificateIsValidOnDate(certificate, now, "User");
+        return validateIsSignedByTrustedCA(certificate, "User", trustedCACertificateAnchors, trustedCACertificateCertStore, now);
+    }
+
+    /**
+     * Validates that the given certificate is signed by a trusted CA and returns the certificate that directly
+     * issued it.
+     *
+     * @param certificate the certificate whose certification path is validated
+     * @param certificateSubject the role of the certificate, e.g. "User" or "AIA OCSP responder", used in
+     *     validity failure messages
+     * @param trustedCACertificateAnchors trusted CA certificates as trust anchors
+     * @param trustedCACertificateCertStore trusted CA certificates as a certificate store
+     * @param now validation date
+     * @return the certificate that directly issued the given certificate; the trust anchor when the anchor
+     *     is the direct issuer
+     */
+    public static X509Certificate validateIsSignedByTrustedCA(X509Certificate certificate,
+                                                              String certificateSubject,
+                                                              Set<TrustAnchor> trustedCACertificateAnchors,
+                                                              CertStore trustedCACertificateCertStore,
+                                                              Date now) throws CertificateNotTrustedException, JceException, CertificateNotYetValidException, CertificateExpiredException {
+        certificateIsValidOnDate(certificate, now, certificateSubject);
 
         final X509CertSelector selector = new X509CertSelector();
         selector.setCertificate(certificate);
 
         try {
             final PKIXBuilderParameters pkixBuilderParameters = new PKIXBuilderParameters(trustedCACertificateAnchors, selector);
-            // Certificate revocation check is intentionally disabled as we do the OCSP check with SubjectCertificateNotRevokedValidator ourselves.
+            // Revocation checking of the validated certificate is intentionally disabled here: each caller applies
+            // its own role-specific leaf revocation policy.
             pkixBuilderParameters.setRevocationEnabled(false);
             pkixBuilderParameters.setDate(now);
             pkixBuilderParameters.addCertStore(trustedCACertificateCertStore);

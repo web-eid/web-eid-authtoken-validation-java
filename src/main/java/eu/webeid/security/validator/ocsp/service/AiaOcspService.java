@@ -74,10 +74,10 @@ public class AiaOcspService implements OcspService {
     public void validateResponderCertificate(X509CertificateHolder cert, Date now) throws AuthTokenException {
         try {
             final X509Certificate certificate = certificateConverter.getCertificate(cert);
-            CertificateValidator.certificateIsValidOnDate(certificate, now, "AIA OCSP responder");
-            // Trusted certificates' validity has been already verified in validateCertificateExpiry().
             OcspResponseValidator.validateHasSigningExtension(certificate);
-            CertificateValidator.validateIsSignedByTrustedCA(certificate, trustedCACertificateAnchors, trustedCACertificateCertStore, now);
+            // The responder certificate's validity on the current date is checked as part of the certification
+            // path validation.
+            CertificateValidator.validateIsSignedByTrustedCA(certificate, "AIA OCSP responder", trustedCACertificateAnchors, trustedCACertificateCertStore, now);
         } catch (CertificateException e) {
             throw new OCSPCertificateException("Invalid responder certificate", e);
         }
