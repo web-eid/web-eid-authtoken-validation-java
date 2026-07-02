@@ -77,8 +77,18 @@ public class AiaOcspService implements OcspService {
             final X509Certificate certificate = certificateConverter.getCertificate(cert);
             OcspResponseValidator.validateHasSigningExtension(certificate);
             // The responder certificate's validity on the current date is checked as part of the certification
-            // path validation.
-            CertificateValidator.validateIsSignedByTrustedCA(certificate, "AIA OCSP responder", trustedCACertificateAnchors, trustedCACertificateCertStore, List.of(), now);
+            // path validation. Responder certificates are deliberately not revocation-checked: RFC 6960 section
+            // 4.2.2.2.1 lets CAs vouch for their responders with id-pkix-ocsp-nocheck instead, and asking an OCSP
+            // service whether its own signer is revoked would be circular.
+            CertificateValidator.validateIsSignedByTrustedCA(
+                certificate,
+                "AIA OCSP responder",
+                trustedCACertificateAnchors,
+                trustedCACertificateCertStore,
+                List.of(),
+                CertificateValidator.IntermediateRevocationCheck.DISABLED,
+                now
+            );
         } catch (CertificateException e) {
             throw new OCSPCertificateException("Invalid responder certificate", e);
         }
