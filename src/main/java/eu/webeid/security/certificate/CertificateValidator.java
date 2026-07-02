@@ -62,7 +62,7 @@ public final class CertificateValidator {
                                                               Set<TrustAnchor> trustedCACertificateAnchors,
                                                               CertStore trustedCACertificateCertStore,
                                                               Date now) throws CertificateNotTrustedException, JceException, CertificateNotYetValidException, CertificateExpiredException {
-        return validateIsSignedByTrustedCA(certificate, "User", trustedCACertificateAnchors, trustedCACertificateCertStore, now);
+        return validateIsSignedByTrustedCA(certificate, "User", trustedCACertificateAnchors, trustedCACertificateCertStore, List.of(), now);
     }
 
     /**
@@ -74,6 +74,8 @@ public final class CertificateValidator {
      *     validity failure messages
      * @param trustedCACertificateAnchors trusted CA certificates as trust anchors
      * @param trustedCACertificateCertStore trusted CA certificates as a certificate store
+     * @param additionalIntermediateCertificates untrusted intermediate certificates offered as certification-path
+     *     candidates only; the path must still terminate at one of the trust anchors
      * @param now validation date
      * @return the certificate that directly issued the given certificate; the trust anchor when the anchor
      *     is the direct issuer
@@ -82,6 +84,7 @@ public final class CertificateValidator {
                                                               String certificateSubject,
                                                               Set<TrustAnchor> trustedCACertificateAnchors,
                                                               CertStore trustedCACertificateCertStore,
+                                                              List<X509Certificate> additionalIntermediateCertificates,
                                                               Date now) throws CertificateNotTrustedException, JceException, CertificateNotYetValidException, CertificateExpiredException {
         certificateIsValidOnDate(certificate, now, certificateSubject);
 
@@ -95,6 +98,9 @@ public final class CertificateValidator {
             pkixBuilderParameters.setRevocationEnabled(false);
             pkixBuilderParameters.setDate(now);
             pkixBuilderParameters.addCertStore(trustedCACertificateCertStore);
+            if (additionalIntermediateCertificates != null && !additionalIntermediateCertificates.isEmpty()) {
+                pkixBuilderParameters.addCertStore(buildCertStoreFromCertificates(additionalIntermediateCertificates));
+            }
 
             // See the comment in buildCertStoreFromCertificates() below why we use the default JCE provider.
             final CertPathBuilder certPathBuilder = CertPathBuilder.getInstance(CertPathBuilder.getDefaultType());
