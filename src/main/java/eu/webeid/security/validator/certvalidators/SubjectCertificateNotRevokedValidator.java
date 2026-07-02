@@ -55,6 +55,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Date;
+import java.util.List;
 import java.util.Objects;
 
 public final class SubjectCertificateNotRevokedValidator {
@@ -66,6 +67,7 @@ public final class SubjectCertificateNotRevokedValidator {
     private final OcspServiceProvider ocspServiceProvider;
     private final Duration allowedOcspResponseTimeSkew;
     private final Duration maxOcspResponseThisUpdateAge;
+    private final List<X509Certificate> additionalIntermediateCertificates;
 
     static {
         Security.addProvider(new BouncyCastleProvider());
@@ -76,11 +78,22 @@ public final class SubjectCertificateNotRevokedValidator {
                                                  OcspServiceProvider ocspServiceProvider,
                                                  Duration allowedOcspResponseTimeSkew,
                                                  Duration maxOcspResponseThisUpdateAge) {
+        this(trustValidator, ocspClient, ocspServiceProvider, allowedOcspResponseTimeSkew,
+            maxOcspResponseThisUpdateAge, List.of());
+    }
+
+    public SubjectCertificateNotRevokedValidator(SubjectCertificateTrustedValidator trustValidator,
+                                                 OcspClient ocspClient,
+                                                 OcspServiceProvider ocspServiceProvider,
+                                                 Duration allowedOcspResponseTimeSkew,
+                                                 Duration maxOcspResponseThisUpdateAge,
+                                                 List<X509Certificate> additionalIntermediateCertificates) {
         this.trustValidator = trustValidator;
         this.ocspClient = ocspClient;
         this.ocspServiceProvider = ocspServiceProvider;
         this.allowedOcspResponseTimeSkew = allowedOcspResponseTimeSkew;
         this.maxOcspResponseThisUpdateAge = maxOcspResponseThisUpdateAge;
+        this.additionalIntermediateCertificates = additionalIntermediateCertificates;
     }
 
     /**
@@ -91,7 +104,10 @@ public final class SubjectCertificateNotRevokedValidator {
      */
     public void validateCertificateNotRevoked(X509Certificate subjectCertificate) throws AuthTokenException {
         try {
-            OcspService ocspService = ocspServiceProvider.getService(subjectCertificate);
+            OcspService ocspService = ocspServiceProvider.getService(
+                subjectCertificate,
+                Objects.requireNonNull(trustValidator.getSubjectCertificateIssuerCertificate()),
+                additionalIntermediateCertificates);
 
             final CertificateID certificateId = getCertificateId(subjectCertificate,
                 Objects.requireNonNull(trustValidator.getSubjectCertificateIssuerCertificate()));
