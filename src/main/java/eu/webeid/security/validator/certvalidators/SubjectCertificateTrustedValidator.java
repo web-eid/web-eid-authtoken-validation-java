@@ -35,6 +35,7 @@ import java.security.cert.CertStore;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
 import java.util.Date;
+import java.util.List;
 import java.util.Set;
 
 public final class SubjectCertificateTrustedValidator {
@@ -68,6 +69,7 @@ public final class SubjectCertificateTrustedValidator {
             "User",
             trustedCACertificateAnchors,
             trustedCACertificateCertStore,
+            List.of(),
             now
         );
         LOG.debug("Subject certificate is valid and signed by a trusted CA");

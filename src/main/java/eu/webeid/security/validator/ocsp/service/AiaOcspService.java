@@ -36,6 +36,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
 import java.util.Date;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -77,7 +78,7 @@ public class AiaOcspService implements OcspService {
             OcspResponseValidator.validateHasSigningExtension(certificate);
             // The responder certificate's validity on the current date is checked as part of the certification
             // path validation.
-            CertificateValidator.validateIsSignedByTrustedCA(certificate, "AIA OCSP responder", trustedCACertificateAnchors, trustedCACertificateCertStore, now);
+            CertificateValidator.validateIsSignedByTrustedCA(certificate, "AIA OCSP responder", trustedCACertificateAnchors, trustedCACertificateCertStore, List.of(), now);
         } catch (CertificateException e) {
             throw new OCSPCertificateException("Invalid responder certificate", e);
         }
