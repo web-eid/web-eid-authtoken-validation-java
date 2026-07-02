@@ -74,11 +74,12 @@ public final class SubjectCertificateValidatorBatch {
         AuthTokenValidationConfiguration configuration,
         Set<TrustAnchor> trustedCACertificateAnchors,
         CertStore trustedCACertificateCertStore,
+        List<X509Certificate> additionalIntermediateCertificates,
         OcspClient ocspClient,
         OcspServiceProvider ocspServiceProvider) {
 
         final SubjectCertificateTrustedValidator certTrustedValidator =
-            new SubjectCertificateTrustedValidator(trustedCACertificateAnchors, trustedCACertificateCertStore);
+            new SubjectCertificateTrustedValidator(trustedCACertificateAnchors, trustedCACertificateCertStore, additionalIntermediateCertificates);
 
         return SubjectCertificateValidatorBatch.createFrom(
             certTrustedValidator::validateCertificateTrusted
