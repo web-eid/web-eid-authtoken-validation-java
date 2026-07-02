@@ -49,6 +49,8 @@ import java.security.cert.CertStore;
 import java.security.cert.CertificateException;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.Set;
 
@@ -246,6 +248,47 @@ class AuthTokenV11CertificateTest extends AbstractTestWithValidator {
                 .isInstanceOf(AuthTokenParseException.class)
                 .hasMessage("Signing certificate key usage extension missing or does not contain non-repudiation bit required for digital signatures");
         }
+    }
+
+    @Test
+    void whenValidV11TokenWithUnverifiedIntermediateCertificates_thenValidationSucceeds() throws Exception {
+        mockDate("2023-10-01", mockedClock);
+
+        validV11AuthToken.setUnverifiedIntermediateCertificates(Arrays.asList(esteid2018CaCertificateInBase64()));
+
+        assertThatCode(() -> validator.validate(validV11AuthToken, VALID_CHALLENGE_NONCE))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenUnverifiedIntermediateCertificatesEmpty_thenValidationFails() {
+        validV11AuthToken.setUnverifiedIntermediateCertificates(Collections.emptyList());
+
+        assertThatThrownBy(() -> validator.validate(validV11AuthToken, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(AuthTokenParseException.class)
+            .hasMessage("'unverifiedIntermediateCertificates' must not be empty for format 'web-eid:1.1'");
+    }
+
+    @Test
+    void whenUnverifiedIntermediateCertificateContainsEmptyEntry_thenValidationFails() {
+        validV11AuthToken.setUnverifiedIntermediateCertificates(Arrays.asList(""));
+
+        assertThatThrownBy(() -> validator.validate(validV11AuthToken, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(AuthTokenParseException.class)
+            .hasMessage("'unverifiedIntermediateCertificates' must not contain null or empty entries for format 'web-eid:1.1'");
+    }
+
+    @Test
+    void whenUnverifiedIntermediateCertificateIsNotBase64_thenValidationFails() {
+        validV11AuthToken.setUnverifiedIntermediateCertificates(Arrays.asList("This is not a certificate"));
+
+        assertThatThrownBy(() -> validator.validate(validV11AuthToken, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(CertificateDecodingException.class);
+    }
+
+    private static String esteid2018CaCertificateInBase64() throws Exception {
+        X509Certificate caCertificate = CertificateLoader.loadCertificatesFromResources("TEST_of_ESTEID2018.cer")[0];
+        return Base64.getEncoder().encodeToString(caCertificate.getEncoded());
     }
 
     private AuthTokenVersion11Validator spyAuthTokenVersion11Validator() {

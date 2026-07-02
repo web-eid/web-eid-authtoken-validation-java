@@ -26,6 +26,7 @@ import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.certificate.CertificateLoader;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.AuthTokenParseException;
+import eu.webeid.security.util.Strings;
 import eu.webeid.security.validator.AuthTokenSignatureValidator;
 import eu.webeid.security.validator.AuthTokenValidationConfiguration;
 import eu.webeid.security.validator.certvalidators.SubjectCertificateValidatorBatch;
@@ -35,6 +36,7 @@ import eu.webeid.security.validator.ocsp.OcspServiceProvider;
 import java.security.cert.CertStore;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
+import java.util.List;
 import java.util.Set;
 
 class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
@@ -73,10 +75,17 @@ class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
 
     @Override
     public X509Certificate validate(WebEidAuthToken token, String currentChallengeNonce) throws AuthTokenException {
-        if (AuthTokenVersion.supportsExactly(token.getFormat(), SUPPORTED_EXACT_MAJOR_VERSION, SUPPORTED_MINIMAL_MINOR_VERSION) && token.getUnverifiedSigningCertificates() != null) {
-            throw new AuthTokenParseException(
-                "'unverifiedSigningCertificates' field is not allowed for format '" + token.getFormat() + "'"
-            );
+        if (AuthTokenVersion.supportsExactly(token.getFormat(), SUPPORTED_EXACT_MAJOR_VERSION, SUPPORTED_MINIMAL_MINOR_VERSION)) {
+            if (token.getUnverifiedSigningCertificates() != null) {
+                throw new AuthTokenParseException(
+                    "'unverifiedSigningCertificates' field is not allowed for format '" + token.getFormat() + "'"
+                );
+            }
+            if (token.getUnverifiedIntermediateCertificates() != null) {
+                throw new AuthTokenParseException(
+                    "'unverifiedIntermediateCertificates' field is not allowed for format '" + token.getFormat() + "'"
+                );
+            }
         }
 
         if (token.getUnverifiedCertificate() == null || token.getUnverifiedCertificate().isEmpty()) {
@@ -84,6 +93,7 @@ class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
         }
 
         final X509Certificate subjectCertificate = CertificateLoader.decodeCertificateFromBase64(token.getUnverifiedCertificate());
+        final List<X509Certificate> additionalIntermediateCertificates = decodeAdditionalIntermediateCertificates(token);
 
         simpleSubjectCertificateValidators.executeFor(subjectCertificate);
 
@@ -91,6 +101,7 @@ class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
             configuration,
             trustedCACertificateAnchors,
             trustedCACertificateCertStore,
+            additionalIntermediateCertificates,
             ocspClient,
             ocspServiceProvider
         ).executeFor(subjectCertificate);
@@ -105,5 +116,23 @@ class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
         );
 
         return subjectCertificate;
+    }
+
+    private static List<X509Certificate> decodeAdditionalIntermediateCertificates(WebEidAuthToken token) throws AuthTokenException {
+        validateIntermediateCertificatesField(token.getUnverifiedIntermediateCertificates(),
+            "unverifiedIntermediateCertificates", token.getFormat());
+        return CertificateLoader.decodeCertificatesFromBase64(token.getUnverifiedIntermediateCertificates());
+    }
+
+    static void validateIntermediateCertificatesField(List<String> intermediateCertificates, String fieldName, String format) throws AuthTokenParseException {
+        if (intermediateCertificates == null) {
+            return;
+        }
+        if (intermediateCertificates.isEmpty()) {
+            throw new AuthTokenParseException("'" + fieldName + "' must not be empty for format '" + format + "'");
+        }
+        if (intermediateCertificates.stream().anyMatch(Strings::isNullOrEmpty)) {
+            throw new AuthTokenParseException("'" + fieldName + "' must not contain null or empty entries for format '" + format + "'");
+        }
     }
 }

@@ -44,11 +44,19 @@ public final class SubjectCertificateTrustedValidator {
 
     private final Set<TrustAnchor> trustedCACertificateAnchors;
     private final CertStore trustedCACertificateCertStore;
+    private final List<X509Certificate> additionalIntermediateCertificates;
     private X509Certificate subjectCertificateIssuerCertificate;
 
     public SubjectCertificateTrustedValidator(Set<TrustAnchor> trustedCACertificateAnchors, CertStore trustedCACertificateCertStore) {
+        this(trustedCACertificateAnchors, trustedCACertificateCertStore, List.of());
+    }
+
+    public SubjectCertificateTrustedValidator(Set<TrustAnchor> trustedCACertificateAnchors,
+                                              CertStore trustedCACertificateCertStore,
+                                              List<X509Certificate> additionalIntermediateCertificates) {
         this.trustedCACertificateAnchors = trustedCACertificateAnchors;
         this.trustedCACertificateCertStore = trustedCACertificateCertStore;
+        this.additionalIntermediateCertificates = additionalIntermediateCertificates;
     }
 
     /**
@@ -69,7 +77,7 @@ public final class SubjectCertificateTrustedValidator {
             "User",
             trustedCACertificateAnchors,
             trustedCACertificateCertStore,
-            List.of(),
+            additionalIntermediateCertificates,
             // Intermediate CA certificates require revocation checks here because they are not checked elsewhere.
             // Subject certificate revocation is handled separately by SubjectCertificateNotRevokedValidator.
             CertificateValidator.IntermediateRevocationCheck.ENABLED,
