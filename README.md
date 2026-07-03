@@ -317,7 +317,7 @@ It contains the following fields:
 
 - `signature`: the base64-encoded signature of the token (see the description below),
 
-- `format`: the type identifier and version of the token format separated by a colon character '`:`', `web-eid:1.0` as of now; the version number consists of the major and minor number separated by a dot, major version changes are incompatible with previous versions, minor version changes are backwards-compatible within the given major version,
+- `format`: the type identifier and version of the token format separated by a colon character '`:`'. While minor version changes are intended to be backwards-compatible within the same major version, this validation library accepts only explicitly supported token format versions.
 
 - `appVersion`: the URL identifying the name and version of the application that issued the token; informative purpose, can be used to identify the affected application in case of faulty tokens.
 

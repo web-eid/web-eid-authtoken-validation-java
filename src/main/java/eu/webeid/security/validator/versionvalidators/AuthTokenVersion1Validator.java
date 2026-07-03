@@ -41,7 +41,6 @@ import java.util.regex.Pattern;
 class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
 
     private static final String V1_SUPPORTED_TOKEN_FORMAT_PREFIX = "web-eid:1";
-    private static final Pattern V1_SUPPORTED_TOKEN_FORMAT_PATTERN = Pattern.compile("^web-eid:1(?:\\.\\d+)?$");
     private final SubjectCertificateValidatorBatch simpleSubjectCertificateValidators;
     private final Set<TrustAnchor> trustedCACertificateAnchors;
     private final CertStore trustedCACertificateCertStore;
@@ -70,11 +69,8 @@ class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
 
     @Override
     public boolean supports(String format) {
-        return format != null && getSupportedFormatPattern().matcher(format).matches();
-    }
-
-    protected Pattern getSupportedFormatPattern() {
-        return V1_SUPPORTED_TOKEN_FORMAT_PATTERN;
+        return V1_SUPPORTED_TOKEN_FORMAT_PREFIX.equals(format)
+            || "web-eid:1.0".equals(format);
     }
 
     @Override
