@@ -60,7 +60,7 @@ import static eu.webeid.security.util.Strings.isNullOrEmpty;
 
 class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements AuthTokenVersionValidator {
 
-    private static final Pattern V11_SUPPORTED_TOKEN_FORMAT_PATTERN = Pattern.compile("^web-eid:1\\.1$");
+    private static final String V11_SUPPORTED_TOKEN_FORMAT_PREFIX = "web-eid:1.1";
     private static final Set<String> SUPPORTED_SIGNING_CRYPTO_ALGORITHMS = Set.of("ECC", "RSA");
     private static final Set<String> SUPPORTED_SIGNING_PADDING_SCHEMES = Set.of("NONE", "PKCS1.5", "PSS");
     private static final Set<String> SUPPORTED_SIGNING_HASH_FUNCTIONS = Set.of(
@@ -95,8 +95,8 @@ class AuthTokenVersion11Validator extends AuthTokenVersion1Validator implements 
     }
 
     @Override
-    protected Pattern getSupportedFormatPattern() {
-        return V11_SUPPORTED_TOKEN_FORMAT_PATTERN;
+    public boolean supports(String format) {
+        return V11_SUPPORTED_TOKEN_FORMAT_PREFIX.equals(format);
     }
 
     @Override
