@@ -84,7 +84,8 @@ public final class AuthTokenVersionValidatorFactory {
                     new AiaOcspServiceConfiguration(
                             validationConfig.getNonceDisabledOcspUrls(),
                             trustedCACertificateAnchors,
-                            trustedCACertificateCertStore));
+                            trustedCACertificateCertStore,
+                            validationConfig.getAiaOcspResponderIssuerMatchingPolicy()));
         }
 
         final AuthTokenSignatureValidator authTokenSignatureValidator =
