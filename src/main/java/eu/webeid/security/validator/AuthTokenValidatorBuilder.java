@@ -25,6 +25,7 @@ package eu.webeid.security.validator;
 import eu.webeid.security.exceptions.JceException;
 import eu.webeid.security.validator.ocsp.OcspClient;
 import eu.webeid.security.validator.ocsp.OcspClientImpl;
+import eu.webeid.security.validator.ocsp.service.AiaOcspServiceConfiguration.ResponderIssuerMatchingPolicy;
 import eu.webeid.security.validator.ocsp.service.DesignatedOcspServiceConfiguration;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.slf4j.Logger;
@@ -169,6 +170,23 @@ public class AuthTokenValidatorBuilder {
     public AuthTokenValidatorBuilder withNonceDisabledOcspUrls(URI... urls) {
         Collections.addAll(configuration.getNonceDisabledOcspUrls(), urls);
         LOG.debug("OCSP URLs for which the nonce protocol extension is disabled set to {}", configuration.getNonceDisabledOcspUrls());
+        return this;
+    }
+
+    /**
+     * Sets how an AIA OCSP responder certificate issuer is matched against the issuer of the subject certificate.
+     * The default is {@link ResponderIssuerMatchingPolicy#EXACT_CERTIFICATE}. Use
+     * {@link ResponderIssuerMatchingPolicy#SUBJECT_AND_PUBLIC_KEY} only when equivalent cross-certificates must be
+     * accepted. Under that policy, non-anchor intermediate certificates in the responder's certification path are
+     * checked for revocation.
+     *
+     * @param matchingPolicy AIA OCSP responder issuer matching policy
+     * @return the builder instance for method chaining
+     */
+    public AuthTokenValidatorBuilder withAiaOcspResponderIssuerMatchingPolicy(
+        ResponderIssuerMatchingPolicy matchingPolicy) {
+        configuration.setAiaOcspResponderIssuerMatchingPolicy(matchingPolicy);
+        LOG.debug("AIA OCSP responder issuer matching policy set to {}", matchingPolicy);
         return this;
     }
 

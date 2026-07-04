@@ -56,6 +56,7 @@ public class AiaOcspService implements OcspService {
     private final List<X509Certificate> additionalIntermediateCertificates;
     private final URI url;
     private final boolean supportsNonce;
+    private final AiaOcspServiceConfiguration.ResponderIssuerMatchingPolicy responderIssuerMatchingPolicy;
 
     /**
      * Creates an AIA OCSP service for a single validation run of the given certificate.
@@ -78,6 +79,7 @@ public class AiaOcspService implements OcspService {
         this.additionalIntermediateCertificates = Objects.requireNonNull(additionalIntermediateCertificates);
         this.url = getOcspAiaUrlFromCertificate(Objects.requireNonNull(certificate));
         this.supportsNonce = !configuration.getNonceDisabledOcspUrls().contains(this.url);
+        this.responderIssuerMatchingPolicy = configuration.getResponderIssuerMatchingPolicy();
     }
 
     @Override
@@ -97,46 +99,49 @@ public class AiaOcspService implements OcspService {
             // The responder certificate's validity on the current date is checked as part of the certification
             // path validation. A responder may be issued by a token-supplied intermediate that is not itself
             // trusted, so the intermediates are offered as path candidates; the path must still terminate at a
-            // trusted anchor. Revocation is deliberately not checked anywhere in this path, for two distinct
-            // reasons:
+            // trusted anchor. The responder certificate itself is never revocation-checked, whatever revocation
+            // policy the CA has chosen for it under RFC 6960 section 4.2.2.2.1: OCSP-checking a responder against
+            // its own service would be circular, and no CRL-based check of the responder certificate is implemented
+            // (the only CRL use in the library is the default JDK checker's CRL fallback in
+            // CertificateValidator.validateIntermediateCertificatesNotRevoked). In practice all production Estonian,
+            // Belgian and Finnish AIA responder certificates carry id-pkix-ocsp-nocheck, which tells clients to skip
+            // the check anyway.
             //
-            // - The responder certificate itself is never revocation-checked, whatever revocation policy the
-            //   CA has chosen for it under RFC 6960 section 4.2.2.2.1: OCSP-checking a responder against its
-            //   own service would be circular, and no CRL-based check of the responder certificate is
-            //   implemented (the only CRL use in the library is the default JDK checker's CRL fallback in
-            //   CertificateValidator.validateIntermediateCertificatesNotRevoked). In practice all production
-            //   Estonian, Belgian and Finnish AIA responder certificates carry id-pkix-ocsp-nocheck, which
-            //   tells clients to skip the check anyway.
-            //
-            // - The intermediate CA certificates of the path are not revocation-checked either, hence the
-            //   IntermediateRevocationCheck.DISABLED argument. The representsSameCA checks in this method only
-            //   accept a responder that is, or is directly delegated by, the subject certificate's issuer,
-            //   matched by subject and public key. This validation run has already vetted that issuer while
-            //   validating the subject certificate, as either a configured trust anchor or a token-supplied
-            //   intermediate that was revocation-checked then. When the responder's path is built through the
-            //   same certificates, re-checking it here would only repeat those checks; when it is built
-            //   through an equivalent cross-certificate of the issuer (accepted by the subject and public key
-            //   match), the distinct certificates in that path are knowingly left unchecked.
+            // With exact issuer matching, the intermediate CA certificates are not checked again: this validation
+            // run has already vetted the exact issuer while validating the subject certificate, as either a
+            // configured trust anchor or a token-supplied intermediate that was revocation-checked then. With
+            // subject-and-public-key matching, however, the responder path may use a different equivalent
+            // cross-certificate, so every non-anchor intermediate in that path is revocation-checked.
             final X509Certificate responderIssuerCertificate = CertificateValidator.validateIsSignedByTrustedCA(
                 certificate,
                 "AIA OCSP responder",
                 trustedCACertificateAnchors,
                 trustedCACertificateCertStore,
                 additionalIntermediateCertificates,
-                CertificateValidator.IntermediateRevocationCheck.DISABLED,
+                getIntermediateRevocationCheckByPolicy(),
                 now
             );
             // RFC 6960 section 4.2.2.2: the response must be signed by the CA that issued the subject certificate
             // or by a responder directly delegated by it; a locally configured responder is handled by
-            // DesignatedOcspService. CA identity is compared by subject and public key so that equivalent
-            // cross-certificates for the same CA are accepted.
-            if (representsSameCA(certificate, certificateIssuerCertificate)) {
+            // DesignatedOcspService.
+            if (matchesCertificateIssuer(certificate, certificateIssuerCertificate)) {
                 // The response is signed by the issuing CA itself; the OCSP-signing extended key usage is required
                 // only for delegated responder certificates.
                 return;
             }
+            if (representsSameCA(certificate, certificateIssuerCertificate)) {
+                // The response is signed directly by the issuing CA, but with a certificate that is only equivalent
+                // to (same subject and public key), not identical with, the subject certificate's issuer certificate.
+                // This can only happen under the EXACT_CERTIFICATE policy. Report it explicitly, because otherwise
+                // control falls through to the delegated-responder branch below and fails with a misleading
+                // missing-OCSP-signing-extended-key-usage error; the SUBJECT_AND_PUBLIC_KEY policy accepts it.
+                throw new CertificateNotTrustedException(certificate,
+                    new CertificateException("OCSP response is signed by a certificate equivalent to but not the "
+                        + "same as the subject certificate issuer; the exact-certificate responder issuer matching "
+                        + "policy requires the issuer certificate itself"));
+            }
             OcspResponseValidator.validateHasSigningExtension(certificate);
-            if (!representsSameCA(responderIssuerCertificate, certificateIssuerCertificate)) {
+            if (!matchesCertificateIssuer(responderIssuerCertificate, certificateIssuerCertificate)) {
                 throw new CertificateNotTrustedException(certificate,
                     new CertificateException("OCSP responder is not authorized by the subject certificate issuer"));
             }
@@ -148,6 +153,20 @@ public class AiaOcspService implements OcspService {
     private static boolean representsSameCA(X509Certificate first, X509Certificate second) {
         return first.getSubjectX500Principal().equals(second.getSubjectX500Principal())
             && Arrays.equals(first.getPublicKey().getEncoded(), second.getPublicKey().getEncoded());
+    }
+
+    private boolean matchesCertificateIssuer(X509Certificate first, X509Certificate second) {
+        return switch (responderIssuerMatchingPolicy) {
+            case EXACT_CERTIFICATE -> first.equals(second);
+            case SUBJECT_AND_PUBLIC_KEY -> representsSameCA(first, second);
+        };
+    }
+
+    private CertificateValidator.IntermediateRevocationCheck getIntermediateRevocationCheckByPolicy() {
+        return switch (responderIssuerMatchingPolicy) {
+            case EXACT_CERTIFICATE -> CertificateValidator.IntermediateRevocationCheck.DISABLED;
+            case SUBJECT_AND_PUBLIC_KEY -> CertificateValidator.IntermediateRevocationCheck.ENABLED;
+        };
     }
 
     private static URI getOcspAiaUrlFromCertificate(X509Certificate certificate) throws AuthTokenException {

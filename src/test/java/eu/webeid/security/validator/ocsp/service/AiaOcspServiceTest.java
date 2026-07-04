@@ -36,6 +36,8 @@ import org.bouncycastle.asn1.x509.GeneralName;
 import org.bouncycastle.asn1.x509.KeyPurposeId;
 import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.X509v2CRLBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509CRLConverter;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
@@ -43,20 +45,28 @@ import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.math.BigInteger;
 import java.net.URI;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.CertStore;
 import java.security.cert.CertificateException;
+import java.security.cert.CollectionCertStoreParameters;
 import java.security.cert.TrustAnchor;
+import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
+import static eu.webeid.security.validator.ocsp.service.AiaOcspServiceConfiguration.ResponderIssuerMatchingPolicy.EXACT_CERTIFICATE;
+import static eu.webeid.security.validator.ocsp.service.AiaOcspServiceConfiguration.ResponderIssuerMatchingPolicy.SUBJECT_AND_PUBLIC_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -96,6 +106,7 @@ class AiaOcspServiceTest {
 
         final X509Certificate rootCertificate = generateCertificate(
             "Test Root CA", rootKeyPair.getPublic(), "Test Root CA", rootKeyPair, 1, true, false, null);
+        final X509CRL rootCrl = generateCrl(new X500Name("CN=Test Root CA"), rootKeyPair.getPrivate());
         intermediateCertificate = generateCertificate(
             "Test Intermediate CA", intermediateKeyPair.getPublic(), "Test Root CA", rootKeyPair, 2, true, false, null);
         // An equivalent cross-certificate for the intermediate CA: same subject and public key as
@@ -137,16 +148,45 @@ class AiaOcspServiceTest {
         // trusted, exactly like a deployment that relies on the token-supplied intermediate to build the chain.
         final Set<TrustAnchor> anchors = Collections.singleton(new TrustAnchor(rootCertificate, null));
         aiaOcspServiceConfiguration = new AiaOcspServiceConfiguration(
-            Collections.emptySet(), anchors, CertificateValidator.buildCertStoreFromCertificates(Collections.emptyList()));
+            Collections.emptySet(), anchors, buildCrlStore(rootCrl));
     }
 
     @Test
-    void whenResponderChainsViaTokenIntermediate_thenValidationSucceeds() throws Exception {
-        final AiaOcspService service = aiaServiceFor(intermediateCertificate, Collections.singletonList(intermediateCertificate));
+    void whenMatchingPolicyIsNotSpecified_thenExactCertificateMatchingIsUsed() {
+        assertThat(aiaOcspServiceConfiguration.getResponderIssuerMatchingPolicy()).isEqualTo(EXACT_CERTIFICATE);
+    }
+
+    @ParameterizedTest
+    @EnumSource(AiaOcspServiceConfiguration.ResponderIssuerMatchingPolicy.class)
+    void whenResponderChainsViaTokenIntermediate_thenValidationSucceeds(
+        AiaOcspServiceConfiguration.ResponderIssuerMatchingPolicy matchingPolicy) throws Exception {
+        final AiaOcspService service = aiaServiceFor(intermediateCertificate,
+            Collections.singletonList(intermediateCertificate), matchingPolicy);
         final X509CertificateHolder responderHolder = new X509CertificateHolder(responderCertificate.getEncoded());
 
         assertThatCode(() -> service.validateResponderCertificate(responderHolder, NOW))
             .doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenIntermediateRevocationStatusIsUnknown_thenOnlySubjectAndPublicKeyPolicyFails() throws Exception {
+        final CertStore emptyStore = CertificateValidator.buildCertStoreFromCertificates(Collections.emptyList());
+        final AiaOcspServiceConfiguration exactConfiguration = new AiaOcspServiceConfiguration(
+            Collections.emptySet(), aiaOcspServiceConfiguration.getTrustedCACertificateAnchors(), emptyStore,
+            EXACT_CERTIFICATE);
+        final AiaOcspServiceConfiguration subjectAndPublicKeyConfiguration = new AiaOcspServiceConfiguration(
+            Collections.emptySet(), aiaOcspServiceConfiguration.getTrustedCACertificateAnchors(), emptyStore,
+            SUBJECT_AND_PUBLIC_KEY);
+        final AiaOcspService exactService = new AiaOcspService(exactConfiguration, subjectCertificate,
+            intermediateCertificate, Collections.singletonList(intermediateCertificate));
+        final AiaOcspService subjectAndPublicKeyService = new AiaOcspService(subjectAndPublicKeyConfiguration,
+            subjectCertificate, intermediateCertificate, Collections.singletonList(intermediateCertificate));
+        final X509CertificateHolder responderHolder = new X509CertificateHolder(responderCertificate.getEncoded());
+
+        assertThatCode(() -> exactService.validateResponderCertificate(responderHolder, NOW))
+            .doesNotThrowAnyException();
+        assertThatExceptionOfType(CertificateNotTrustedException.class)
+            .isThrownBy(() -> subjectAndPublicKeyService.validateResponderCertificate(responderHolder, NOW));
     }
 
     @Test
@@ -160,12 +200,46 @@ class AiaOcspServiceTest {
     }
 
     @Test
-    void whenResponderIssuerIsEquivalentCrossCertificate_thenValidationSucceeds() throws Exception {
+    void whenResponderIssuerIsEquivalentCrossCertificateWithDefaultPolicy_thenValidationFails() throws Exception {
         // The responder still chains to the root via the real intermediate, so its issuer in the built path is
         // intermediateCertificate. The subject issuer is passed as the equivalent cross-certificate (same subject and
-        // public key, different certificate), which representsSameCA must treat as the same CA.
+        // public key, different certificate), which the default exact-certificate policy must reject.
         final AiaOcspService service = aiaServiceFor(crossIntermediateCertificate, Collections.singletonList(intermediateCertificate));
         final X509CertificateHolder responderHolder = new X509CertificateHolder(responderCertificate.getEncoded());
+
+        assertThatExceptionOfType(CertificateNotTrustedException.class)
+            .isThrownBy(() -> service.validateResponderCertificate(responderHolder, NOW))
+            .withCauseInstanceOf(CertificateException.class);
+    }
+
+    @Test
+    void whenResponderIssuerIsEquivalentCrossCertificateWithSubjectAndPublicKeyPolicy_thenValidationSucceeds() throws Exception {
+        final AiaOcspService service = aiaServiceFor(crossIntermediateCertificate,
+            Collections.singletonList(intermediateCertificate), SUBJECT_AND_PUBLIC_KEY);
+        final X509CertificateHolder responderHolder = new X509CertificateHolder(responderCertificate.getEncoded());
+
+        assertThatCode(() -> service.validateResponderCertificate(responderHolder, NOW))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenResponseIsSignedByEquivalentCrossCertificateWithDefaultPolicy_thenValidationFails() throws Exception {
+        final AiaOcspService service = aiaServiceFor(intermediateCertificate, Collections.emptyList());
+        final X509CertificateHolder responderHolder = new X509CertificateHolder(crossIntermediateCertificate.getEncoded());
+
+        assertThatExceptionOfType(CertificateNotTrustedException.class)
+            .isThrownBy(() -> service.validateResponderCertificate(responderHolder, NOW))
+            .withCauseInstanceOf(CertificateException.class)
+            .havingCause()
+            .withMessageContaining("equivalent to but not the same as the subject certificate issuer");
+    }
+
+    @Test
+    void whenResponseIsSignedByEquivalentCrossCertificateWithSubjectAndPublicKeyPolicy_thenValidationSucceeds()
+        throws Exception {
+        final AiaOcspService service = aiaServiceFor(intermediateCertificate,
+            Collections.emptyList(), SUBJECT_AND_PUBLIC_KEY);
+        final X509CertificateHolder responderHolder = new X509CertificateHolder(crossIntermediateCertificate.getEncoded());
 
         assertThatCode(() -> service.validateResponderCertificate(responderHolder, NOW))
             .doesNotThrowAnyException();
@@ -183,10 +257,12 @@ class AiaOcspServiceTest {
             .withCauseInstanceOf(CertificateException.class);
     }
 
-    @Test
-    void whenResponderIssuerHasSameNameButDifferentKeyThanSubjectIssuer_thenValidationFails() throws Exception {
+    @ParameterizedTest
+    @EnumSource(AiaOcspServiceConfiguration.ResponderIssuerMatchingPolicy.class)
+    void whenResponderIssuerHasSameNameButDifferentKeyThanSubjectIssuer_thenValidationFails(
+        AiaOcspServiceConfiguration.ResponderIssuerMatchingPolicy matchingPolicy) throws Exception {
         final AiaOcspService service = aiaServiceFor(intermediateCertificate,
-            Collections.singletonList(impostorIntermediateCertificate));
+            Collections.singletonList(impostorIntermediateCertificate), matchingPolicy);
         final X509CertificateHolder responderHolder =
             new X509CertificateHolder(impostorResponderCertificate.getEncoded());
 
@@ -208,12 +284,15 @@ class AiaOcspServiceTest {
             .withCauseInstanceOf(CertificateException.class);
     }
 
-    @Test
-    void whenResponseSignedByIssuingCaWithoutOcspSigningEku_thenValidationSucceeds() throws Exception {
+    @ParameterizedTest
+    @EnumSource(AiaOcspServiceConfiguration.ResponderIssuerMatchingPolicy.class)
+    void whenResponseSignedByIssuingCaWithoutOcspSigningEku_thenValidationSucceeds(
+        AiaOcspServiceConfiguration.ResponderIssuerMatchingPolicy matchingPolicy) throws Exception {
         // RFC 6960 section 4.2.2.2: a response signed by the CA that issued the subject certificate is authorized
         // by CA identity alone; the OCSP-signing extended key usage is required only for delegated responders.
         // The intermediate CA certificate does not carry the extended key usage.
-        final AiaOcspService service = aiaServiceFor(intermediateCertificate, Collections.singletonList(intermediateCertificate));
+        final AiaOcspService service = aiaServiceFor(intermediateCertificate,
+            Collections.singletonList(intermediateCertificate), matchingPolicy);
         final X509CertificateHolder responderHolder = new X509CertificateHolder(intermediateCertificate.getEncoded());
 
         assertThatCode(() -> service.validateResponderCertificate(responderHolder, NOW))
@@ -252,6 +331,19 @@ class AiaOcspServiceTest {
             certificateIssuerCertificate, additionalIntermediateCertificates);
     }
 
+    private static AiaOcspService aiaServiceFor(X509Certificate certificateIssuerCertificate,
+                                                List<X509Certificate> additionalIntermediateCertificates,
+                                                AiaOcspServiceConfiguration.ResponderIssuerMatchingPolicy matchingPolicy)
+        throws Exception {
+        final AiaOcspServiceConfiguration configuration = new AiaOcspServiceConfiguration(
+            aiaOcspServiceConfiguration.getNonceDisabledOcspUrls(),
+            aiaOcspServiceConfiguration.getTrustedCACertificateAnchors(),
+            aiaOcspServiceConfiguration.getTrustedCACertificateCertStore(),
+            matchingPolicy);
+        return new AiaOcspService(configuration, subjectCertificate,
+            certificateIssuerCertificate, additionalIntermediateCertificates);
+    }
+
     private static KeyPair generateKeyPair() throws Exception {
         final KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
         keyPairGenerator.initialize(2048);
@@ -281,5 +373,16 @@ class AiaOcspServiceTest {
         }
         final ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA").build(issuerKeyPair.getPrivate());
         return new JcaX509CertificateConverter().getCertificate(builder.build(signer));
+    }
+
+    private static X509CRL generateCrl(X500Name issuer, PrivateKey issuerPrivateKey) throws Exception {
+        final X509v2CRLBuilder builder = new X509v2CRLBuilder(issuer, NOT_BEFORE);
+        builder.setNextUpdate(NOT_AFTER);
+        final ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA").build(issuerPrivateKey);
+        return new JcaX509CRLConverter().getCRL(builder.build(signer));
+    }
+
+    private static CertStore buildCrlStore(X509CRL... crls) throws Exception {
+        return CertStore.getInstance("Collection", new CollectionCertStoreParameters(List.of(crls)));
     }
 }

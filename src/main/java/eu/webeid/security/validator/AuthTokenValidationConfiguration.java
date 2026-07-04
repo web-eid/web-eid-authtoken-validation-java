@@ -23,6 +23,7 @@
 package eu.webeid.security.validator;
 
 import eu.webeid.security.certificate.SubjectCertificatePolicies;
+import eu.webeid.security.validator.ocsp.service.AiaOcspServiceConfiguration.ResponderIssuerMatchingPolicy;
 import eu.webeid.security.validator.ocsp.service.DesignatedOcspServiceConfiguration;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 
@@ -59,6 +60,8 @@ public final class AuthTokenValidationConfiguration {
         SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY
     );
     private Collection<URI> nonceDisabledOcspUrls = new HashSet<>();
+    private ResponderIssuerMatchingPolicy aiaOcspResponderIssuerMatchingPolicy =
+        ResponderIssuerMatchingPolicy.EXACT_CERTIFICATE;
 
     AuthTokenValidationConfiguration() {
     }
@@ -73,6 +76,7 @@ public final class AuthTokenValidationConfiguration {
         this.designatedOcspServiceConfiguration = other.designatedOcspServiceConfiguration;
         this.disallowedSubjectCertificatePolicies = Set.copyOf(other.disallowedSubjectCertificatePolicies);
         this.nonceDisabledOcspUrls = Set.copyOf(other.nonceDisabledOcspUrls);
+        this.aiaOcspResponderIssuerMatchingPolicy = other.aiaOcspResponderIssuerMatchingPolicy;
     }
 
     void setSiteOrigin(URI siteOrigin) {
@@ -133,6 +137,14 @@ public final class AuthTokenValidationConfiguration {
 
     public Collection<URI> getNonceDisabledOcspUrls() {
         return nonceDisabledOcspUrls;
+    }
+
+    public ResponderIssuerMatchingPolicy getAiaOcspResponderIssuerMatchingPolicy() {
+        return aiaOcspResponderIssuerMatchingPolicy;
+    }
+
+    void setAiaOcspResponderIssuerMatchingPolicy(ResponderIssuerMatchingPolicy matchingPolicy) {
+        this.aiaOcspResponderIssuerMatchingPolicy = Objects.requireNonNull(matchingPolicy);
     }
 
     /**
