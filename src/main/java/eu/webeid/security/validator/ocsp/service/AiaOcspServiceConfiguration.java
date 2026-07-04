@@ -31,14 +31,38 @@ import java.util.Set;
 
 public class AiaOcspServiceConfiguration {
 
+    /**
+     * Determines how the issuer authorizing an AIA OCSP responder is matched against the subject certificate's
+     * issuer.
+     */
+    public enum ResponderIssuerMatchingPolicy {
+        /** Requires the same encoded X.509 certificate. */
+        EXACT_CERTIFICATE,
+        /**
+         * Accepts different certificates that contain the same subject and public key. Non-anchor intermediate
+         * certificates in the responder's certification path are checked for revocation.
+         */
+        SUBJECT_AND_PUBLIC_KEY
+    }
+
     private final Collection<URI> nonceDisabledOcspUrls;
     private final Set<TrustAnchor> trustedCACertificateAnchors;
     private final CertStore trustedCACertificateCertStore;
+    private final ResponderIssuerMatchingPolicy responderIssuerMatchingPolicy;
 
     public AiaOcspServiceConfiguration(Collection<URI> nonceDisabledOcspUrls, Set<TrustAnchor> trustedCACertificateAnchors, CertStore trustedCACertificateCertStore) {
+        this(nonceDisabledOcspUrls, trustedCACertificateAnchors, trustedCACertificateCertStore,
+            ResponderIssuerMatchingPolicy.EXACT_CERTIFICATE);
+    }
+
+    public AiaOcspServiceConfiguration(Collection<URI> nonceDisabledOcspUrls,
+                                       Set<TrustAnchor> trustedCACertificateAnchors,
+                                       CertStore trustedCACertificateCertStore,
+                                       ResponderIssuerMatchingPolicy responderIssuerMatchingPolicy) {
         this.nonceDisabledOcspUrls = Objects.requireNonNull(nonceDisabledOcspUrls);
         this.trustedCACertificateAnchors = Objects.requireNonNull(trustedCACertificateAnchors);
         this.trustedCACertificateCertStore = Objects.requireNonNull(trustedCACertificateCertStore);
+        this.responderIssuerMatchingPolicy = Objects.requireNonNull(responderIssuerMatchingPolicy);
     }
 
     public Collection<URI> getNonceDisabledOcspUrls() {
@@ -51,6 +75,10 @@ public class AiaOcspServiceConfiguration {
 
     public CertStore getTrustedCACertificateCertStore() {
         return trustedCACertificateCertStore;
+    }
+
+    public ResponderIssuerMatchingPolicy getResponderIssuerMatchingPolicy() {
+        return responderIssuerMatchingPolicy;
     }
 
 }
