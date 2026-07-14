@@ -36,11 +36,10 @@ import java.security.cert.CertStore;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
-
-    private static final String V1_SUPPORTED_TOKEN_FORMAT_PREFIX = "web-eid:1";
+    static final int SUPPORTED_EXACT_MAJOR_VERSION = 1;
+    private static final int SUPPORTED_MINIMAL_MINOR_VERSION = 0;
     private final SubjectCertificateValidatorBatch simpleSubjectCertificateValidators;
     private final Set<TrustAnchor> trustedCACertificateAnchors;
     private final CertStore trustedCACertificateCertStore;
@@ -69,13 +68,12 @@ class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
 
     @Override
     public boolean supports(String format) {
-        return V1_SUPPORTED_TOKEN_FORMAT_PREFIX.equals(format)
-            || "web-eid:1.0".equals(format);
+        return AuthTokenVersion.supports(format, SUPPORTED_EXACT_MAJOR_VERSION, SUPPORTED_MINIMAL_MINOR_VERSION);
     }
 
     @Override
     public X509Certificate validate(WebEidAuthToken token, String currentChallengeNonce) throws AuthTokenException {
-        if (isExactV10Format(token.getFormat()) && token.getUnverifiedSigningCertificates() != null) {
+        if (AuthTokenVersion.supportsExactly(token.getFormat(), SUPPORTED_EXACT_MAJOR_VERSION, SUPPORTED_MINIMAL_MINOR_VERSION) && token.getUnverifiedSigningCertificates() != null) {
             throw new AuthTokenParseException(
                 "'unverifiedSigningCertificates' field is not allowed for format '" + token.getFormat() + "'"
             );
@@ -107,9 +105,5 @@ class AuthTokenVersion1Validator implements AuthTokenVersionValidator {
         );
 
         return subjectCertificate;
-    }
-
-    private static boolean isExactV10Format(String format) {
-        return V1_SUPPORTED_TOKEN_FORMAT_PREFIX.equals(format) || "web-eid:1.0".equals(format);
     }
 }
