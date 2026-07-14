@@ -82,15 +82,15 @@ class AuthTokenVersion11ValidatorTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"web-eid:1.1"})
-    void whenFormatIsV11_thenSupportsReturnsTrue(String format) {
+    @ValueSource(strings = {"web-eid:1.1", "web-eid:1.2", "web-eid:1.10", "web-eid:1.999"})
+    void whenFormatIsV11OrHigherMinorVersion_thenSupportsReturnsTrue(String format) {
         assertThat(validator.supports(format)).isTrue();
     }
 
     @ParameterizedTest
     @NullAndEmptySource
-    @ValueSource(strings = {"web-eid:1", "web-eid:1.0", "web-eid:1.1.0", "web-eid:1.10", "web-eid:1.2", "web-eid:2", "webauthn:1.1"})
-    void whenFormatIsNullEmptyOrNotV11_thenSupportsReturnsFalse(String format) {
+    @ValueSource(strings = {"web-eid:1", "web-eid:1.0", "web-eid:1.", "web-eid:1.0TEST", "web-eid:1.00", "web-eid:1.1.0", "web-eid:2", "web-eid:0.9", "webauthn:1.1"})
+    void whenFormatIsNullEmptyMinorVersion0NonCanonicalOrMalformed_thenSupportsReturnsFalse(String format) {
         assertThat(validator.supports(format)).isFalse();
     }
 
