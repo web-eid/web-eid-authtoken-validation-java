@@ -28,7 +28,10 @@ import eu.webeid.security.exceptions.AuthTokenSignatureValidationException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
 import eu.webeid.security.testutil.AuthTokenValidators;
 import eu.webeid.security.util.DateAndTime;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 import java.security.cert.X509Certificate;
 
@@ -45,6 +48,22 @@ class AuthTokenSignatureTest extends AbstractTestWithValidator {
         "\"appVersion\":\"https://web-eid.eu/web-eid-app/releases/2.0.0+0\"," +
         "\"signature\":\"arx164xRiwhIQDINe0J+ZxJWZFOQTx0PBtOaWaxAe7gofEIHRIbV1w0sOCYBJnvmvMem9hU4nc2+iJx2x8poYck4Z6eI3GwtiksIec3XQ9ZIk1n/XchXnmPn3GYV+HzJ\"," +
         "\"format\":\"web-eid:1.0\"}";
+
+    private MockedStatic<DateAndTime.DefaultClock> mockedClock;
+
+    @Override
+    @BeforeEach
+    protected void setup() {
+        super.setup();
+        mockedClock = mockStatic(DateAndTime.DefaultClock.class);
+        // Ensure that the certificates do not expire.
+        mockDate("2021-07-23", mockedClock);
+    }
+
+    @AfterEach
+    void tearDown() {
+        mockedClock.close();
+    }
 
     @Test
     void whenValidTokenAndNonce_thenValidationSucceeds() throws Exception {
@@ -80,15 +99,11 @@ class AuthTokenSignatureTest extends AbstractTestWithValidator {
 
     @Test
     void whenTokenWithWrongCert_thenValidationFails() throws Exception {
-        // Ensure that the certificate does not expire.
-        try (final var mockedClock = mockStatic(DateAndTime.DefaultClock.class)) {
-            mockDate("2024-08-01", mockedClock);
-            final AuthTokenValidator authTokenValidator = AuthTokenValidators.getAuthTokenValidator();
-            final WebEidAuthToken authTokenWithWrongCert = authTokenValidator.parse(AUTH_TOKEN_WRONG_CERT);
-            assertThatThrownBy(() -> authTokenValidator
-                .validate(authTokenWithWrongCert, VALID_CHALLENGE_NONCE))
-                .isInstanceOf(AuthTokenSignatureValidationException.class);
-        }
+        final AuthTokenValidator authTokenValidator = AuthTokenValidators.getAuthTokenValidator();
+        final WebEidAuthToken authTokenWithWrongCert = authTokenValidator.parse(AUTH_TOKEN_WRONG_CERT);
+        assertThatThrownBy(() -> authTokenValidator
+            .validate(authTokenWithWrongCert, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(AuthTokenSignatureValidationException.class);
     }
 
 }
