@@ -22,15 +22,36 @@
 
 package eu.webeid.security.validator;
 
-import org.junit.jupiter.api.Test;
 import eu.webeid.security.authtoken.WebEidAuthToken;
-import eu.webeid.security.exceptions.AuthTokenParseException;
 import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.exceptions.AuthTokenParseException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
+import eu.webeid.security.util.DateAndTime;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
+import static eu.webeid.security.testutil.DateMocker.mockDate;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mockStatic;
 
 class AuthTokenAlgorithmTest extends AbstractTestWithValidator {
+    private MockedStatic<DateAndTime.DefaultClock> mockedClock;
+
+    @Override
+    @BeforeEach
+    protected void setup() {
+        super.setup();
+        mockedClock = mockStatic(DateAndTime.DefaultClock.class);
+        // Ensure that the certificates do not expire.
+        mockDate("2021-07-23", mockedClock);
+    }
+
+    @AfterEach
+    void tearDown() {
+        mockedClock.close();
+    }
 
     @Test
     void whenAlgorithmNone_thenValidationFails() throws AuthTokenException {
