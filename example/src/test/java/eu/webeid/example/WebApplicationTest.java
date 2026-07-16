@@ -103,6 +103,7 @@ public class WebApplicationTest {
         session.setAttribute("challenge-nonce", new ChallengeNonce(ObjectMother.VALID_CHALLENGE_NONCE, DateAndTime.utcNow().plusMinutes(1)));
 
         Dates.setMockedSignatureDate(Dates.getSigningDateTime());
+        Dates.setMockedAuthTokenValidationDate(Dates.getAuthTokenValidationDateTime());
 
         // Act and assert
         mvcBuilder.build().perform(get("/auth/challenge"));
