@@ -99,7 +99,7 @@ import eu.webeid.security.challenge.ChallengeNonceStore;
 
 ## 4. Add trusted certificate authority certificates
 
-You must explicitly specify which **intermediate** certificate authorities (CAs) are trusted to issue the eID authentication and OCSP responder certificates. CA certificates can be loaded from either the truststore file, resources or any stream source. We use the [`CertificateLoader`](src/main/java/eu/webeid/security/certificate/CertificateLoader.java) helper class to load CA certificates from resources here, but consider loading the truststore file (see [loadTrustedCACertificatesFromTrustStore](example/src/main/java/eu/webeid/example/config/ValidationConfiguration.java#L104-L123)) instead.
+You must explicitly specify which **intermediate** certificate authorities (CAs) are trusted to issue the eID authentication and OCSP responder certificates. CA certificates can be loaded from either the truststore file, resources or any stream source. We use the [`CertificateLoader`](src/main/java/eu/webeid/security/certificate/CertificateLoader.java) helper class to load CA certificates from resources here, but consider loading the truststore file (see [loadTrustedCACertificatesFromTrustStore](example/src/main/java/eu/webeid/example/config/ValidationConfiguration.java#L115-L142)) instead.
 
 First, copy the trusted certificates, for example `ESTEID2018.cer`, to `resources/cacerts/`, then load the certificates as follows:
 
@@ -121,13 +121,14 @@ The mandatory parameters are the website origin (the URL serving the web applica
 The authentication token validator will be used in the login processing component of your web application authentication framework; it is thread-safe and should be scoped as a singleton.
 
 ```java
+import java.net.URI;
 import eu.webeid.security.validator.AuthTokenValidator;
 import eu.webeid.security.validator.AuthTokenValidatorBuilder;
 
 ...
     public AuthTokenValidator tokenValidator() throws JceException {
         return new AuthTokenValidatorBuilder()
-                .withSiteOrigin("https://example.org")
+                .withSiteOrigin(URI.create("https://example.org"))
                 .withTrustedCertificateAuthorities(trustedIntermediateCACertificates())
                 .build();
     }
@@ -197,8 +198,11 @@ protected void doFilterInternal(@NonNull HttpServletRequest request,
 
     var challenge = nonceGenerator.generateAndStoreNonce();
 
-    String loginUri = ServletUriComponentsBuilder.fromCurrentContextPath()
-        .path(mobileLoginPath).build().toUriString();
+    String loginUri = UriComponentsBuilder
+        .fromUriString(webEidAuthTokenProperties.validation().localOrigin())
+        .path(mobileLoginPath)
+        .build()
+        .toUriString();
 
     String payloadJson = OBJECT_WRITER.writeValueAsString(
         new AuthPayload(challenge.getBase64EncodedNonce(), loginUri,
@@ -216,9 +220,9 @@ Both filters are registered in the Spring Security filter chain in ApplicationCo
 See the full implementation [here](example/src/main/java/eu/webeid/example/config/ApplicationConfiguration.java):
 ```java
 http
-    .addFilterBefore(new WebEidMobileAuthInitFilter("/auth/mobile/init", "/auth/mobile/login", challengeNonceGenerator, webEidMobileProperties), 
-        UsernamePasswordAuthenticationFilter.class)
-    .addFilterBefore(new WebEidChallengeNonceFilter("/auth/challenge", challengeNonceGenerator), 
+    .addFilterBefore(new WebEidMobileAuthInitFilter("/auth/mobile/init", "/auth/mobile/login", challengeNonceGenerator,
+                     webEidMobileProperties, webEidAuthTokenProperties), UsernamePasswordAuthenticationFilter.class)
+    .addFilterBefore(new WebEidChallengeNonceFilter("/auth/challenge", challengeNonceGenerator),
         UsernamePasswordAuthenticationFilter.class)
 ```
 
@@ -234,7 +238,7 @@ When using [Spring Security](https://spring.io/guides/topicals/spring-security-a
 - implement an AJAX authentication processing filter that extracts the authentication token and passes it to the authentication manager as shown [here](example/src/main/java/eu/webeid/example/security/WebEidAjaxLoginProcessingFilter.java),
 - configure the authentication provider and authentication processing filter in the application configuration as shown [here](example/src/main/java/eu/webeid/example/config/ApplicationConfiguration.java).
 
-The gist of the validation is [in the `authenticate()` method](example/src/main/java/eu/webeid/example/security/WebEidAuthenticationProvider.java#L74-L76) of the authentication provider:
+The gist of the validation is [in the `authenticate()` method](example/src/main/java/eu/webeid/example/security/WebEidAuthenticationProvider.java#L77-L84) of the authentication provider:
 
 ```java
 try {
@@ -395,7 +399,7 @@ X509Certificate userCertificate = tokenValidator.validate(token, challengeNonce)
 The `validate()` method returns the validated user certificate object if validation is successful or throws an exception as described in section *[Possible validation errors](#possible-validation-errors)* below if validation fails. The `CertificateData` and `TitleCase` classes can be used for extracting user information from the user certificate object:
 
 ```java  
-import eu.webeid.security.certificate;
+import eu.webeid.security.certificate.CertificateData;
 import static eu.webeid.security.util.Strings.toTitleCase;
 
 ...
@@ -425,7 +429,7 @@ Extended configuration example:
 
 ```java  
 AuthTokenValidator validator = new AuthTokenValidatorBuilder()
-    .withSiteOrigin("https://example.org")
+    .withSiteOrigin(URI.create("https://example.org"))
     .withTrustedCertificateAuthorities(trustedCertificateAuthorities())
     .withoutUserCertificateRevocationCheckWithOcsp()
     .withDisallowedCertificatePolicies(new ASN1ObjectIdentifier("1.2.3"))
@@ -464,11 +468,11 @@ Nonce usage is described in more detail in the [Web eID system architecture docu
 
 ## Basic usage
 
-As described in section *[3. Configure the nonce generator](#3-configure-the-nonce-generator)*, the only mandatory configuration parameter of the challenge nonce generator is the challenge nonce store.
+As described in section *[3. Configure the challenge nonce generator](#3-configure-the-challenge-nonce-generator)*, the only mandatory configuration parameter of the challenge nonce generator is the challenge nonce store.
 
 The challenge nonce store is used to save the nonce value along with the nonce expiry time. It must be possible to look up the challenge nonce data structure from the store using an identifier specific to the browser session. The values from the store are used by the token validator as described in the section *[Authentication token validation > Basic usage](#basic-usage)* that also contains recommendations for store usage and configuration.
 
-The nonce generator configuration and construction is described in more detail in section *[3. Configure the nonce generator](#3-configure-the-nonce-generator)*. Once the generator object has been constructed, it can be used for generating nonces as follows:
+The nonce generator configuration and construction is described in more detail in section *[3. Configure the challenge nonce generator](#3-configure-the-challenge-nonce-generator)*. Once the generator object has been constructed, it can be used for generating nonces as follows:
 
 ```java  
 ChallengeNonce challengeNonce = nonceGenerator.generateAndStoreNonce();  
