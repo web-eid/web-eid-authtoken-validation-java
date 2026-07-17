@@ -223,7 +223,7 @@ http
     .addFilterBefore(new WebEidMobileAuthInitFilter("/auth/mobile/init", "/auth/mobile/login", challengeNonceGenerator,
                      webEidMobileProperties, webEidAuthTokenProperties), UsernamePasswordAuthenticationFilter.class)
     .addFilterBefore(new WebEidChallengeNonceFilter("/auth/challenge", challengeNonceGenerator),
-        UsernamePasswordAuthenticationFilter.class)
+        UsernamePasswordAuthenticationFilter.class);
 ```
 
 Also, see general guidelines for implementing secure authentication services [here](https://github.com/SK-EID/smart-id-documentation/wiki/Secure-Implementation-Guide).
@@ -282,7 +282,7 @@ In the following,
 - **origin** is defined as the website origin, the URL serving the web application,
 - **challenge nonce** (or challenge) is defined as a cryptographic nonce, a large random number that can be used only once, with at least 256 bits of entropy.
 
-The Web eID authentication token (format **`web-eid:1.0`**) is a JSON data structure that looks like the following example:
+A Web eID authentication token in **`web-eid:1.0`** format is a JSON data structure that looks like the following example:
 
 ```json
 {
@@ -308,13 +308,13 @@ It contains the following fields:
 
 - `signature`: the base64-encoded signature of the token (see the description below),
 
-- `format`: the type identifier and version of the token format separated by a colon character '`:`', `web-eid:1.0` as of now; the version number consists of the major and minor number separated by a dot, major version changes are incompatible with previous versions, minor version changes are backwards-compatible within the given major version,
+- `format`: the type identifier and version of the token format separated by a colon character '`:`', `web-eid:1.0` or `web-eid:1.1` as of now; the version number consists of the major and minor number separated by a dot, major version changes are incompatible with previous versions, minor version changes are backwards-compatible within the given major version,
 
 - `appVersion`: the URL identifying the name and version of the application that issued the token; informative purpose, can be used to identify the affected application in case of faulty tokens.
 
 The value that is signed by the user’s authentication private key and included in the `signature` field is `hash(origin)+hash(challenge)`. The hash function is used before concatenation to ensure field separation as the hash of a value is guaranteed to have a fixed length. Otherwise the origin `example.com` with challenge nonce `.eu1234` and another origin `example.com.eu` with challenge nonce `1234` would result in the same value after concatenation. The hash function `hash` is the same hash function that is used in the signature algorithm, for example SHA256 in case of RS256.
 
-The Web eID authentication token (format **`web-eid:1.1`**) is a JSON data structure that looks like the following example:
+A Web eID authentication token in **`web-eid:1.1`** format is a JSON data structure that looks like the following example:
 
 ```json
 {
@@ -358,23 +358,24 @@ Allowed values are:
 
     cryptoAlgorithm: "ECC", "RSA"
 
-    hashFunction: 
-      "SHA-224", "SHA-256", "SHA-384", "SHA-512", 
+    hashFunction:
+      "SHA-224", "SHA-256", "SHA-384", "SHA-512",
       "SHA3-224", "SHA3-256", "SHA3-384", "SHA3-512"
 
     paddingScheme: "NONE", "PKCS1.5", "PSS"
 
 # Authentication token validation
 
-The authentication token validation process consists of two stages:
+The authentication token validation process consists of the following stages:
 
 - First, **user certificate validation**: the validator parses the token and extracts the user certificate from the *unverifiedCertificate* field. Then it checks the certificate expiration, purpose and policies. Next it checks that the certificate is signed by a trusted CA and checks the certificate status with OCSP.
 - Second, **token signature validation**: the validator validates that the token signature was created using the provided user certificate by reconstructing the signed data `hash(origin)+hash(challenge)` and using the public key from the certificate to verify the signature in the `signature` field. If the signature verification succeeds, then the origin and challenge nonce have been implicitly and correctly verified without the need to implement any additional security checks.
 - Additional validation for **Web eID authentication tokens (format v1.1)**: the token must contain the `unverifiedSigningCertificates` field with at least one signing certificate entry. Each entry's `supportedSignatureAlgorithms` are validated against the set of allowed cryptographic algorithms, hash functions, and padding schemes. For each signing certificate, the following checks are performed:
     - The subject must match the subject of the authentication certificate, ensuring both certificates belong to the same user.
     - The issuing authority must match that of the authentication certificate, verified via the Authority Key Identifier (AKI) extension.
-    - The certificate must not be expired.
+    - The certificate must be within its validity period.
     - The certificate must contain the non-repudiation key usage bit required for digital signatures.
+    - The certificate chain must validate against the configured trusted certificate authorities.
 
 The website back end must look up the challenge nonce from its local store using an identifier specific to the browser session, to guarantee that the authentication token was received from the same browser to which the corresponding challenge nonce was issued. The website back end must guarantee that the challenge nonce lifetime is limited and that its expiration is checked, and that it can be used only once by removing it from the store during validation.
 
@@ -502,11 +503,11 @@ In version 1, the generated challenge nonces were stored in a JSR107 compatible 
 
 In the internal implementation, the Web eID authentication token format changed in version 2. In version 1, the authentication token was in the OpenID X509 ID Token (JWT) format in order to be compatible with the standard OpenID Connect ID Token specification. During independent security review it was pointed out that any similarities of the Web eID authentication token to the JWT format are actually undesirable, as they would imply that the claims presented in the Web eID authentication token can be trusted and processed, while in fact they must be ignored, as they can be manipulated at the client side. The presence of the claims in the authentication token introduces a risk of vulnerabilities in case the authentication implementer decides to rely on any of them for making security critical decisions or decides to apply the same standard validation workflow that is applied to standard JWTs. Since there does not exist a standardized format for an authentication proof that corresponds to the requirements of the Web eID authentication protocol, a special purpose JSON-based format for the Web eID authentication token was adopted in version 2. The format is described in detail in the section *[Authentication token format](#authentication-token-format)*, and the full analysis of the format change is available in [this article](https://web-eid.github.io/web-eid-system-architecture-doc/web-eid-auth-token-v2-format-spec.pdf).
 
-# Authentication Token Format Versions
+# Authentication token format versions
 
 The Web eID authentication protocol defines two token formats currently supported by this library:
 
-- **Format v1.0** – Used in desktop Web eID authentication flows with traditional smart card readers.  
+- **Format v1.0** – Used in desktop Web eID authentication flows with traditional smart card readers.
 
 - **Format v1.1** – An extended authentication token format that allows signing certificate information to be included in the authentication response.
   - `unverifiedSigningCertificates` – an array of signing certificate entries. Each entry contains:
