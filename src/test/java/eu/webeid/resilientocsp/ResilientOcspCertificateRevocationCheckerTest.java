@@ -29,6 +29,7 @@ import eu.webeid.ocsp.exceptions.UserCertificateOCSPException;
 import eu.webeid.ocsp.service.FallbackOcspService;
 import eu.webeid.ocsp.service.OcspService;
 import eu.webeid.ocsp.service.OcspServiceProvider;
+import eu.webeid.resilientocsp.ResilientOcspCertificateRevocationChecker.CircuitBreakerStatistics;
 import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateOCSPCheckFailedException;
 import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateRevokedException;
 import eu.webeid.security.authtoken.WebEidAuthToken;
@@ -532,6 +533,121 @@ class ResilientOcspCertificateRevocationCheckerTest {
     }
 
     @Test
+    void whenPrimaryAnswersInHalfOpenState_thenStatisticsReportHalfOpenState() throws Exception {
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any()))
+            .thenThrow(new OCSPClientException("Primary OCSP service unavailable"))
+            .thenThrow(new OCSPClientException("Primary OCSP service unavailable"))
+            .thenReturn(ocspRespGood);
+        when(ocspClient.request(eq(FALLBACK_URI), any())).thenReturn(ocspRespGood);
+        CircuitBreakerConfig recoverableCircuitBreakerConfig = CircuitBreakerConfig.custom()
+            .slidingWindowSize(2)
+            .minimumNumberOfCalls(2)
+            .failureRateThreshold(50)
+            .waitDurationInOpenState(Duration.ofSeconds(1))
+            .permittedNumberOfCallsInHalfOpenState(1)
+            .build();
+        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient)
+            .withFallbacks(FALLBACK_URI)
+            .withCircuitBreakerConfig(recoverableCircuitBreakerConfig)
+            .build();
+        // The first two calls fail on the primary and trip the breaker.
+        checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
+        checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
+        // Let the open state expire without calling the checker, so that the next call is the one that the
+        // circuit breaker permits in half open state.
+        await().pollDelay(waitLongerThan(Duration.ofSeconds(1)))
+            .atMost(Duration.ofSeconds(10))
+            .until(() -> true);
+
+        List<RevocationInfo> revocationInfoList =
+            checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
+
+        assertThat(revocationInfoList.get(0).ocspResponderUri()).isEqualTo(PRIMARY_URI);
+        // The primary answered, so the circuit breaker permitted the call in half open state.
+        // The reported state must not contradict which responder answered.
+        assertThat(getCircuitBreakerStatistics(revocationInfoList.get(0)).state())
+            .isEqualTo(CircuitBreaker.State.HALF_OPEN);
+    }
+
+    @Test
+    void whenPrimaryFailsInHalfOpenStateAndFallbackAnswers_thenStatisticsReportHalfOpenState() throws Exception {
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any())).thenThrow(new OCSPClientException("Primary OCSP service unavailable"));
+        when(ocspClient.request(eq(FALLBACK_URI), any())).thenReturn(ocspRespGood);
+        CircuitBreakerConfig recoverableCircuitBreakerConfig = CircuitBreakerConfig.custom()
+            .slidingWindowSize(2)
+            .minimumNumberOfCalls(2)
+            .failureRateThreshold(50)
+            .waitDurationInOpenState(Duration.ofSeconds(1))
+            .permittedNumberOfCallsInHalfOpenState(1)
+            .build();
+        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient)
+            .withFallbacks(FALLBACK_URI)
+            .withCircuitBreakerConfig(recoverableCircuitBreakerConfig)
+            .build();
+        // The first two calls fail on the primary and trip the breaker.
+        checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
+        checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
+        // Let the open state expire without calling the checker, so that the next call is the one that the
+        // circuit breaker permits in half open state.
+        await().pollDelay(waitLongerThan(Duration.ofSeconds(1)))
+            .atMost(Duration.ofSeconds(10))
+            .until(() -> true);
+
+        List<RevocationInfo> revocationInfoList =
+            checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
+        // The next call finds the freshly re-opened breaker: the primary is not called and the statistics
+        // are a new snapshot that reports the OPEN state that rejected the call.
+        List<RevocationInfo> reopenedRevocationInfoList =
+            checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
+
+        assertThat(revocationInfoList).hasSize(2);
+        assertThat(revocationInfoList.get(0).ocspResponderUri()).isEqualTo(PRIMARY_URI);
+        assertThat(revocationInfoList.get(1).ocspResponderUri()).isEqualTo(FALLBACK_URI);
+        // The breaker permitted the primary call in half open state and re-opened when the call failed,
+        // before the fallback ran. The statistics must keep the snapshot taken when the primary request
+        // started (HALF_OPEN): neither the expired OPEN state that a snapshot taken before the call would
+        // report, nor the re-opened OPEN state that a capture in the fallback path would take.
+        assertThat(getCircuitBreakerStatistics(revocationInfoList.get(0)).state())
+            .isEqualTo(CircuitBreaker.State.HALF_OPEN);
+        assertThat(reopenedRevocationInfoList).hasSize(1);
+        assertThat(reopenedRevocationInfoList.get(0).ocspResponderUri()).isEqualTo(FALLBACK_URI);
+        assertThat(getCircuitBreakerStatistics(reopenedRevocationInfoList.get(0)).state())
+            .isEqualTo(CircuitBreaker.State.OPEN);
+        verify(ocspClient, times(3)).request(eq(PRIMARY_URI), any());
+    }
+
+    @Test
+    void whenPrimaryFailsInClosedState_thenStatisticsDoNotIncludeCurrentCallFailure() throws Exception {
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any())).thenThrow(new OCSPClientException("Primary OCSP service unavailable"));
+        when(ocspClient.request(eq(FALLBACK_URI), any())).thenReturn(ocspRespGood);
+        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient)
+            .withFallbacks(FALLBACK_URI)
+            .build();
+
+        List<RevocationInfo> firstCallRevocationInfoList =
+            checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
+        List<RevocationInfo> secondCallRevocationInfoList =
+            checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
+
+        // The statistics are captured when the primary request starts, so the outcome of the very call they
+        // are attached to is not yet included: the first call reports no recorded calls at all and the
+        // second call reports only the first call's failure.
+        CircuitBreakerStatistics firstCallStatistics =
+            getCircuitBreakerStatistics(firstCallRevocationInfoList.get(0));
+        assertThat(firstCallStatistics.state()).isEqualTo(CircuitBreaker.State.CLOSED);
+        assertThat(firstCallStatistics.numberOfBufferedCalls()).isZero();
+        assertThat(firstCallStatistics.numberOfFailedCalls()).isZero();
+        CircuitBreakerStatistics secondCallStatistics =
+            getCircuitBreakerStatistics(secondCallRevocationInfoList.get(0));
+        assertThat(secondCallStatistics.state()).isEqualTo(CircuitBreaker.State.CLOSED);
+        assertThat(secondCallStatistics.numberOfBufferedCalls()).isEqualTo(1);
+        assertThat(secondCallStatistics.numberOfFailedCalls()).isEqualTo(1);
+    }
+
+    @Test
     void whenOcspRequestFailsWithStatusCode_thenRevocationInfoContainsHttpStatusCodeAndResponseBody() throws Exception {
         byte[] responseBody = "error".getBytes();
         OCSPClientException ocspClientException = new OCSPClientException("OCSP request was not successful", responseBody, 503);
@@ -787,12 +903,15 @@ class ResilientOcspCertificateRevocationCheckerTest {
 
         assertThat(revocationInfoList).hasSize(1);
         assertThat(revocationInfoList.get(0).ocspResponderUri()).isEqualTo(FALLBACK_URI);
-        ResilientOcspCertificateRevocationChecker.CircuitBreakerStatistics statistics =
-            (ResilientOcspCertificateRevocationChecker.CircuitBreakerStatistics)
+        CircuitBreakerStatistics statistics =
+            (CircuitBreakerStatistics)
                 revocationInfoList.get(0).ocspResponseAttributes().get(RevocationInfo.KEY_CIRCUIT_BREAKER_STATISTICS);
         assertThat(statistics).isNotNull();
         assertThat(statistics.state()).isEqualTo(CircuitBreaker.State.OPEN);
         assertThat(statistics.numberOfFailedCalls()).isEqualTo(2);
+        // The circuit breaker rejected the primary call, so the snapshot is taken when the fallback request
+        // starts and includes the rejection of this very call.
+        assertThat(statistics.numberOfNotPermittedCalls()).isEqualTo(1);
     }
 
     @Test
@@ -998,6 +1117,17 @@ class ResilientOcspCertificateRevocationCheckerTest {
         MockedStatic<DateAndTime.DefaultClock> mockedClock = Mockito.mockStatic(DateAndTime.DefaultClock.class);
         mockDate(isoDateTime, mockedClock);
         return mockedClock;
+    }
+
+    // Overshooting the open-state duration is safe: the breaker transitions to HALF_OPEN lazily, when the
+    // next call asks for permission, not on a timer.
+    private static Duration waitLongerThan(Duration waitDurationInOpenState) {
+        return waitDurationInOpenState.plusMillis(500);
+    }
+
+    private static CircuitBreakerStatistics getCircuitBreakerStatistics(RevocationInfo revocationInfo) {
+        return (CircuitBreakerStatistics)
+            revocationInfo.ocspResponseAttributes().get(RevocationInfo.KEY_CIRCUIT_BREAKER_STATISTICS);
     }
 
     private static CertificateStatus getCertificateStatus(RevocationInfo revocationInfo) throws Exception {
