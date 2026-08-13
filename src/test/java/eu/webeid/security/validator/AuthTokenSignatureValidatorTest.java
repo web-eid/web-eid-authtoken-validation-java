@@ -7,13 +7,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.certificate.CertificateLoader;
+import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.AuthTokenParseException;
 import eu.webeid.security.exceptions.AuthTokenSignatureValidationException;
 import io.jsonwebtoken.security.SignatureException;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
+import java.security.KeyPairGenerator;
+import java.security.PublicKey;
 import java.security.cert.X509Certificate;
+import java.security.spec.ECGenParameterSpec;
 
 import static eu.webeid.security.testutil.AbstractTestWithValidator.VALID_AUTH_TOKEN;
 import static eu.webeid.security.testutil.AbstractTestWithValidator.VALID_CHALLENGE_NONCE;
@@ -71,6 +75,41 @@ class AuthTokenSignatureValidatorTest {
         assertThatCode(() -> signatureValidator
             .validate("RS256", authToken.signature(), x509Certificate.getPublicKey(), VALID_CHALLENGE_NONCE))
             .doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenRsaKeyIsTooShortForAlgorithm_thenThrowsAuthTokenSignatureValidationException() throws Exception {
+        final AuthTokenSignatureValidator signatureValidator =
+            new AuthTokenSignatureValidator(URI.create("https://ria.ee"));
+
+        final KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+        keyPairGenerator.initialize(1024);
+        final PublicKey weakPublicKey = keyPairGenerator.generateKeyPair().getPublic();
+
+        final WebEidAuthToken authToken = OBJECT_READER.readValue(VALID_RS256_AUTH_TOKEN);
+
+        // The public key comes from the unverified certificate of the token, so a key that JJWT refuses
+        // to use must fail with a checked AuthTokenException, not with an unchecked JJWT exception.
+        assertThatThrownBy(() -> signatureValidator
+            .validate("RS256", authToken.signature(), weakPublicKey, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(AuthTokenSignatureValidationException.class);
+    }
+
+    @Test
+    void whenEcKeyDoesNotMatchAlgorithm_thenThrowsAuthTokenSignatureValidationException() throws Exception {
+        final AuthTokenSignatureValidator signatureValidator =
+            new AuthTokenSignatureValidator(URI.create("https://ria.ee"));
+
+        final KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("EC");
+        keyPairGenerator.initialize(new ECGenParameterSpec("secp256r1"));
+        final PublicKey p256PublicKey = keyPairGenerator.generateKeyPair().getPublic();
+
+        final WebEidAuthToken authToken = OBJECT_READER.readValue(VALID_AUTH_TOKEN);
+
+        // ES512 requires a P-521 key, so JJWT rejects the P-256 key of the unverified certificate.
+        assertThatThrownBy(() -> signatureValidator
+            .validate("ES512", authToken.signature(), p256PublicKey, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(AuthTokenException.class);
     }
 
 }
