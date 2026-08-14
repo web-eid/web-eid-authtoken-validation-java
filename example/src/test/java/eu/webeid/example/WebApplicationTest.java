@@ -47,13 +47,18 @@ import eu.webeid.security.util.DateAndTime;
 import eu.webeid.security.validator.certvalidators.SubjectCertificateNotRevokedValidator;
 
 import java.security.cert.X509Certificate;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @SpringBootTest
 @WebAppConfiguration
 public class WebApplicationTest {
+
+    private static final Pattern CSRF_TOKEN_META_TAG = Pattern.compile("<meta id=\"csrftoken\" name=\"csrftoken\" content=\"[^\"]+\"/>");
 
     @Autowired
     private WebApplicationContext context;
@@ -78,7 +83,11 @@ public class WebApplicationTest {
             .getResponse();
         // @formatter:on
         assertEquals(HttpStatus.OK.value(), response.getStatus());
-        System.out.println(response.getContentAsString());
+        assertNull(response.getCookie("XSRF-TOKEN"));
+        String content = response.getContentAsString();
+        assertTrue(CSRF_TOKEN_META_TAG.matcher(content).find());
+        assertTrue(content.contains("<meta id=\"csrfheadername\" name=\"csrfheadername\" content=\"X-CSRF-TOKEN\"/>"));
+        System.out.println(content);
     }
 
     @Test

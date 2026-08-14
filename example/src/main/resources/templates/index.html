@@ -248,14 +248,12 @@
 <script type="module">
     "use strict";
     import * as webeid from "/js/web-eid.js";
+    import {csrfHeader} from "/js/csrf.js";
     import {hideErrorMessage, showErrorMessage, checkHttpError} from "/js/errors.js";
 
     hideErrorMessage();
 
     const authButton = document.querySelector("#webeid-auth-button");
-
-    const csrfToken = document.querySelector('#csrftoken').content;
-    const csrfHeaderName = document.querySelector('#csrfheadername').content;
 
     const lang = new URLSearchParams(window.location.search).get("lang") || "en";
 
@@ -279,7 +277,7 @@
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    [csrfHeaderName]: csrfToken
+                    ...csrfHeader()
                 },
                 body: `{"auth-token": ${JSON.stringify(authToken)}}`
             });

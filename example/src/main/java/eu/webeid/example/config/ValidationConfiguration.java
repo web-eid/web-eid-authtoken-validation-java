@@ -91,11 +91,6 @@ public class ValidationConfiguration {
         }
     }
 
-    @Bean
-    public YAMLConfig yamlConfig() {
-        return new YAMLConfig();
-    }
-
     private X509Certificate[] loadTrustedCACertificatesFromCerFiles() {
         List<X509Certificate> caCertificates = new ArrayList<>();
 

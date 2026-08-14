@@ -142,7 +142,9 @@ The main configuration file `src/main/resources/application.yaml` is shared by a
 
 Besides configuration settings, the trusted certificate authority certificates may need to be configured as described in section [_3. Configure the trusted certificate authority certificates_](#3-configure-the-trusted-certificate-authority-certificates) above.
 
-Spring Security has CSRF protection enabled by default. Web eID requires CSRF protection.
+Spring Security has CSRF protection enabled by default. Web eID requires CSRF protection. By default, the frontend reads
+CSRF tokens from Thymeleaf meta tags. Set `web-eid-auth-token.csrf.use-spa-configuration=true` to use Spring Security's
+SPA-compatible CSRF setup with a JavaScript-readable `XSRF-TOKEN` cookie.
 
 ### Integration with Web eID components
 
