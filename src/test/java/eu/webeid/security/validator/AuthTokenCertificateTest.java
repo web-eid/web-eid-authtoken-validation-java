@@ -44,7 +44,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
 import java.security.cert.CertificateException;
+import java.util.Base64;
 
+import static eu.webeid.security.testutil.Certificates.getCertificateWithoutCertificatePolicies;
 import static eu.webeid.security.testutil.DateMocker.mockDate;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -168,6 +170,16 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
             .isInstanceOf(UserCertificateDisallowedPolicyException.class);
+    }
+
+    @Test
+    void whenCertificatePoliciesExtensionIsMissing_thenValidationContinuesToTrustCheck() throws Exception {
+        final String certificateWithoutPolicies = Base64.getEncoder()
+            .encodeToString(getCertificateWithoutCertificatePolicies().getEncoded());
+        final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", certificateWithoutPolicies);
+        assertThatThrownBy(() -> validator
+            .validate(token, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(CertificateNotTrustedException.class);
     }
 
     @Test

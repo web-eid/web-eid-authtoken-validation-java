@@ -51,6 +51,7 @@ public final class SubjectCertificatePolicyValidator {
 
     /**
      * Validates that the user certificate policies match the configured policies.
+     * A certificate without the certificate policies extension does not contain disallowed policies and passes validation.
      *
      * @param subjectCertificate user certificate to be validated
      * @throws UserCertificateDisallowedPolicyException when user certificate policy does not match the configured policies.
@@ -58,6 +59,10 @@ public final class SubjectCertificatePolicyValidator {
      */
     public void validateCertificatePolicies(X509Certificate subjectCertificate) throws AuthTokenException {
         final byte[] extensionValue = subjectCertificate.getExtensionValue(Extension.certificatePolicies.getId());
+        if (extensionValue == null) {
+            LOG.debug("User certificate does not contain the certificate policies extension, hence it does not contain disallowed policies.");
+            return;
+        }
         try {
             final CertificatePolicies policies = CertificatePolicies.getInstance(
                 JcaX509ExtensionUtils.parseExtensionValue(extensionValue)
