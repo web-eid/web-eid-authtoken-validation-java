@@ -40,7 +40,7 @@ import static eu.webeid.security.util.Collections.newHashSet;
 import static eu.webeid.security.util.DateAndTime.requirePositiveDuration;
 
 /**
- * Stores configuration parameters for {@link AuthTokenValidatorImpl}.
+ * Stores configuration parameters for {@link AuthTokenValidatorManager}.
  */
 public final class AuthTokenValidationConfiguration {
 
@@ -79,15 +79,15 @@ public final class AuthTokenValidationConfiguration {
         this.siteOrigin = siteOrigin;
     }
 
-    URI getSiteOrigin() {
+    public URI getSiteOrigin() {
         return siteOrigin;
     }
 
-    Collection<X509Certificate> getTrustedCACertificates() {
+    public Collection<X509Certificate> getTrustedCACertificates() {
         return trustedCACertificates;
     }
 
-    boolean isUserCertificateRevocationCheckWithOcspEnabled() {
+    public boolean isUserCertificateRevocationCheckWithOcspEnabled() {
         return isUserCertificateRevocationCheckWithOcspEnabled;
     }
 
@@ -152,7 +152,7 @@ public final class AuthTokenValidationConfiguration {
         requirePositiveDuration(maxOcspResponseThisUpdateAge, "Max OCSP response thisUpdate age");
     }
 
-    AuthTokenValidationConfiguration copy() {
+    public AuthTokenValidationConfiguration copy() {
         return new AuthTokenValidationConfiguration(this);
     }
 
