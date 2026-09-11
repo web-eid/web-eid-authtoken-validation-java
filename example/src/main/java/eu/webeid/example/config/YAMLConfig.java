@@ -23,6 +23,13 @@
 package eu.webeid.example.config;
 
 import java.time.Duration;
+import java.net.InetAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.UnknownHostException;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -32,6 +39,8 @@ import org.springframework.context.annotation.Configuration;
 @EnableConfigurationProperties
 @ConfigurationProperties(prefix = "web-eid-auth-token.validation")
 public class YAMLConfig {
+
+    private static final Logger LOG = LoggerFactory.getLogger(YAMLConfig.class);
 
     @Value("local-origin")
     private String localOrigin;
@@ -52,7 +61,27 @@ public class YAMLConfig {
     }
 
     public void setLocalOrigin(String localOrigin) {
+        if (StringUtils.endsWith(localOrigin, "/")) {
+            throw new IllegalArgumentException("Configuration parameter local-origin cannot end with '/': " + localOrigin);
+        }
         this.localOrigin = localOrigin;
+
+        // Intended for local development only:
+        // When the Web-eID WebExtension developer setting ALLOW_HTTP_LOCALHOST is enabled,
+        // then Web-eID permits the extension to run over plain HTTP on localhost,
+        // but Web-eID app will still use protocol HTTPS in origin. Thus, we fake it here to make sure message validates.
+        if (StringUtils.startsWith(localOrigin, "http:")) {
+            try {
+                if (InetAddress.getByName(new URI(localOrigin).getHost()).isLoopbackAddress()) {
+                    this.localOrigin = localOrigin.replaceFirst("^http:", "https:");
+                    LOG.warn("Configuration local-origin contains http protocol {}, which is not supported. Replacing it with secure {}", localOrigin, this.localOrigin);
+                }
+            } catch (URISyntaxException e) {
+                LOG.error("Configuration parameter origin-local does not contain an URL: {}", localOrigin, e);
+            } catch (UnknownHostException e) {
+                LOG.error("Unable to determine if origin-local {} is loopback address", localOrigin, e);
+            }
+        }
     }
 
     public String getSiteCertHash() {
