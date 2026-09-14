@@ -23,7 +23,6 @@
 package eu.webeid.security.validator;
 
 import eu.webeid.security.authtoken.WebEidAuthToken;
-import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.AuthTokenParseException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
 import org.junit.jupiter.api.Test;
@@ -65,11 +64,10 @@ class AuthTokenStructureTest extends AbstractTestWithValidator {
     }
 
     @Test
-    void whenUnknownTokenVersion_thenParsingFails() throws AuthTokenException {
-        final WebEidAuthToken token = replaceTokenField(VALID_AUTH_TOKEN, "web-eid:1", "invalid");
-        assertThatThrownBy(() -> validator
-            .validate(token, ""))
+    void whenUnknownTokenVersion_thenParsingFails() throws Exception {
+        WebEidAuthToken token = replaceTokenField(VALID_AUTH_TOKEN, "web-eid:1", "invalid");
+        assertThatThrownBy(() -> validator.validate(token, "nonce"))
             .isInstanceOf(AuthTokenParseException.class)
-            .hasMessage("Only token format version 'web-eid:1' is currently supported");
+            .hasMessage("Token format version 'invalid.0' is currently not supported");
     }
 }

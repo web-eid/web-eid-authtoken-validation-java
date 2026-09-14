@@ -20,14 +20,14 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: zulu
-          java-version: 17
+          java-version: 21
 
       - name: Cache Maven packages
         uses: actions/cache@v4
         with:
           path: ~/.m2
-          key: ${{ runner.os }}-m2-v17-${{ secrets.CACHE_VERSION }}-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2-v17-${{ secrets.CACHE_VERSION }}
+          key: ${{ runner.os }}-m2-v21-${{ secrets.CACHE_VERSION }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2-v21-${{ secrets.CACHE_VERSION }}
 
       - name: Install library
         run: mvn -B -ntp install

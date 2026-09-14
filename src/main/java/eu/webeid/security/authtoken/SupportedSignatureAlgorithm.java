@@ -20,38 +20,37 @@
  * SOFTWARE.
  */
 
-package eu.webeid.example.config;
+package eu.webeid.security.authtoken;
 
-import org.springframework.beans.factory.ObjectFactory;
-import eu.webeid.security.challenge.ChallengeNonce;
-import eu.webeid.security.challenge.ChallengeNonceStore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-import jakarta.servlet.http.HttpSession;
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class SupportedSignatureAlgorithm {
+    private String cryptoAlgorithm;
+    private String hashFunction;
+    private String paddingScheme;
 
-public class SessionBackedChallengeNonceStore implements ChallengeNonceStore {
-
-    private static final String CHALLENGE_NONCE_KEY = "challenge-nonce";
-
-    final ObjectFactory<HttpSession> httpSessionFactory;
-
-    public SessionBackedChallengeNonceStore(ObjectFactory<HttpSession> httpSessionFactory) {
-        this.httpSessionFactory = httpSessionFactory;
+    public String getCryptoAlgorithm() {
+        return cryptoAlgorithm;
     }
 
-    @Override
-    public void put(ChallengeNonce challengeNonce) {
-        currentSession().setAttribute(CHALLENGE_NONCE_KEY, challengeNonce);
+    public void setCryptoAlgorithm(String cryptoAlgorithm) {
+        this.cryptoAlgorithm = cryptoAlgorithm;
     }
 
-    @Override
-    public ChallengeNonce getAndRemoveImpl() {
-        final ChallengeNonce challengeNonce = (ChallengeNonce) currentSession().getAttribute(CHALLENGE_NONCE_KEY);
-        currentSession().removeAttribute(CHALLENGE_NONCE_KEY);
-        return challengeNonce;
+    public String getHashFunction() {
+        return hashFunction;
     }
 
-    private HttpSession currentSession() {
-        return httpSessionFactory.getObject();
+    public void setHashFunction(String hashFunction) {
+        this.hashFunction = hashFunction;
     }
 
+    public String getPaddingScheme() {
+        return paddingScheme;
+    }
+
+    public void setPaddingScheme(String paddingScheme) {
+        this.paddingScheme = paddingScheme;
+    }
 }

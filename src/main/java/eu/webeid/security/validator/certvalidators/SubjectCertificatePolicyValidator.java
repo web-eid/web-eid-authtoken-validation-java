@@ -23,13 +23,13 @@
 package eu.webeid.security.validator.certvalidators;
 
 import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.exceptions.UserCertificateDisallowedPolicyException;
+import eu.webeid.security.exceptions.UserCertificateParseException;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x509.CertificatePolicies;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.PolicyInformation;
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
-import eu.webeid.security.exceptions.UserCertificateDisallowedPolicyException;
-import eu.webeid.security.exceptions.UserCertificateParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
