@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Estonian Information System Authority
+// SPDX-License-Identifier: MIT
+
 package eu.webeid.security.certificate;
 
 import org.junit.jupiter.api.Test;
