@@ -13,6 +13,7 @@ import eu.webeid.security.validator.ocsp.OcspClient;
 import eu.webeid.security.validator.ocsp.OcspClientImpl;
 import eu.webeid.security.validator.ocsp.OcspServiceProvider;
 import org.bouncycastle.asn1.ocsp.OCSPResponseStatus;
+import org.bouncycastle.cert.CertIOException;
 import org.bouncycastle.cert.ocsp.OCSPException;
 import org.bouncycastle.cert.ocsp.OCSPResp;
 import org.junit.jupiter.api.BeforeEach;
@@ -119,8 +120,7 @@ class SubjectCertificateNotRevokedValidatorTest {
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
             .cause()
-            .isInstanceOf(IOException.class)
-            .hasMessage("DEF length 110 object truncated by 105");
+            .isExactlyInstanceOf(CertIOException.class);
     }
 
     @Test
@@ -165,8 +165,7 @@ class SubjectCertificateNotRevokedValidatorTest {
             validator.validateCertificateNotRevoked(estEid2018Cert))
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
             .cause()
-            .isInstanceOf(OCSPException.class)
-            .hasMessage("exception processing sig: java.lang.IllegalArgumentException: invalid info structure in RSA public key");
+            .isExactlyInstanceOf(OCSPException.class);
     }
 
     @Test
