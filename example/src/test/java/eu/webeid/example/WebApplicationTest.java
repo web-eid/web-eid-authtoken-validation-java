@@ -29,6 +29,7 @@ import eu.webeid.example.testutil.ObjectMother;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.challenge.ChallengeNonce;
 import eu.webeid.security.util.DateAndTime;
+import eu.webeid.security.validator.certvalidators.SubjectCertificateNotRevokedValidator;
 import mockit.Mock;
 import mockit.MockUp;
 import org.digidoc4j.impl.asic.AsicSignatureFinalizer;
@@ -49,6 +50,7 @@ import org.springframework.test.web.servlet.setup.DefaultMockMvcBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.security.cert.X509Certificate;
 import java.util.stream.Stream;
 
 import static eu.webeid.example.testutil.ObjectMother.VALID_AUTH_TOKEN;
@@ -98,6 +100,15 @@ class WebApplicationTest {
             @Mock
             public void validateOcspResponse(XadesSignature xadesSignature) {
                 // Do not call real OCSP service in tests.
+            }
+        };
+
+        new MockUp<SubjectCertificateNotRevokedValidator>() {
+            @Mock
+            public void validateCertificateNotRevoked(X509Certificate subjectCertificate) {
+                // Do not call real OCSP service in tests. The test certificates have expired, so the
+                // validation clock is mocked to a date in the past, but OCSP responses are always
+                // current, which makes the OCSP response time and responder certificate checks fail.
             }
         };
 
