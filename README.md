@@ -8,7 +8,7 @@ More information about the Web eID project is available on the project [website]
 
 # Quickstart
 
-Complete the steps below to add support for secure authentication with eID cards to your Java web application back end. Instructions for the front end are available [here](https://github.com/web-eid/web-eid.js).
+Complete the steps below to add support for secure authentication with eID cards to your Java web application back end. Instructions for the front end are available [here](https://github.com/web-eid/web-eid.js). If your application already uses Web eID and you only need to add the mobile flow, see [Adding Web eID for Mobile support to an existing integration](#adding-web-eid-for-mobile-support-to-an-existing-integration).
 
 A Java web application that uses Maven or Gradle to manage packages is needed for running this quickstart. Examples are for Maven, but they are straightforward to translate to Gradle.
 
@@ -183,7 +183,7 @@ public final class WebEidChallengeNonceFilter extends OncePerRequestFilter {
 }
 ```
 
-The `WebEidMobileAuthInitFilter` handles `/auth/mobile/init` requests for authentication flows using **Web eID token format v1.1**. It generates a challenge nonce and returns a deep link URI that embeds both the challenge nonce and the authentication endpoint required for initiating the v1.1 flow.
+The `WebEidMobileAuthInitFilter` handles `/auth/mobile/init` requests for mobile authentication. It generates a challenge nonce and returns a deep link URI containing the challenge nonce, the login page URL and an optional request for a signing certificate. The response uses token format `web-eid:1.1` when a signing certificate is requested, or `web-eid:1.0` for authentication only.
 See the full implementation [here](example/src/main/java/eu/webeid/example/security/WebEidMobileAuthInitFilter.java).
 
 ```java
@@ -252,9 +252,21 @@ try {
   ...
 ```
 
+## Adding Web eID for Mobile support to an existing integration
+
+Reuse your existing challenge nonce generator and store, trusted CA configuration, token validation and authorization logic. The mobile flow adds an App Link/Universal Link that opens the RIA DigiDoc app and a login page that receives the response in its URL fragment and posts the token to your back end. Authentication-only responses use `web-eid:1.0`; requesting a signing certificate with `getSigningCertificate=true` requires a validator that supports `web-eid:1.1`. The validator configuration stays the same.
+
+1. Add `POST /auth/mobile/init` to generate and store a challenge nonce and return `authUri`: `https://id.eesti.ee/auth#<payload>`, where the payload is Base64-encoded JSON containing `challenge`, `loginUri` and optionally `getSigningCertificate` ([init filter](example/src/main/java/eu/webeid/example/security/WebEidMobileAuthInitFilter.java)). Set `web-eid-mobile.base-request-uri` to `https://id.eesti.ee` for the RIA DigiDoc app; the example defaults to the development scheme `web-eid-mobile://`. Configure `web-eid-mobile.request-signing-cert` as needed and enable `web-eid-mobile.enabled` if previously disabled.
+2. Serve `GET /auth/mobile/login` at an HTTPS `loginUri` on the validator's configured `web-eid-auth-token.validation.local-origin`. Its script must decode the response, handle errors and post `authToken` to the existing `POST /auth/login` endpoint ([login page](example/src/main/resources/templates/webeid-login.html), [payload parser](example/src/main/resources/static/js/payload.js)). Retrieve and consume the session's unexpired challenge nonce, validate the token, apply your authorization checks and establish the authenticated session as before.
+3. Use `Secure`, `HttpOnly`, `SameSite=Lax` for the pre-authentication session cookie so it accompanies the return from the app. Keep CSRF protection on POST endpoints and protect the login page against XSS. Callback fragments are untrusted input; the CSRF token alone does not authenticate them. See the architecture document's [security assumptions](https://github.com/web-eid/web-eid-for-mobile-architecture-doc#security-assumptions).
+4. Add a mobile login button that calls the init endpoint and opens the returned `authUri` ([front end](example/src/main/resources/templates/index.html)). Keep the existing desktop login control.
+
+Optional mobile signing is demonstrated by [SigningController](example/src/main/java/eu/webeid/example/web/rest/SigningController.java) and [MobileSigningService](example/src/main/java/eu/webeid/example/service/MobileSigningService.java). A validated signing certificate returned during authentication can be stored with its supported algorithms to skip the separate certificate request. Check that the signing certificate belongs to the authenticated user before preparing the data to sign.
+
 # Table of contents
 
 - [Quickstart](#quickstart)
+  - [Adding Web eID for Mobile support to an existing integration](#adding-web-eid-for-mobile-support-to-an-existing-integration)
 - [Introduction](#introduction)
 - [Authentication token format](#authentication-token-format)
 - [Authentication token validation](#authentication-token-validation)

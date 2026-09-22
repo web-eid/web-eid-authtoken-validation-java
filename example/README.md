@@ -80,6 +80,7 @@ When the application has started, open the _ngrok_ HTTPS URL in your preferred w
   + [Overview of the source code](#overview-of-the-source-code)
   + [Configuration](#configuration)
   + [Integration with Web eID components](#integration-with-web-eid-components)
+  + [Adding Web eID for Mobile support to an existing integration](#adding-web-eid-for-mobile-support-to-an-existing-integration)
   + [Integration with DigiDoc4j components](#integration-with-digidoc4j-components)
     - [Using the Certificates' *Authority Information Access* (AIA) extension in DigiDoc4j](#using-the-certificates-authority-information-access-aia-extension-in-digidoc4j)
     - [Using DigiDoc4j in test mode with the `dev` profile](#using-digidoc4j-in-test-mode-with-the-dev-profile)
@@ -157,6 +158,14 @@ Spring Security has CSRF protection enabled by default. Web eID requires CSRF pr
 Detailed overview of Java code changes required for integrating Web eID authentication token validation is available in the [_web-eid-authtoken-validation-java_ library README](https://github.com/web-eid/web-eid-authtoken-validation-java/blob/main/README.md). There are instructions for configuring the nonce generator, trusted certificate authority certificates, authentication token validator, Spring Security authentication integration and security filters. The corresponding Java code is in the `src/main/java/eu/webeid/example/{config,security,web/rest}` directories.
 
 A similar overview of JavaScript and HTML code changes required for authentication and digital signing with Web eID is available in the [web-eid.js library README](https://github.com/web-eid/web-eid.js/blob/main/README.md). The corresponding JavaScript and HTML code is in the `src/resources/{static,templates}` directories.
+
+### Adding Web eID for Mobile support to an existing integration
+
+To add mobile authentication to an existing integration, follow the [library migration guide](../README.md#adding-web-eid-for-mobile-support-to-an-existing-integration). This example adds `POST /auth/mobile/init` through `WebEidMobileAuthInitFilter` and `GET /auth/mobile/login` through `WebEidLoginPageGeneratingFilter`, using `templates/webeid-login.html` and `static/js/payload.js`. Both login flows submit to `POST /auth/login` and share `WebEidAuthenticationProvider`.
+
+Configure `web-eid-mobile.base-request-uri`, `web-eid-mobile.request-signing-cert` and `web-eid-auth-token.validation.local-origin` in `application-{dev,prod}.yaml`. Set the base request URI to `https://id.eesti.ee` for the RIA DigiDoc app; both profiles currently use `web-eid-mobile://` for development. `web-eid-mobile.enabled` selects the mobile-enabled security filter chain in `ApplicationConfiguration`. The mobile button is in `templates/index.html`; `SameSiteCookieConfiguration` sets `SameSite=Lax`, and `application.yaml` enables forwarded HTTPS detection behind a reverse proxy. Spring Security CSRF protection remains enabled.
+
+For optional mobile signing, see `SigningController`, `MobileSigningService` and `templates/webeid-callback.html`. `WebEidAuthentication` stores a signing certificate from the validated token when requested; `SigningService.prepareContainer()` checks its subject ID against the authenticated user's ID.
 
 ### Integration with DigiDoc4j components
 
