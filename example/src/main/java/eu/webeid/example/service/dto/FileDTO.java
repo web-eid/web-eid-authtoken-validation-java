@@ -8,10 +8,8 @@ import org.springframework.util.MimeTypeUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.Serializable;
-import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.Objects;
 
 public class FileDTO implements Serializable {
@@ -40,12 +38,9 @@ public class FileDTO implements Serializable {
     }
 
     public static FileDTO getExampleForSigningFromResources() throws IOException {
-        final URI resourceUri = new ClassPathResource("/static/files/" + EXAMPLE_FILENAME).getURI();
-        return new FileDTO(
-                EXAMPLE_FILENAME,
-                MimeTypeUtils.TEXT_PLAIN_VALUE,
-                Files.readAllBytes(Paths.get(resourceUri))
-        );
+        try (InputStream stream = new ClassPathResource("/static/files/" + EXAMPLE_FILENAME).getInputStream()) {
+            return new FileDTO(EXAMPLE_FILENAME, MimeTypeUtils.TEXT_PLAIN_VALUE, stream.readAllBytes());
+        }
     }
 
     public String getName() {

@@ -6,6 +6,7 @@ package eu.webeid.example.security;
 import eu.webeid.security.certificate.CertificateLoader;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
 
 import java.security.cert.X509Certificate;
 import java.util.Collections;
@@ -21,6 +22,18 @@ class WebEidAuthenticationTest {
         final X509Certificate certificate = CertificateLoader.decodeCertificateFromBase64(ORGANIZATION_CERT);
         final Authentication authentication = WebEidAuthentication.fromCertificate(certificate, Collections.emptyList());
         assertThat(authentication.getPrincipal()).isEqualTo("Testijad.ee isikutuvastus");
+    }
+
+    @Test
+    void whenComparedWithAnotherAuthenticationType_thenReturnsFalse() throws Exception {
+        final X509Certificate certificate = CertificateLoader.decodeCertificateFromBase64(ORGANIZATION_CERT);
+        final Authentication authentication = WebEidAuthentication.fromCertificate(certificate, Collections.emptyList());
+        final Authentication other = new PreAuthenticatedAuthenticationToken(
+                authentication.getPrincipal(), authentication.getCredentials(), Collections.emptyList());
+
+        assertThat(authentication.equals(other)).isFalse();
+        assertThat(authentication.equals(null)).isFalse();
+        assertThat(authentication).isEqualTo(WebEidAuthentication.fromCertificate(certificate, Collections.emptyList()));
     }
 
 }
