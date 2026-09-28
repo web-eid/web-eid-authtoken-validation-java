@@ -220,10 +220,11 @@ class OcspNetworkTest {
                 ? new OcspCertificateRevocationChecker(
                         OcspClientImpl.build(Duration.ofSeconds(2)),
                         new OcspServiceProvider(
-                                new DesignatedOcspServiceConfiguration(designatedUri, responder, List.of(issuer), nonceEnabled),
-                                new AiaOcspServiceConfiguration(Set.of(), anchors, store)),
-                        OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW,
-                        OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE)
+                                new DesignatedOcspServiceConfiguration(designatedUri, responder, List.of(issuer), nonceEnabled,
+                                        OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE, OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE),
+                                new AiaOcspServiceConfiguration(Set.of(), anchors, store,
+                                        OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE, OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE)),
+                        OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW)
                 : null;
         return CertificateValidator.validateCertificateTrustAndRevocation(
                 subject, anchors, store, Date.from(now), mode, checker, null, nonceEnabled);

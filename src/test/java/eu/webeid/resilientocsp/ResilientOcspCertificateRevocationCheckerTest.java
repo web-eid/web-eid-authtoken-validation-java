@@ -33,6 +33,7 @@ import eu.webeid.resilientocsp.ResilientOcspCertificateRevocationChecker.Circuit
 import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateOCSPCheckFailedException;
 import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateRevokedException;
 import eu.webeid.security.authtoken.WebEidAuthToken;
+import eu.webeid.security.util.DateAndTime;
 import eu.webeid.security.validator.AuthTokenValidator;
 import eu.webeid.security.validator.revocationcheck.RevocationInfo;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;

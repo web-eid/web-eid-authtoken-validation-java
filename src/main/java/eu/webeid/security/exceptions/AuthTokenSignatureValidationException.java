@@ -18,8 +18,4 @@ public class AuthTokenSignatureValidationException extends AuthTokenException {
         super(MESSAGE, cause);
     }
 
-    public AuthTokenSignatureValidationException(Throwable cause) {
-        super("Token signature validation has failed", cause);
-    }
-
 }

@@ -38,6 +38,7 @@ import java.security.cert.X509Certificate;
 import java.util.List;
 
 import static eu.webeid.security.testutil.AbstractTestWithValidator.VALID_AUTH_TOKEN;
+import static eu.webeid.security.testutil.AbstractTestWithValidator.VALID_AUTH_TOKEN_TEST_DATE;
 import static eu.webeid.security.testutil.AbstractTestWithValidator.VALID_CHALLENGE_NONCE;
 import static eu.webeid.security.testutil.DateMocker.mockDate;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,7 +59,7 @@ class AuthTokenValidatorValidationOrderTest {
     void setUp() {
         mockedClock = mockStatic(DateAndTime.DefaultClock.class);
         // Ensure that the certificates do not expire.
-        mockDate("2021-07-23", mockedClock);
+        mockDate(VALID_AUTH_TOKEN_TEST_DATE, mockedClock);
     }
 
     @AfterEach
