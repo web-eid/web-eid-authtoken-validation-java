@@ -22,26 +22,16 @@
 
 package eu.webeid.ocsp.exceptions;
 
-import eu.webeid.security.exceptions.CertificateRevokedException;
+import eu.webeid.security.exceptions.AuthTokenException;
 
-import java.net.URI;
+public class UserCertificateOCSPException extends AuthTokenException {
 
-import static eu.webeid.ocsp.exceptions.OcspResponderUriMessageAppender.appendResponderUri;
-
-/**
- * Thrown when the user certificate has been revoked.
- */
-public class UserCertificateRevokedException extends CertificateRevokedException {
-
-    public UserCertificateRevokedException() {
-        super("User certificate has been revoked");
+    public UserCertificateOCSPException(String message) {
+        super(message);
     }
 
-    public UserCertificateRevokedException(URI ocspResponderUri) {
-        super(appendResponderUri("User certificate has been revoked", ocspResponderUri));
+    public UserCertificateOCSPException(String message, Throwable exception) {
+        super(message, exception);
     }
 
-    public UserCertificateRevokedException(String msg, URI ocspResponderUri) {
-        super(appendResponderUri("User certificate has been revoked: " + msg, ocspResponderUri));
-    }
 }

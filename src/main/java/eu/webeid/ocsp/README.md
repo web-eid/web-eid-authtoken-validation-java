@@ -75,14 +75,15 @@ List<X509Certificate> trustedCAs = List.of(trustedIntermediateCACertificates());
 AiaOcspServiceConfiguration aiaConfiguration = new AiaOcspServiceConfiguration(
     Set.of(), // AIA responder URLs for which request and response nonce checks are disabled.
     CertificateValidator.buildTrustAnchorsFromCertificates(trustedCAs),
-    CertificateValidator.buildCertStoreFromCertificates(trustedCAs)
+    CertificateValidator.buildCertStoreFromCertificates(trustedCAs),
+    OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
+    OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE
 );
 OcspServiceProvider services = new OcspServiceProvider(null, aiaConfiguration);
 OcspCertificateRevocationChecker checker = new OcspCertificateRevocationChecker(
     OcspClientImpl.build(Duration.ofSeconds(5)),
     services,
-    OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW,
-    OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE
+    OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW
 );
 
 AuthTokenValidator validator = new AuthTokenValidatorBuilder()
@@ -94,7 +95,14 @@ AuthTokenValidator validator = new AuthTokenValidatorBuilder()
 
 The five-second connection and response timeout above is an explicit example setting. For a custom Java `HttpClient`, use `new OcspClientImpl(httpClient, responseTimeout)` and configure the connection timeout on that client. Alternatively, supply your own `OcspClient` implementation. See [OcspClientOverrideTest](../../../../../test/java/eu/webeid/ocsp/client/OcspClientOverrideTest.java).
 
-The custom checker's suggested constants are 15 minutes for clock/update skew and 2 minutes for maximum `thisUpdate` age; pass different positive durations to its constructor to change them. These checks are implemented by [OcspResponseValidator](protocol/OcspResponseValidator.java).
+The custom checker's suggested constant for clock/update skew is 15 minutes; pass a different positive duration to its constructor to change it.
+
+The maximum ages of the OCSP response's `thisUpdate` and `nextUpdate` times are configured per OCSP service, via the constructor of `AiaOcspServiceConfiguration`, `DesignatedOcspServiceConfiguration` or `FallbackOcspServiceConfiguration`:
+
+- `maxThisUpdateAge` – the maximum age of the OCSP response's `thisUpdate` time before the response is too old to rely on. `OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE` is 2 minutes.
+- `maxNextUpdateAge` – the maximum age of the OCSP response's `nextUpdate` time before the response is too old to rely on. `OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE` is 15 minutes, which is equal to the default allowed time skew.
+
+These checks are implemented by [OcspResponseValidator](protocol/OcspResponseValidator.java).
 
 For a designated responder, replace the `services` definition above with the following configuration. `responderCertificate` must be the service's trusted signing certificate and `supportedIssuers` the collection of issuer certificates served by it:
 
@@ -106,7 +114,9 @@ DesignatedOcspServiceConfiguration designated = new DesignatedOcspServiceConfigu
     URI.create("https://ocsp.example.org"),
     responderCertificate,
     supportedIssuers,
-    true // This service supports nonces.
+    true, // This service supports nonces.
+    OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
+    OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE
 );
 OcspServiceProvider services = new OcspServiceProvider(designated, aiaConfiguration);
 ```

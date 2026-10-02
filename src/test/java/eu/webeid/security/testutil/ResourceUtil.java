@@ -20,28 +20,21 @@
  * SOFTWARE.
  */
 
-package eu.webeid.ocsp.exceptions;
+package eu.webeid.security.testutil;
 
-import eu.webeid.security.exceptions.CertificateRevokedException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Objects;
 
-import java.net.URI;
+public final class ResourceUtil {
 
-import static eu.webeid.ocsp.exceptions.OcspResponderUriMessageAppender.appendResponderUri;
-
-/**
- * Thrown when the user certificate has been revoked.
- */
-public class UserCertificateRevokedException extends CertificateRevokedException {
-
-    public UserCertificateRevokedException() {
-        super("User certificate has been revoked");
+    private ResourceUtil() {
     }
 
-    public UserCertificateRevokedException(URI ocspResponderUri) {
-        super(appendResponderUri("User certificate has been revoked", ocspResponderUri));
-    }
-
-    public UserCertificateRevokedException(String msg, URI ocspResponderUri) {
-        super(appendResponderUri("User certificate has been revoked: " + msg, ocspResponderUri));
+    public static byte[] bytesFromResource(String resource) throws IOException {
+        try (final InputStream resourceAsStream = ClassLoader.getSystemResourceAsStream(resource)) {
+            Objects.requireNonNull(resourceAsStream, () -> "Resource not found: " + resource);
+            return resourceAsStream.readAllBytes();
+        }
     }
 }

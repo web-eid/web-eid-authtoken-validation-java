@@ -20,28 +20,27 @@
  * SOFTWARE.
  */
 
-package eu.webeid.ocsp.exceptions;
+package eu.webeid.ocsp.protocol;
 
-import eu.webeid.security.exceptions.CertificateRevokedException;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.junit.jupiter.api.Test;
 
-import java.net.URI;
+import static eu.webeid.ocsp.protocol.IssuerDistinguishedName.getIssuerDistinguishedName;
+import static eu.webeid.security.testutil.Certificates.getMariliisEsteid2015Cert;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
-import static eu.webeid.ocsp.exceptions.OcspResponderUriMessageAppender.appendResponderUri;
+class IssuerDistinguishedNameTest {
 
-/**
- * Thrown when the user certificate has been revoked.
- */
-public class UserCertificateRevokedException extends CertificateRevokedException {
+    private static final X500Name ISSUER_DN = new X500Name("CN=TEST of ESTEID-SK 2015, OID.2.5.4.97=NTREE-10747013, O=AS Sertifitseerimiskeskus, C=EE");
 
-    public UserCertificateRevokedException() {
-        super("User certificate has been revoked");
+    @Test
+    void whenCertificateGiven_thenReturnsIssuerDistinguishedName() throws Exception {
+        assertThat(getIssuerDistinguishedName(getMariliisEsteid2015Cert())).isEqualTo(ISSUER_DN);
     }
 
-    public UserCertificateRevokedException(URI ocspResponderUri) {
-        super(appendResponderUri("User certificate has been revoked", ocspResponderUri));
-    }
-
-    public UserCertificateRevokedException(String msg, URI ocspResponderUri) {
-        super(appendResponderUri("User certificate has been revoked: " + msg, ocspResponderUri));
+    @Test
+    void whenCertificateIsNull_thenThrows() {
+        assertThatNullPointerException().isThrownBy(() -> getIssuerDistinguishedName(null));
     }
 }

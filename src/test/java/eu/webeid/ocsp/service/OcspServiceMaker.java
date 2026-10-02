@@ -6,23 +6,28 @@ package eu.webeid.ocsp.service;
 import eu.webeid.security.certificate.CertificateValidator;
 import eu.webeid.security.exceptions.JceException;
 import eu.webeid.ocsp.exceptions.OCSPCertificateException;
+import org.bouncycastle.asn1.x500.X500Name;
 
 import java.io.IOException;
 import java.net.URI;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 
 import static eu.webeid.security.testutil.Certificates.getTestEsteid2015CA;
 import static eu.webeid.security.testutil.Certificates.getTestEsteid2018CA;
-import static eu.webeid.security.testutil.Certificates.getTestSkOcspResponder2020;
+import static eu.webeid.security.testutil.Certificates.getTestSelfSignedOcspResponder;
 
 public class OcspServiceMaker {
 
+    public static final Duration MAX_THIS_UPDATE_AGE = Duration.ofMinutes(3);
+    public static final Duration MAX_NEXT_UPDATE_AGE = Duration.ofMinutes(20);
+
     private static final String TEST_OCSP_ACCESS_LOCATION = "http://demo.sk.ee/ocsp";
     private static final List<X509Certificate> TRUSTED_CA_CERTIFICATES;
-    private static final URI TEST_ESTEID_2015 = URI.create("http://aia.demo.sk.ee/esteid2015");
+    private static final X500Name ISSUER_DN = new X500Name("CN=TEST of ESTEID-SK 2015, OID.2.5.4.97=NTREE-10747013, O=AS Sertifitseerimiskeskus, C=EE");
 
     static {
         try {
@@ -50,9 +55,11 @@ public class OcspServiceMaker {
 
     private static AiaOcspServiceConfiguration getAiaOcspServiceConfiguration() throws JceException {
         return new AiaOcspServiceConfiguration(
-            Set.of(TEST_ESTEID_2015),
+            Set.of(ISSUER_DN),
             CertificateValidator.buildTrustAnchorsFromCertificates(TRUSTED_CA_CERTIFICATES),
-            CertificateValidator.buildCertStoreFromCertificates(TRUSTED_CA_CERTIFICATES));
+            CertificateValidator.buildCertStoreFromCertificates(TRUSTED_CA_CERTIFICATES),
+            MAX_THIS_UPDATE_AGE,
+            MAX_NEXT_UPDATE_AGE);
     }
 
     public static DesignatedOcspServiceConfiguration getDesignatedOcspServiceConfiguration() throws CertificateException, IOException, OCSPCertificateException {
@@ -66,9 +73,11 @@ public class OcspServiceMaker {
     private static DesignatedOcspServiceConfiguration getDesignatedOcspServiceConfiguration(boolean doesSupportNonce, String ocspServiceAccessLocation) throws CertificateException, IOException, OCSPCertificateException {
         return new DesignatedOcspServiceConfiguration(
             URI.create(ocspServiceAccessLocation),
-            getTestSkOcspResponder2020(),
+            getTestSelfSignedOcspResponder(),
             TRUSTED_CA_CERTIFICATES,
-            doesSupportNonce);
+            doesSupportNonce,
+            MAX_THIS_UPDATE_AGE,
+            MAX_NEXT_UPDATE_AGE);
     }
 
 }
