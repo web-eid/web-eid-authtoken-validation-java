@@ -19,6 +19,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpSession;
@@ -32,10 +33,13 @@ import eu.webeid.security.challenge.ChallengeNonce;
 import eu.webeid.security.util.DateAndTime;
 
 import java.util.Date;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mockStatic;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -45,6 +49,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(TestValidatorConfiguration.class)
 @WebAppConfiguration
 public class WebApplicationTest {
+
+    private static final Pattern CSRF_TOKEN_META_TAG = Pattern.compile("<meta id=\"csrftoken\" name=\"csrftoken\" content=\"[^\"]+\"/>");
 
     @Autowired
     private WebApplicationContext context;
@@ -69,7 +75,11 @@ public class WebApplicationTest {
             .getResponse();
         // @formatter:on
         assertEquals(HttpStatus.OK.value(), response.getStatus());
-        System.out.println(response.getContentAsString());
+        assertNull(response.getCookie("WEBEID-XSRF-TOKEN"));
+        String content = response.getContentAsString();
+        assertTrue(CSRF_TOKEN_META_TAG.matcher(content).find());
+        assertTrue(content.contains("<meta id=\"csrfheadername\" name=\"csrfheadername\" content=\"X-CSRF-TOKEN\"/>"));
+        System.out.println(content);
     }
 
     @ParameterizedTest
@@ -80,6 +90,30 @@ public class WebApplicationTest {
                         .contentType("application/json")
                         .content(body))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void userWhenLoggedOutReturnsUnauthorized() throws Exception {
+        mvcBuilder.build().perform(get("/auth/user"))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void logoutExpiresSessionCookie() throws Exception {
+        MockHttpServletResponse response = mvcBuilder.build()
+            .perform(post("/logout")
+                .secure(true)
+                .session(new MockHttpSession())
+                .with(csrf()))
+            .andReturn()
+            .getResponse();
+
+        assertEquals(HttpStatus.OK.value(), response.getStatus());
+        assertTrue(response.getHeaders(HttpHeaders.SET_COOKIE).stream().anyMatch(cookie ->
+            cookie.startsWith("__Host-JSESSIONID=")
+                && cookie.contains("Path=/")
+                && cookie.contains("Max-Age=0")
+                && cookie.contains("Secure")));
     }
 
     @Test
@@ -101,6 +135,13 @@ public class WebApplicationTest {
             MvcResult result = HttpHelper.login(mvcBuilder, session, ObjectMother.mockAuthToken());
             session = (MockHttpSession) result.getRequest().getSession();
             MockHttpServletResponse response = result.getResponse();
+            assertEquals("{\"sub\":\"JAAK-KRISTJAN JÕEORG\",\"auth\":\"[ROLE_USER]\"}", response.getContentAsString());
+
+            response = mvcBuilder.build()
+                .perform(get("/auth/user").session(session))
+                .andReturn()
+                .getResponse();
+            assertEquals(HttpStatus.OK.value(), response.getStatus());
             assertEquals("{\"sub\":\"JAAK-KRISTJAN JÕEORG\",\"auth\":\"[ROLE_USER]\"}", response.getContentAsString());
 
             /* Example how to test file upload.
