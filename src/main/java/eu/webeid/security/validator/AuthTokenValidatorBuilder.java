@@ -75,6 +75,25 @@ public class AuthTokenValidatorBuilder {
     }
 
     /**
+     * Controls whether the user certificate must have the Digital Signature bit set in its Key Usage extension.
+     * Enabled by default.
+     * <p>
+     * Disable this only for eID schemes whose authentication certificates do not assert Digital Signature key usage.
+     * The Key Usage extension must still be present, and if the Extended Key Usage extension is present,
+     * it must still contain client authentication.
+     *
+     * @param required whether the Digital Signature key usage is required
+     * @return the builder instance for method chaining
+     */
+    public AuthTokenValidatorBuilder withDigitalSignatureKeyUsageRequired(boolean required) {
+        configuration.setDigitalSignatureKeyUsageRequired(required);
+        if (!required) {
+            LOG.warn("Digital Signature key usage requirement for the user certificate is disabled");
+        }
+        return this;
+    }
+
+    /**
      * Turns off user certificate revocation check (with OCSP and/or CRL).
      * <p>
      * <b>Turning off user certificate revocation check is dangerous and should be used only in

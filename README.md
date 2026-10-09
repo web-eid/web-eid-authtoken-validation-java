@@ -322,6 +322,8 @@ The default validator uses the platform OCSP implementation to check certificate
 
 Use `withDisallowedCertificatePolicies(ASN1ObjectIdentifier... policies)` to add disallowed certificate policies. Estonian Mobile-ID policies are disallowed by default because smart-card authentication must not accept Mobile-ID certificates.
 
+The user certificate must have the Digital Signature key usage by default. Use `withDigitalSignatureKeyUsageRequired(false)` to accept authentication certificates that do not assert it; the Key Usage extension must still be present, and an Extended Key Usage extension, if present, must still contain client authentication.
+
 For more advanced revocation requirements, supply a `CertificateRevocationChecker` with `withCertificateRevocationChecker(...)`. The [OCSP configuration guide](src/main/java/eu/webeid/ocsp/README.md) covers custom implementations, the bundled OCSP checker, custom PKIX checkers, responder selection, HTTP settings, and nonce policies.
 
 ## Possible validation errors

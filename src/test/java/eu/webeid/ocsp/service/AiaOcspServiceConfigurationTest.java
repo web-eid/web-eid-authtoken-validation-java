@@ -3,6 +3,7 @@
 
 package eu.webeid.ocsp.service;
 
+import eu.webeid.ocsp.OcspCertificateRevocationChecker;
 import eu.webeid.security.certificate.CertificateValidator;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ class AiaOcspServiceConfigurationTest {
         final TrustAnchor anchor = new TrustAnchor(getTestEsteid2018CA(), null);
         final Set<TrustAnchor> anchors = new HashSet<>(Set.of(anchor));
         final AiaOcspServiceConfiguration configuration = new AiaOcspServiceConfiguration(
-                nonceDisabledIssuerDNs, anchors, CertificateValidator.buildCertStoreFromCertificates(List.of(getTestEsteid2018CA())));
+                nonceDisabledIssuerDNs, anchors, CertificateValidator.buildCertStoreFromCertificates(List.of(getTestEsteid2018CA())), OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE, OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE);
 
         nonceDisabledIssuerDNs.clear();
         anchors.clear();

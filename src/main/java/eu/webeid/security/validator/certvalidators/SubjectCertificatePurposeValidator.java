@@ -19,19 +19,26 @@ public final class SubjectCertificatePurposeValidator {
     private static final Logger LOG = LoggerFactory.getLogger(SubjectCertificatePurposeValidator.class);
     private static final int KEY_USAGE_DIGITAL_SIGNATURE = 0;
     private static final String EXTENDED_KEY_USAGE_CLIENT_AUTHENTICATION = "1.3.6.1.5.5.7.3.2";
+
+    private final boolean isDigitalSignatureKeyUsageRequired;
+
+    public SubjectCertificatePurposeValidator(boolean isDigitalSignatureKeyUsageRequired) {
+        this.isDigitalSignatureKeyUsageRequired = isDigitalSignatureKeyUsageRequired;
+    }
+
     /**
      * Validates that the purpose of the user certificate from the authentication token contains client authentication.
      *
      * @param subjectCertificate user certificate to be validated
      * @throws AuthTokenException when the purpose of certificate does not contain client authentication
      */
-    public static void validateCertificatePurpose(X509Certificate subjectCertificate) throws AuthTokenException {
+    public void validateCertificatePurpose(X509Certificate subjectCertificate) throws AuthTokenException {
         try {
             final boolean[] keyUsage = subjectCertificate.getKeyUsage();
             if (keyUsage == null) {
                 throw new UserCertificateMissingPurposeException();
             }
-            if (!keyUsage[KEY_USAGE_DIGITAL_SIGNATURE]) {
+            if (isDigitalSignatureKeyUsageRequired && !keyUsage[KEY_USAGE_DIGITAL_SIGNATURE]) {
                 throw new UserCertificateWrongPurposeException();
             }
             final List<String> usages = subjectCertificate.getExtendedKeyUsage();
@@ -49,9 +56,4 @@ public final class SubjectCertificatePurposeValidator {
         }
         LOG.debug("User certificate can be used for client authentication.");
     }
-
-    private SubjectCertificatePurposeValidator() {
-        throw new IllegalStateException("Functional class");
-    }
-
 }

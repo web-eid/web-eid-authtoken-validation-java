@@ -31,6 +31,7 @@ public final class AuthTokenValidationConfiguration {
         SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V3,
         SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY
     ));
+    private boolean isDigitalSignatureKeyUsageRequired = true;
     private boolean isUserCertificateRevocationCheckEnabled = true;
     private boolean platformOcspNonceEnabled = true;
     private CertificateRevocationChecker certificateRevocationChecker;
@@ -44,6 +45,7 @@ public final class AuthTokenValidationConfiguration {
         this.siteOrigin = other.siteOrigin;
         this.trustedCACertificates = Set.copyOf(other.trustedCACertificates);
         this.disallowedSubjectCertificatePolicies = Set.copyOf(other.disallowedSubjectCertificatePolicies);
+        this.isDigitalSignatureKeyUsageRequired = other.isDigitalSignatureKeyUsageRequired;
         this.isUserCertificateRevocationCheckEnabled = other.isUserCertificateRevocationCheckEnabled;
         this.platformOcspNonceEnabled = other.platformOcspNonceEnabled;
         this.certificateRevocationChecker = other.certificateRevocationChecker;
@@ -65,6 +67,14 @@ public final class AuthTokenValidationConfiguration {
 
     public Collection<ASN1ObjectIdentifier> getDisallowedSubjectCertificatePolicies() {
         return disallowedSubjectCertificatePolicies;
+    }
+
+    boolean isDigitalSignatureKeyUsageRequired() {
+        return isDigitalSignatureKeyUsageRequired;
+    }
+
+    void setDigitalSignatureKeyUsageRequired(boolean required) {
+        isDigitalSignatureKeyUsageRequired = required;
     }
 
     boolean isUserCertificateRevocationCheckEnabled() {

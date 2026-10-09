@@ -25,6 +25,7 @@ import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 
 public final class OcspResponseValidator {
@@ -35,14 +36,57 @@ public final class OcspResponseValidator {
      * https://oidref.com/1.3.6.1.5.5.7.3.9
      */
     private static final String OID_OCSP_SIGNING = "1.3.6.1.5.5.7.3.9";
+    private static final int KEY_USAGE_DIGITAL_SIGNATURE_BIT_INDEX = 0;
+    private static final int KEY_USAGE_KEY_CERT_SIGN_BIT_INDEX = 5;
     private static final String ERROR_PREFIX = "Certificate status update time check failed: ";
 
-    public static void validateHasSigningExtension(X509Certificate certificate) throws OCSPCertificateException {
+    public static void validateBasicConstraintsNotCA(X509Certificate certificate) throws OCSPCertificateException {
+        Objects.requireNonNull(certificate, "certificate");
+        // X509Certificate.getBasicConstraints() returns -1 when the Basic Constraints extension is absent
+        // or when cA=FALSE, and a non-negative value only when cA=TRUE (the pathLenConstraint, or
+        // Integer.MAX_VALUE when cA=TRUE without pathLenConstraint).
+        if (certificate.getBasicConstraints() >= 0) {
+            throw new OCSPCertificateException("Certificate " + certificate.getSubjectX500Principal() +
+                " must not be a CA certificate (Basic Constraints CA:TRUE is not allowed for OCSP responder)");
+        }
+    }
+
+    public static void validateKeyUsageDigitalSignature(X509Certificate certificate) throws OCSPCertificateException {
+        Objects.requireNonNull(certificate, "certificate");
+        final boolean[] keyUsage = certificate.getKeyUsage();
+        if (keyUsage == null) {
+            throw new OCSPCertificateException("Certificate " + certificate.getSubjectX500Principal() +
+                " does not contain the Key Usage extension required for OCSP response signing");
+        }
+        if (keyUsage.length <= KEY_USAGE_DIGITAL_SIGNATURE_BIT_INDEX || !keyUsage[KEY_USAGE_DIGITAL_SIGNATURE_BIT_INDEX]) {
+            throw new OCSPCertificateException("Certificate " + certificate.getSubjectX500Principal() +
+                " Key Usage extension does not contain Digital Signature, which is required for OCSP response signing");
+        }
+    }
+
+    public static void validateKeyUsageNotCertificateSigning(X509Certificate certificate) throws OCSPCertificateException {
+        Objects.requireNonNull(certificate, "certificate");
+        final boolean[] keyUsage = certificate.getKeyUsage();
+        if (keyUsage == null) {
+            return;
+        }
+        if (keyUsage.length > KEY_USAGE_KEY_CERT_SIGN_BIT_INDEX && keyUsage[KEY_USAGE_KEY_CERT_SIGN_BIT_INDEX]) {
+            throw new OCSPCertificateException("Certificate " + certificate.getSubjectX500Principal() +
+                " Key Usage extension contains Certificate Signing, which is not allowed for OCSP responder");
+        }
+    }
+
+    public static void validateExtendedKeyUsageOcspSigning(X509Certificate certificate) throws OCSPCertificateException {
         Objects.requireNonNull(certificate, "certificate");
         try {
-            if (certificate.getExtendedKeyUsage() == null || !certificate.getExtendedKeyUsage().contains(OID_OCSP_SIGNING)) {
+            final List<String> extendedKeyUsage = certificate.getExtendedKeyUsage();
+            if (extendedKeyUsage == null) {
                 throw new OCSPCertificateException("Certificate " + certificate.getSubjectX500Principal() +
-                    " does not contain the key usage extension for OCSP response signing");
+                    " does not contain the Extended Key Usage extension required for OCSP response signing");
+            }
+            if (!extendedKeyUsage.contains(OID_OCSP_SIGNING)) {
+                throw new OCSPCertificateException("Certificate " + certificate.getSubjectX500Principal() +
+                    " Extended Key Usage extension does not contain OCSP Signing, which is required for OCSP response signing");
             }
         } catch (CertificateParsingException e) {
             throw new OCSPCertificateException("Certificate parsing failed:", e);
@@ -58,7 +102,7 @@ public final class OcspResponseValidator {
         }
     }
 
-    public static void validateCertificateStatusUpdateTime(SingleResp certStatusResponse, Duration allowedTimeSkew, Duration maxThisupdateAge, URI ocspResponderUri) throws UserCertificateOCSPCheckFailedException {
+    public static void validateCertificateStatusUpdateTime(SingleResp certStatusResponse, Duration allowedTimeSkew, Duration maxThisUpdateAge, Duration maxNextUpdateAge, URI ocspResponderUri) throws UserCertificateOCSPCheckFailedException {
         // From RFC 2560, https://www.ietf.org/rfc/rfc2560.txt:
         // 4.2.2.  Notes on OCSP Responses
         // 4.2.2.1.  Time
@@ -69,9 +113,9 @@ public final class OcspResponseValidator {
         //   If nextUpdate is not set, the responder is indicating that newer
         //   revocation information is available all the time.
         final Instant now = DateAndTime.DefaultClock.getInstance().now().toInstant();
-        final Instant earliestAcceptableTimeSkew = now.minus(allowedTimeSkew);
         final Instant latestAcceptableTimeSkew = now.plus(allowedTimeSkew);
-        final Instant minimumValidThisUpdateTime = now.minus(maxThisupdateAge);
+        final Instant minimumValidThisUpdateTime = now.minus(maxThisUpdateAge);
+        final Instant minimumValidNextUpdateTime = now.minus(maxNextUpdateAge);
 
         final Instant thisUpdate = certStatusResponse.getThisUpdate().toInstant();
         if (thisUpdate.isAfter(latestAcceptableTimeSkew)) {
@@ -89,9 +133,10 @@ public final class OcspResponseValidator {
             return;
         }
         final Instant nextUpdate = certStatusResponse.getNextUpdate().toInstant();
-        if (nextUpdate.isBefore(earliestAcceptableTimeSkew)) {
+        if (nextUpdate.isBefore(minimumValidNextUpdateTime)) {
             throw new UserCertificateOCSPCheckFailedException(ERROR_PREFIX +
-                "nextUpdate '" + nextUpdate + "' is in the past", ocspResponderUri);
+                "nextUpdate '" + nextUpdate + "' is too old, " +
+                "minimum time allowed: '" + minimumValidNextUpdateTime + "'", ocspResponderUri);
         }
         if (nextUpdate.isBefore(thisUpdate)) {
             throw new UserCertificateOCSPCheckFailedException(ERROR_PREFIX +

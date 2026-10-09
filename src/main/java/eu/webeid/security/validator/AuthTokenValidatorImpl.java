@@ -41,6 +41,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
     private final Set<TrustAnchor> trustedCACertificateAnchors;
     private final CertStore trustedCACertificateCertStore;
     private final AuthTokenSignatureValidator authTokenSignatureValidator;
+    private final SubjectCertificatePurposeValidator subjectCertificatePurposeValidator;
     private final SubjectCertificatePolicyValidator subjectCertificatePolicyValidator;
 
     /**
@@ -54,6 +55,7 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         trustedCACertificateAnchors = CertificateValidator.buildTrustAnchorsFromCertificates(configuration.getTrustedCACertificates());
         trustedCACertificateCertStore = CertificateValidator.buildCertStoreFromCertificates(configuration.getTrustedCACertificates());
 
+        subjectCertificatePurposeValidator = new SubjectCertificatePurposeValidator(configuration.isDigitalSignatureKeyUsageRequired());
         subjectCertificatePolicyValidator = new SubjectCertificatePolicyValidator(configuration.getDisallowedSubjectCertificatePolicies());
 
         authTokenSignatureValidator = new AuthTokenSignatureValidator(configuration.getSiteOrigin());
@@ -115,12 +117,22 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         }
         final X509Certificate subjectCertificate = CertificateLoader.decodeCertificateFromBase64(token.unverifiedCertificate());
 
-        SubjectCertificatePurposeValidator.validateCertificatePurpose(subjectCertificate);
+        subjectCertificatePurposeValidator.validateCertificatePurpose(subjectCertificate);
         subjectCertificatePolicyValidator.validateCertificatePolicies(subjectCertificate);
 
         // Use the clock instance so that the date can be mocked in tests.
         final Date now = DateAndTime.DefaultClock.getInstance().now();
 
+        // It is guaranteed that if the signature verification succeeds, then the origin and challenge
+        // have been implicitly and correctly verified without the need to implement any additional checks.
+        authTokenSignatureValidator.validate(token.algorithm(),
+            token.signature(),
+            subjectCertificate.getPublicKey(),
+            currentChallengeNonce
+        );
+
+        // Revocation validation is the last step to ensure that all non-network checks
+        // are completed before any OCSP requests are made.
         final List<RevocationInfo> revocationInfoList = CertificateValidator.validateCertificateTrustAndRevocation(
                 subjectCertificate,
                 trustedCACertificateAnchors,
@@ -132,14 +144,6 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
                 configuration.isPlatformOcspNonceEnabled()
         );
         LOG.debug("Subject certificate is valid and signed by a trusted CA");
-
-        // It is guaranteed that if the signature verification succeeds, then the origin and challenge
-        // have been implicitly and correctly verified without the need to implement any additional checks.
-        authTokenSignatureValidator.validate(token.algorithm(),
-            token.signature(),
-            subjectCertificate.getPublicKey(),
-            currentChallengeNonce
-        );
 
         return new ValidationInfo(subjectCertificate, revocationInfoList);
     }
