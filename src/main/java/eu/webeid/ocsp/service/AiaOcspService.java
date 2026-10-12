@@ -40,6 +40,7 @@ public class AiaOcspService implements OcspService {
     private final FallbackOcspService fallbackOcspService;
     private final Duration maxThisUpdateAge;
     private final Duration maxNextUpdateAge;
+    private final boolean isKeyUsageRequired;
 
     public AiaOcspService(AiaOcspServiceConfiguration configuration, X509Certificate certificate, FallbackOcspService fallbackOcspService) throws UserCertificateOCSPException {
         Objects.requireNonNull(configuration);
@@ -51,6 +52,7 @@ public class AiaOcspService implements OcspService {
         this.supportsNonce = !configuration.getNonceDisabledIssuerDNs().contains(issuerDN);
         this.maxThisUpdateAge = configuration.getMaxThisUpdateAge();
         this.maxNextUpdateAge = configuration.getMaxNextUpdateAge();
+        this.isKeyUsageRequired = configuration.isKeyUsageRequired();
     }
 
     @Override
@@ -85,7 +87,7 @@ public class AiaOcspService implements OcspService {
             CertificateValidator.requireCertificateIsValidOnDate(certificate, now, "AIA OCSP responder");
             if (!certificate.equals(issuerCertificate)) {
                 OcspResponseValidator.validateBasicConstraintsNotCA(certificate);
-                OcspResponseValidator.validateKeyUsageDigitalSignature(certificate);
+                OcspResponseValidator.validateKeyUsageDigitalSignature(certificate, isKeyUsageRequired);
                 OcspResponseValidator.validateKeyUsageNotCertificateSigning(certificate);
                 OcspResponseValidator.validateExtendedKeyUsageOcspSigning(certificate);
                 // A delegated OCSP signer must be issued directly by the CA whose certificate status was requested.

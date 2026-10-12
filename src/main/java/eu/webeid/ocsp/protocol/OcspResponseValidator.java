@@ -37,6 +37,7 @@ public final class OcspResponseValidator {
      */
     private static final String OID_OCSP_SIGNING = "1.3.6.1.5.5.7.3.9";
     private static final int KEY_USAGE_DIGITAL_SIGNATURE_BIT_INDEX = 0;
+    private static final int KEY_USAGE_NON_REPUDIATION_BIT_INDEX = 1;
     private static final int KEY_USAGE_KEY_CERT_SIGN_BIT_INDEX = 5;
     private static final String ERROR_PREFIX = "Certificate status update time check failed: ";
 
@@ -51,16 +52,28 @@ public final class OcspResponseValidator {
         }
     }
 
-    public static void validateKeyUsageDigitalSignature(X509Certificate certificate) throws OCSPCertificateException {
+    /**
+     * The flag controls whether Key Usage must be present. If present, Key Usage must include
+     * Digital Signature or Non Repudiation.
+     */
+    public static void validateKeyUsageDigitalSignature(X509Certificate certificate, boolean isKeyUsageRequired) throws OCSPCertificateException {
         Objects.requireNonNull(certificate, "certificate");
         final boolean[] keyUsage = certificate.getKeyUsage();
         if (keyUsage == null) {
+            if (!isKeyUsageRequired) {
+                return;
+            }
             throw new OCSPCertificateException("Certificate " + certificate.getSubjectX500Principal() +
                 " does not contain the Key Usage extension required for OCSP response signing");
         }
-        if (keyUsage.length <= KEY_USAGE_DIGITAL_SIGNATURE_BIT_INDEX || !keyUsage[KEY_USAGE_DIGITAL_SIGNATURE_BIT_INDEX]) {
+        final boolean hasDigitalSignature = keyUsage.length > KEY_USAGE_DIGITAL_SIGNATURE_BIT_INDEX
+            && keyUsage[KEY_USAGE_DIGITAL_SIGNATURE_BIT_INDEX];
+        // RFC 5280 section 4.2.1.12 also permits Non Repudiation for OCSP signing.
+        final boolean hasNonRepudiation = keyUsage.length > KEY_USAGE_NON_REPUDIATION_BIT_INDEX
+            && keyUsage[KEY_USAGE_NON_REPUDIATION_BIT_INDEX];
+        if (!hasDigitalSignature && !hasNonRepudiation) {
             throw new OCSPCertificateException("Certificate " + certificate.getSubjectX500Principal() +
-                " Key Usage extension does not contain Digital Signature, which is required for OCSP response signing");
+                " Key Usage extension does not contain Digital Signature or Non Repudiation, which is required for OCSP response signing");
         }
     }
 

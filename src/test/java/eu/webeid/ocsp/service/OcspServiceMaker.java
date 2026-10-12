@@ -59,7 +59,7 @@ public class OcspServiceMaker {
             CertificateValidator.buildTrustAnchorsFromCertificates(TRUSTED_CA_CERTIFICATES),
             CertificateValidator.buildCertStoreFromCertificates(TRUSTED_CA_CERTIFICATES),
             MAX_THIS_UPDATE_AGE,
-            MAX_NEXT_UPDATE_AGE);
+            MAX_NEXT_UPDATE_AGE, true);
     }
 
     public static DesignatedOcspServiceConfiguration getDesignatedOcspServiceConfiguration() throws CertificateException, IOException, OCSPCertificateException {
@@ -77,7 +77,7 @@ public class OcspServiceMaker {
             TRUSTED_CA_CERTIFICATES,
             doesSupportNonce,
             MAX_THIS_UPDATE_AGE,
-            MAX_NEXT_UPDATE_AGE);
+            MAX_NEXT_UPDATE_AGE, true);
     }
 
 }

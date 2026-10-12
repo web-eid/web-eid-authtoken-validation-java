@@ -205,26 +205,33 @@ class OcspResponseValidatorTest {
     void whenCertHasKeyUsageDigitalSignature_thenKeyUsageValidationSucceeds() throws Exception {
         final X509Certificate cert = buildCertificate(
             new Extension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature).getEncoded()));
-        assertThatCode(() -> validateKeyUsageDigitalSignature(cert)).doesNotThrowAnyException();
+        assertThatCode(() -> validateKeyUsageDigitalSignature(cert, true)).doesNotThrowAnyException();
     }
 
     @Test
     void whenKeyUsageExtensionAbsent_thenKeyUsageValidationThrows() throws Exception {
         final X509Certificate cert = buildCertificate();
         assertThatExceptionOfType(OCSPCertificateException.class)
-            .isThrownBy(() -> validateKeyUsageDigitalSignature(cert))
+            .isThrownBy(() -> validateKeyUsageDigitalSignature(cert, true))
             .withMessage("Certificate " + cert.getSubjectX500Principal() +
                 " does not contain the Key Usage extension required for OCSP response signing");
     }
 
     @Test
-    void whenCertMissingKeyUsageDigitalSignature_thenKeyUsageValidationThrows() throws Exception {
+    void whenCertHasKeyUsageNonRepudiation_thenKeyUsageValidationSucceeds() throws Exception {
         final X509Certificate cert = buildCertificate(
             new Extension(Extension.keyUsage, true, new KeyUsage(KeyUsage.nonRepudiation).getEncoded()));
+        assertThatCode(() -> validateKeyUsageDigitalSignature(cert, true)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenKeyUsageWithoutDigitalSignatureOrNonRepudiation_thenKeyUsageValidationThrows() throws Exception {
+        final X509Certificate cert = buildCertificate(
+            new Extension(Extension.keyUsage, true, new KeyUsage(KeyUsage.keyEncipherment).getEncoded()));
         assertThatExceptionOfType(OCSPCertificateException.class)
-            .isThrownBy(() -> validateKeyUsageDigitalSignature(cert))
+            .isThrownBy(() -> validateKeyUsageDigitalSignature(cert, true))
             .withMessage("Certificate " + cert.getSubjectX500Principal() +
-                " Key Usage extension does not contain Digital Signature, which is required for OCSP response signing");
+                " Key Usage extension does not contain Digital Signature or Non Repudiation, which is required for OCSP response signing");
     }
 
     @Test
@@ -232,14 +239,43 @@ class OcspResponseValidatorTest {
         final X509Certificate cert = buildCertificate(
             new Extension(Extension.keyUsage, true, new DLBitString(new byte[0]).getEncoded()));
         assertThatExceptionOfType(OCSPCertificateException.class)
-            .isThrownBy(() -> validateKeyUsageDigitalSignature(cert))
+            .isThrownBy(() -> validateKeyUsageDigitalSignature(cert, true))
             .withMessage("Certificate " + cert.getSubjectX500Principal() +
-                " Key Usage extension does not contain Digital Signature, which is required for OCSP response signing");
+                " Key Usage extension does not contain Digital Signature or Non Repudiation, which is required for OCSP response signing");
+    }
+
+    @Test
+    void whenKeyUsageNotRequiredAndCertHasKeyUsageNonRepudiation_thenKeyUsageValidationSucceeds() throws Exception {
+        final X509Certificate cert = buildCertificate(
+            new Extension(Extension.keyUsage, true, new KeyUsage(KeyUsage.nonRepudiation).getEncoded()));
+        assertThatCode(() -> validateKeyUsageDigitalSignature(cert, false)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenKeyUsageNotRequiredButPresentWithoutDigitalSignatureOrNonRepudiation_thenKeyUsageValidationThrows() throws Exception {
+        final X509Certificate cert = buildCertificate(
+            new Extension(Extension.keyUsage, true, new KeyUsage(KeyUsage.keyEncipherment).getEncoded()));
+        assertThatExceptionOfType(OCSPCertificateException.class)
+            .isThrownBy(() -> validateKeyUsageDigitalSignature(cert, false))
+            .withMessage("Certificate " + cert.getSubjectX500Principal() +
+                " Key Usage extension does not contain Digital Signature or Non Repudiation, which is required for OCSP response signing");
+    }
+
+    @Test
+    void whenKeyUsageNotRequiredAndKeyUsageExtensionAbsent_thenKeyUsageValidationSucceeds() throws Exception {
+        final X509Certificate cert = buildCertificate();
+        assertThatCode(() -> validateKeyUsageDigitalSignature(cert, false)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenKeyUsageNotRequiredAndCertIsNull_thenKeyUsageValidationThrowsNullPointerException() {
+        assertThatNullPointerException().isThrownBy(() -> validateKeyUsageDigitalSignature(null, false))
+            .withMessage("certificate");
     }
 
     @Test
     void whenCertIsNull_thenKeyUsageValidationThrowsNullPointerException() {
-        assertThatNullPointerException().isThrownBy(() -> validateKeyUsageDigitalSignature(null))
+        assertThatNullPointerException().isThrownBy(() -> validateKeyUsageDigitalSignature(null, true))
             .withMessage("certificate");
     }
 

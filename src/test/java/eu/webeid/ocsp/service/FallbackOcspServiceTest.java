@@ -71,7 +71,7 @@ class FallbackOcspServiceTest {
         FallbackOcspServiceConfiguration configuration = new FallbackOcspServiceConfiguration(
             PRIMARY_FALLBACK_URI, aiaOcspResponderCert, true,
             null, getTestEsteid2018CA(), trustedCaAnchors, trustedCaCertStore,
-            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true);
 
         FallbackOcspService service = new FallbackOcspService(configuration);
 
@@ -85,11 +85,11 @@ class FallbackOcspServiceTest {
         FallbackOcspServiceConfiguration secondaryConfiguration = new FallbackOcspServiceConfiguration(
             SECONDARY_FALLBACK_URI, null, false,
             null, getTestEsteid2018CA(), trustedCaAnchors, trustedCaCertStore,
-            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true);
         FallbackOcspServiceConfiguration primaryConfiguration = new FallbackOcspServiceConfiguration(
             PRIMARY_FALLBACK_URI, null, true,
             secondaryConfiguration, getTestEsteid2018CA(), trustedCaAnchors, trustedCaCertStore,
-            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true);
 
         FallbackOcspService primary = new FallbackOcspService(primaryConfiguration);
 
@@ -105,7 +105,7 @@ class FallbackOcspServiceTest {
         FallbackOcspServiceConfiguration configuration = new FallbackOcspServiceConfiguration(
             PRIMARY_FALLBACK_URI, aiaOcspResponderCert, true,
             null, getTestEsteid2018CA(), trustedCaAnchors, trustedCaCertStore,
-            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true);
         FallbackOcspService service = new FallbackOcspService(configuration);
         X509CertificateHolder matchingHolder = new X509CertificateHolder(aiaOcspResponderCert.getEncoded());
 
@@ -119,7 +119,7 @@ class FallbackOcspServiceTest {
         FallbackOcspServiceConfiguration configuration = new FallbackOcspServiceConfiguration(
             PRIMARY_FALLBACK_URI, aiaOcspResponderCert, true,
             null, getTestEsteid2018CA(), trustedCaAnchors, trustedCaCertStore,
-            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true);
         FallbackOcspService service = new FallbackOcspService(configuration);
         X509CertificateHolder differentHolder = new X509CertificateHolder(esteid2018CaCert.getEncoded());
 
@@ -134,7 +134,7 @@ class FallbackOcspServiceTest {
         FallbackOcspServiceConfiguration configuration = new FallbackOcspServiceConfiguration(
             PRIMARY_FALLBACK_URI, null, true,
             null, getTestEsteid2018CA(), trustedCaAnchors, trustedCaCertStore,
-            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true);
         FallbackOcspService service = new FallbackOcspService(configuration);
         // The DEMO AIA responder certificate chains to the TEST of ESTEID2018 CA, which is a trusted anchor.
         X509CertificateHolder responderHolder = new X509CertificateHolder(aiaOcspResponderCert.getEncoded());
@@ -149,7 +149,7 @@ class FallbackOcspServiceTest {
         FallbackOcspServiceConfiguration configuration = new FallbackOcspServiceConfiguration(
             PRIMARY_FALLBACK_URI, null, true,
             null, getTestEsteid2018CA(), trustedCaAnchors, trustedCaCertStore,
-            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true);
         FallbackOcspService service = new FallbackOcspService(configuration);
         X509CertificateHolder nonSigningHolder = new X509CertificateHolder(nonSigningUserCert.getEncoded());
 
@@ -168,7 +168,7 @@ class FallbackOcspServiceTest {
         FallbackOcspServiceConfiguration configuration = new FallbackOcspServiceConfiguration(
             PRIMARY_FALLBACK_URI, null, true,
             null, getTestEsteid2018CA(), trustedCaAnchors, trustedCaCertStore,
-            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true);
         FallbackOcspService service = new FallbackOcspService(configuration);
         X509CertificateHolder noKeyUsageHolder = new X509CertificateHolder(ocspResponder2020Cert.getEncoded());
 
@@ -183,7 +183,7 @@ class FallbackOcspServiceTest {
         FallbackOcspServiceConfiguration configuration = new FallbackOcspServiceConfiguration(
             PRIMARY_FALLBACK_URI, null, true,
             null, getTestEsteid2018CA(), trustedCaAnchors, trustedCaCertStore,
-            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true);
         FallbackOcspService service = new FallbackOcspService(configuration);
         // The self-signed responder certificate satisfies every OCSP responder extension requirement, but it was
         // not issued by the subject certificate's issuer, so it is rejected before PKIX path building.
@@ -200,7 +200,7 @@ class FallbackOcspServiceTest {
         FallbackOcspServiceConfiguration configuration = new FallbackOcspServiceConfiguration(
             PRIMARY_FALLBACK_URI, aiaOcspResponderCert, true,
             null, getTestEsteid2018CA(), trustedCaAnchors, trustedCaCertStore,
-            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true);
         FallbackOcspService service = new FallbackOcspService(configuration);
         // Make JcaX509CertificateConverter.getCertificate(holder) fail: the converter calls holder.getEncoded()
         // and wraps the resulting IOException into a CertificateException, which the service catches and rewraps.
@@ -219,7 +219,7 @@ class FallbackOcspServiceTest {
         FallbackOcspServiceConfiguration configuration = new FallbackOcspServiceConfiguration(
             PRIMARY_FALLBACK_URI, aiaOcspResponderCert, true,
             null, getTestEsteid2018CA(), trustedCaAnchors, trustedCaCertStore,
-            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true);
         FallbackOcspService service = new FallbackOcspService(configuration);
         X509CertificateHolder responderHolder = new X509CertificateHolder(aiaOcspResponderCert.getEncoded());
         Date farFuture = new Date(4102444800000L); // 2100-01-01

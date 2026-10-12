@@ -59,7 +59,7 @@ class FallbackOcspServiceConfigurationTest {
         assertThatNullPointerException()
             .isThrownBy(() -> new FallbackOcspServiceConfiguration(
                 null, null, true, null, getTestEsteid2015CA(), trustedCaAnchors, trustedCaCertStore,
-                DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE))
+                DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true))
             .withMessage("Fallback OCSP service access location");
     }
 
@@ -68,7 +68,7 @@ class FallbackOcspServiceConfigurationTest {
         assertThatNullPointerException()
             .isThrownBy(() -> new FallbackOcspServiceConfiguration(
                 FALLBACK_URI, null, true, null, null, trustedCaAnchors, trustedCaCertStore,
-                DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE))
+                DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true))
             .withMessage("issuerCertificate");
     }
 
@@ -77,7 +77,7 @@ class FallbackOcspServiceConfigurationTest {
         assertThatNullPointerException()
             .isThrownBy(() -> new FallbackOcspServiceConfiguration(
                 FALLBACK_URI, null, true, null, getTestEsteid2015CA(), null, trustedCaCertStore,
-                DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE))
+                DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true))
             .withMessage("trustedCACertificateAnchors");
     }
 
@@ -86,7 +86,7 @@ class FallbackOcspServiceConfigurationTest {
         assertThatNullPointerException()
             .isThrownBy(() -> new FallbackOcspServiceConfiguration(
                 FALLBACK_URI, null, true, null, getTestEsteid2015CA(), trustedCaAnchors, null,
-                DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE))
+                DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true))
             .withMessage("trustedCACertificateCertStore");
     }
 
@@ -95,7 +95,7 @@ class FallbackOcspServiceConfigurationTest {
         assertThatNullPointerException()
             .isThrownBy(() -> new FallbackOcspServiceConfiguration(
                 FALLBACK_URI, null, true, null, getTestEsteid2015CA(), trustedCaAnchors, trustedCaCertStore,
-                null, DEFAULT_NEXT_UPDATE_AGE))
+                null, DEFAULT_NEXT_UPDATE_AGE, true))
             .withMessage("maxThisUpdateAge must not be null");
     }
 
@@ -104,7 +104,7 @@ class FallbackOcspServiceConfigurationTest {
         assertThatNullPointerException()
             .isThrownBy(() -> new FallbackOcspServiceConfiguration(
                 FALLBACK_URI, null, true, null, getTestEsteid2015CA(), trustedCaAnchors, trustedCaCertStore,
-                DEFAULT_THIS_UPDATE_AGE, null))
+                DEFAULT_THIS_UPDATE_AGE, null, true))
             .withMessage("maxNextUpdateAge must not be null");
     }
 
@@ -113,7 +113,7 @@ class FallbackOcspServiceConfigurationTest {
         assertThatIllegalArgumentException()
             .isThrownBy(() -> new FallbackOcspServiceConfiguration(
                 FALLBACK_URI, null, true, null, getTestEsteid2015CA(), trustedCaAnchors, trustedCaCertStore,
-                Duration.ZERO, DEFAULT_NEXT_UPDATE_AGE))
+                Duration.ZERO, DEFAULT_NEXT_UPDATE_AGE, true))
             .withMessage("maxThisUpdateAge must be greater than zero");
     }
 
@@ -122,7 +122,7 @@ class FallbackOcspServiceConfigurationTest {
         assertThatIllegalArgumentException()
             .isThrownBy(() -> new FallbackOcspServiceConfiguration(
                 FALLBACK_URI, null, true, null, getTestEsteid2015CA(), trustedCaAnchors, trustedCaCertStore,
-                Duration.ofMinutes(-1), DEFAULT_NEXT_UPDATE_AGE))
+                Duration.ofMinutes(-1), DEFAULT_NEXT_UPDATE_AGE, true))
             .withMessage("maxThisUpdateAge must be greater than zero");
     }
 
@@ -131,7 +131,7 @@ class FallbackOcspServiceConfigurationTest {
         assertThatIllegalArgumentException()
             .isThrownBy(() -> new FallbackOcspServiceConfiguration(
                 FALLBACK_URI, null, true, null, getTestEsteid2015CA(), trustedCaAnchors, trustedCaCertStore,
-                DEFAULT_THIS_UPDATE_AGE, Duration.ZERO))
+                DEFAULT_THIS_UPDATE_AGE, Duration.ZERO, true))
             .withMessage("maxNextUpdateAge must be greater than zero");
     }
 
@@ -140,7 +140,7 @@ class FallbackOcspServiceConfigurationTest {
         assertThatIllegalArgumentException()
             .isThrownBy(() -> new FallbackOcspServiceConfiguration(
                 FALLBACK_URI, null, true, null, getTestEsteid2015CA(), trustedCaAnchors, trustedCaCertStore,
-                DEFAULT_THIS_UPDATE_AGE, Duration.ofMinutes(-1)))
+                DEFAULT_THIS_UPDATE_AGE, Duration.ofMinutes(-1), true))
             .withMessage("maxNextUpdateAge must be greater than zero");
     }
 
@@ -149,7 +149,7 @@ class FallbackOcspServiceConfigurationTest {
         assertThatExceptionOfType(OCSPCertificateException.class)
             .isThrownBy(() -> new FallbackOcspServiceConfiguration(
                 FALLBACK_URI, nonSigningUserCert, true, null, getTestEsteid2015CA(), trustedCaAnchors, trustedCaCertStore,
-                DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE))
+                DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true))
             .withMessageContaining("Extended Key Usage extension does not contain OCSP Signing, "
                 + "which is required for OCSP response signing");
     }
@@ -159,7 +159,7 @@ class FallbackOcspServiceConfigurationTest {
         assertThatExceptionOfType(OCSPCertificateException.class)
             .isThrownBy(() -> new FallbackOcspServiceConfiguration(
                 FALLBACK_URI, ocspResponder2020Cert, true, null, getTestEsteid2015CA(), trustedCaAnchors, trustedCaCertStore,
-                DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE))
+                DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true))
             .withMessageContaining("does not contain the Key Usage extension required for OCSP response signing");
     }
 
@@ -167,7 +167,7 @@ class FallbackOcspServiceConfigurationTest {
     void whenResponderCertificateIsNull_thenConstructionSucceeds() {
         assertThatCode(() -> new FallbackOcspServiceConfiguration(
             FALLBACK_URI, null, true, null, getTestEsteid2015CA(), trustedCaAnchors, trustedCaCertStore,
-            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE))
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true))
             .doesNotThrowAnyException();
     }
 
@@ -176,12 +176,12 @@ class FallbackOcspServiceConfigurationTest {
         FallbackOcspServiceConfiguration nextFallback = new FallbackOcspServiceConfiguration(
             URI.create("http://next.fallback.ocsp.test"), null, false, null,
             getTestEsteid2015CA(), trustedCaAnchors, trustedCaCertStore,
-            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true);
 
         FallbackOcspServiceConfiguration configuration = new FallbackOcspServiceConfiguration(
             FALLBACK_URI, aiaOcspResponderCert, true, nextFallback,
             getTestEsteid2015CA(), trustedCaAnchors, trustedCaCertStore,
-            Duration.ofMinutes(3), Duration.ofMinutes(4));
+            Duration.ofMinutes(3), Duration.ofMinutes(4), true);
 
         assertThat(configuration.getAccessLocation()).isEqualTo(FALLBACK_URI);
         assertThat(configuration.getResponderCertificate()).isEqualTo(aiaOcspResponderCert);
@@ -201,7 +201,7 @@ class FallbackOcspServiceConfigurationTest {
         final FallbackOcspServiceConfiguration configuration = new FallbackOcspServiceConfiguration(
             FALLBACK_URI, null, true, null, getTestEsteid2018CA(), anchors,
             CertificateValidator.buildCertStoreFromCertificates(List.of(getTestEsteid2018CA())),
-            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true);
 
         anchors.clear();
 

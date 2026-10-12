@@ -36,6 +36,7 @@ public class FallbackOcspService implements OcspService {
     private final CertStore trustedCACertificateCertStore;
     private final Duration maxThisUpdateAge;
     private final Duration maxNextUpdateAge;
+    private final boolean isKeyUsageRequired;
 
     public FallbackOcspService(FallbackOcspServiceConfiguration configuration) {
         this.url = configuration.getAccessLocation();
@@ -49,6 +50,7 @@ public class FallbackOcspService implements OcspService {
         this.trustedCACertificateCertStore = configuration.getTrustedCACertificateCertStore();
         this.maxThisUpdateAge = configuration.getMaxThisUpdateAge();
         this.maxNextUpdateAge = configuration.getMaxNextUpdateAge();
+        this.isKeyUsageRequired = configuration.isKeyUsageRequired();
     }
 
     @Override
@@ -105,7 +107,7 @@ public class FallbackOcspService implements OcspService {
     private void validateResponderCertificateAgainstTrustedCa(X509Certificate responderCertificate, X509Certificate issuerCertificate, Date now) throws AuthTokenException, GeneralSecurityException {
         if (!responderCertificate.equals(issuerCertificate)) {
             OcspResponseValidator.validateBasicConstraintsNotCA(responderCertificate);
-            OcspResponseValidator.validateKeyUsageDigitalSignature(responderCertificate);
+            OcspResponseValidator.validateKeyUsageDigitalSignature(responderCertificate, isKeyUsageRequired);
             OcspResponseValidator.validateKeyUsageNotCertificateSigning(responderCertificate);
             OcspResponseValidator.validateExtendedKeyUsageOcspSigning(responderCertificate);
             // A delegated OCSP signer must be issued directly by the CA whose certificate status was requested.

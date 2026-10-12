@@ -21,13 +21,15 @@ public class AiaOcspServiceConfiguration {
     private final CertStore trustedCACertificateCertStore;
     private final Duration maxThisUpdateAge;
     private final Duration maxNextUpdateAge;
+    private final boolean isKeyUsageRequired;
 
-    public AiaOcspServiceConfiguration(Collection<X500Name> nonceDisabledIssuerDNs, Set<TrustAnchor> trustedCACertificateAnchors, CertStore trustedCACertificateCertStore, Duration maxThisUpdateAge, Duration maxNextUpdateAge) {
+    public AiaOcspServiceConfiguration(Collection<X500Name> nonceDisabledIssuerDNs, Set<TrustAnchor> trustedCACertificateAnchors, CertStore trustedCACertificateCertStore, Duration maxThisUpdateAge, Duration maxNextUpdateAge, boolean isKeyUsageRequired) {
         this.nonceDisabledIssuerDNs = Set.copyOf(nonceDisabledIssuerDNs);
         this.trustedCACertificateAnchors = Set.copyOf(trustedCACertificateAnchors);
         this.trustedCACertificateCertStore = Objects.requireNonNull(trustedCACertificateCertStore);
         this.maxThisUpdateAge = requirePositiveDuration(maxThisUpdateAge, "maxThisUpdateAge");
         this.maxNextUpdateAge = requirePositiveDuration(maxNextUpdateAge, "maxNextUpdateAge");
+        this.isKeyUsageRequired = isKeyUsageRequired;
     }
 
     public Collection<X500Name> getNonceDisabledIssuerDNs() {
@@ -48,5 +50,9 @@ public class AiaOcspServiceConfiguration {
 
     public Duration getMaxNextUpdateAge() {
         return maxNextUpdateAge;
+    }
+
+    public boolean isKeyUsageRequired() {
+        return isKeyUsageRequired;
     }
 }

@@ -117,7 +117,7 @@ class OcspCertificateRevocationCheckerNetworkTest {
     void whenDesignatedResponderCertificateDiffers_thenFailurePreservesCertificateCause() throws Exception {
         final var checker = customChecker(new DesignatedOcspServiceConfiguration(
                 responder.designatedUri(), responder.responderCertificate(), List.of(responder.issuer()), true,
-                OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE, OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE));
+                OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE, OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE, true));
         responder.replaceResponderCertificate(true);
 
         assertThatThrownBy(() -> checker.validateCertificateNotRevoked(responder.subject(), responder.issuer()))
@@ -241,7 +241,7 @@ class OcspCertificateRevocationCheckerNetworkTest {
                 new OcspServiceProvider(designated, new AiaOcspServiceConfiguration(Set.of(),
                         CertificateValidator.buildTrustAnchorsFromCertificates(anchors),
                         CertificateValidator.buildCertStoreFromCertificates(intermediates),
-                        OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE, OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE)),
+                        OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE, OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE, true)),
                 OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW);
     }
 
@@ -252,7 +252,7 @@ class OcspCertificateRevocationCheckerNetworkTest {
     private List<RevocationInfo> validate(boolean nonceEnabled) throws Exception {
         final var checker = customChecker(new DesignatedOcspServiceConfiguration(
                 responder.designatedUri(), responder.responderCertificate(), List.of(responder.issuer()), nonceEnabled,
-                OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE, OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE));
+                OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE, OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE, true));
         return CertificateValidator.validateCertificateTrustAndRevocation(
                 responder.subject(),
                 CertificateValidator.buildTrustAnchorsFromCertificates(List.of(responder.issuer())),

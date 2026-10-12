@@ -33,14 +33,15 @@ public class DesignatedOcspServiceConfiguration {
      * @param doesSupportNonce true if the service supports the OCSP protocol nonce extension
      * @param maxThisUpdateAge the maximum age of the OCSP response's {@code thisUpdate} time, must be greater than zero
      * @param maxNextUpdateAge the maximum age of the OCSP response's {@code nextUpdate} time, must be greater than zero
+     * @param isKeyUsageRequired true if the responder certificate must have the Key Usage extension with Digital Signature
      * @throws OCSPCertificateException when the responder certificate lacks OCSP signing usage
      */
-    public DesignatedOcspServiceConfiguration(URI ocspServiceAccessLocation, X509Certificate responderCertificate, Collection<X509Certificate> supportedCertificateIssuers, boolean doesSupportNonce, Duration maxThisUpdateAge, Duration maxNextUpdateAge) throws OCSPCertificateException {
+    public DesignatedOcspServiceConfiguration(URI ocspServiceAccessLocation, X509Certificate responderCertificate, Collection<X509Certificate> supportedCertificateIssuers, boolean doesSupportNonce, Duration maxThisUpdateAge, Duration maxNextUpdateAge, boolean isKeyUsageRequired) throws OCSPCertificateException {
         this.ocspServiceAccessLocation = Objects.requireNonNull(ocspServiceAccessLocation, "OCSP service access location");
         this.responderCertificate = Objects.requireNonNull(responderCertificate, "OCSP responder certificate");
         this.supportedIssuers = Set.copyOf(Objects.requireNonNull(supportedCertificateIssuers, "supported issuers"));
         OcspResponseValidator.validateBasicConstraintsNotCA(responderCertificate);
-        OcspResponseValidator.validateKeyUsageDigitalSignature(responderCertificate);
+        OcspResponseValidator.validateKeyUsageDigitalSignature(responderCertificate, isKeyUsageRequired);
         OcspResponseValidator.validateKeyUsageNotCertificateSigning(responderCertificate);
         OcspResponseValidator.validateExtendedKeyUsageOcspSigning(responderCertificate);
         this.doesSupportNonce = doesSupportNonce;

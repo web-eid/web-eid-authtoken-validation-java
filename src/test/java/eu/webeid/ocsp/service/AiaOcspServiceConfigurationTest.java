@@ -26,7 +26,7 @@ class AiaOcspServiceConfigurationTest {
         final TrustAnchor anchor = new TrustAnchor(getTestEsteid2018CA(), null);
         final Set<TrustAnchor> anchors = new HashSet<>(Set.of(anchor));
         final AiaOcspServiceConfiguration configuration = new AiaOcspServiceConfiguration(
-                nonceDisabledIssuerDNs, anchors, CertificateValidator.buildCertStoreFromCertificates(List.of(getTestEsteid2018CA())), OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE, OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE);
+                nonceDisabledIssuerDNs, anchors, CertificateValidator.buildCertStoreFromCertificates(List.of(getTestEsteid2018CA())), OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE, OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE, true);
 
         nonceDisabledIssuerDNs.clear();
         anchors.clear();

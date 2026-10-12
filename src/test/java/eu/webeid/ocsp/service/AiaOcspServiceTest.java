@@ -57,7 +57,7 @@ class AiaOcspServiceTest {
 
     private static AiaOcspServiceConfiguration configurationWithNonceDisabledFor(X500Name... nonceDisabledIssuerDNs) {
         return new AiaOcspServiceConfiguration(Set.of(nonceDisabledIssuerDNs), trustedCaAnchors, trustedCaCertStore,
-            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true);
     }
 
     @Test
@@ -87,7 +87,7 @@ class AiaOcspServiceTest {
         FallbackOcspServiceConfiguration fallbackConfiguration = new FallbackOcspServiceConfiguration(
             FALLBACK_URI, getDemoEsteidSk2018AiaOcspResponder(), true,
             null, getTestEsteid2018CA(), trustedCaAnchors, trustedCaCertStore,
-            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE);
+            DEFAULT_THIS_UPDATE_AGE, DEFAULT_NEXT_UPDATE_AGE, true);
         FallbackOcspService fallback = new FallbackOcspService(fallbackConfiguration);
 
         AiaOcspService service = new AiaOcspService(configuration, esteid2018UserCert, fallback);

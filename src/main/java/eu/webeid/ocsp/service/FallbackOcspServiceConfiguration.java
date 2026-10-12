@@ -27,18 +27,20 @@ public class FallbackOcspServiceConfiguration {
     private final CertStore trustedCACertificateCertStore;
     private final Duration maxThisUpdateAge;
     private final Duration maxNextUpdateAge;
+    private final boolean isKeyUsageRequired;
 
     public FallbackOcspServiceConfiguration(URI accessLocation, X509Certificate responderCertificate,
                                             boolean doesSupportNonce,
                                             FallbackOcspServiceConfiguration nextFallbackConfiguration,
                                             X509Certificate issuerCertificate, Set<TrustAnchor> trustedCACertificateAnchors,
                                             CertStore trustedCACertificateCertStore,
-                                            Duration maxThisUpdateAge, Duration maxNextUpdateAge) throws OCSPCertificateException {
+                                            Duration maxThisUpdateAge, Duration maxNextUpdateAge,
+                                            boolean isKeyUsageRequired) throws OCSPCertificateException {
         this.accessLocation = Objects.requireNonNull(accessLocation, "Fallback OCSP service access location");
         this.responderCertificate = responderCertificate;
         if (responderCertificate != null) {
             OcspResponseValidator.validateBasicConstraintsNotCA(responderCertificate);
-            OcspResponseValidator.validateKeyUsageDigitalSignature(responderCertificate);
+            OcspResponseValidator.validateKeyUsageDigitalSignature(responderCertificate, isKeyUsageRequired);
             OcspResponseValidator.validateKeyUsageNotCertificateSigning(responderCertificate);
             OcspResponseValidator.validateExtendedKeyUsageOcspSigning(responderCertificate);
         }
@@ -49,6 +51,7 @@ public class FallbackOcspServiceConfiguration {
         this.trustedCACertificateCertStore = Objects.requireNonNull(trustedCACertificateCertStore, "trustedCACertificateCertStore");
         this.maxThisUpdateAge = requirePositiveDuration(maxThisUpdateAge, "maxThisUpdateAge");
         this.maxNextUpdateAge = requirePositiveDuration(maxNextUpdateAge, "maxNextUpdateAge");
+        this.isKeyUsageRequired = isKeyUsageRequired;
     }
 
     public URI getAccessLocation() {
@@ -85,5 +88,9 @@ public class FallbackOcspServiceConfiguration {
 
     public Duration getMaxNextUpdateAge() {
         return maxNextUpdateAge;
+    }
+
+    public boolean isKeyUsageRequired() {
+        return isKeyUsageRequired;
     }
 }
