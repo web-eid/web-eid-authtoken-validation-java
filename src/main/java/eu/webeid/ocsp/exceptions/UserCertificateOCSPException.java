@@ -3,9 +3,9 @@
 
 package eu.webeid.ocsp.exceptions;
 
-import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.exceptions.CertificateRevocationCheckFailedException;
 
-public class UserCertificateOCSPException extends AuthTokenException {
+public class UserCertificateOCSPException extends CertificateRevocationCheckFailedException {
 
     public UserCertificateOCSPException(String message) {
         super(message);
