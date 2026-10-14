@@ -78,7 +78,7 @@ AiaOcspServiceConfiguration aiaConfiguration = new AiaOcspServiceConfiguration(
     CertificateValidator.buildCertStoreFromCertificates(trustedCAs),
     OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
     OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE,
-    true // Require the Key Usage extension with Digital Signature in responder certificates.
+    true // Require the Key Usage extension in responder certificates.
 );
 OcspServiceProvider services = new OcspServiceProvider(null, aiaConfiguration);
 OcspCertificateRevocationChecker checker = new OcspCertificateRevocationChecker(
@@ -105,7 +105,7 @@ The maximum ages of the OCSP response's `thisUpdate` and `nextUpdate` times are 
 
 These checks are implemented by [OcspResponseValidator](protocol/OcspResponseValidator.java).
 
-By default, OCSP responder certificates must have the Key Usage extension with Digital Signature. To accept responder certificates that lack the Key Usage extension or do not assert Digital Signature in it, pass `false` as the last `isKeyUsageRequired` argument of the `AiaOcspServiceConfiguration`, `DesignatedOcspServiceConfiguration` or `FallbackOcspServiceConfiguration` constructor. If the Key Usage extension is present, it must still not contain Certificate Signing, the Extended Key Usage extension must still contain OCSP Signing, and the certificate must still not be a CA certificate. For AIA services, the setting applies only to delegated responder certificates, not to the issuer CA signing its own responses. The setting of a fallback configuration does not propagate to its `nextFallbackConfiguration`.
+The examples require OCSP responder certificates to have the Key Usage extension. To accept responder certificates that lack the Key Usage extension, pass `false` as the last `isKeyUsageRequired` argument of the `AiaOcspServiceConfiguration`, `DesignatedOcspServiceConfiguration` or `FallbackOcspServiceConfiguration` constructor. If the Key Usage extension is present, it must contain Digital Signature or Non Repudiation and must not contain Certificate Signing. The Extended Key Usage extension must still contain OCSP Signing, and the certificate must still not be a CA certificate. For AIA services, the setting applies only to delegated responder certificates, not to the issuer CA signing its own responses. The setting of a fallback configuration does not propagate to its `nextFallbackConfiguration`.
 
 For a designated responder, replace the `services` definition above with the following configuration. `responderCertificate` must be the service's trusted signing certificate and `supportedIssuers` the collection of issuer certificates served by it:
 
@@ -120,7 +120,7 @@ DesignatedOcspServiceConfiguration designated = new DesignatedOcspServiceConfigu
     true, // This service supports nonces.
     OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
     OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE,
-    true // Require the Key Usage extension with Digital Signature in responder certificates.
+    true // Require the Key Usage extension in responder certificates.
 );
 OcspServiceProvider services = new OcspServiceProvider(designated, aiaConfiguration);
 ```
