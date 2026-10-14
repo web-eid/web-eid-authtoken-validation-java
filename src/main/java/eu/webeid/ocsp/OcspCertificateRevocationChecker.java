@@ -10,6 +10,7 @@ import eu.webeid.ocsp.protocol.OcspRequestBuilder;
 import eu.webeid.ocsp.protocol.OcspResponseValidator;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
+import eu.webeid.ocsp.exceptions.UserCertificateOCSPException;
 import eu.webeid.security.util.DateAndTime;
 import eu.webeid.ocsp.service.OcspServiceProvider;
 import eu.webeid.ocsp.service.OcspService;
@@ -50,13 +51,13 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
 
     public static final Duration DEFAULT_TIME_SKEW = Duration.ofMinutes(15);
     public static final Duration DEFAULT_THIS_UPDATE_AGE = Duration.ofMinutes(2);
+    public static final Duration DEFAULT_NEXT_UPDATE_AGE = Duration.ofMinutes(15);
 
     private static final Logger LOG = LoggerFactory.getLogger(OcspCertificateRevocationChecker.class);
 
     private final OcspClient ocspClient;
     private final OcspServiceProvider ocspServiceProvider;
     private final Duration allowedOcspResponseTimeSkew;
-    private final Duration maxOcspResponseThisUpdateAge;
 
     static {
         if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
@@ -66,12 +67,10 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
 
     public OcspCertificateRevocationChecker(OcspClient ocspClient,
                                             OcspServiceProvider ocspServiceProvider,
-                                            Duration allowedOcspResponseTimeSkew,
-                                            Duration maxOcspResponseThisUpdateAge) {
+                                            Duration allowedOcspResponseTimeSkew) {
         this.ocspClient = requireNonNull(ocspClient, "ocspClient");
         this.ocspServiceProvider = requireNonNull(ocspServiceProvider, "ocspServiceProvider");
         this.allowedOcspResponseTimeSkew = requirePositiveDuration(allowedOcspResponseTimeSkew, "allowedOcspResponseTimeSkew");
-        this.maxOcspResponseThisUpdateAge = requirePositiveDuration(maxOcspResponseThisUpdateAge, "maxOcspResponseThisUpdateAge");
     }
 
     /**
@@ -86,22 +85,16 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
         requireNonNull(subjectCertificate, "subjectCertificate");
         requireNonNull(issuerCertificate, "issuerCertificate");
 
-        URI ocspResponderUri = null;
+        final OcspService ocspService = ocspServiceProvider.getService(subjectCertificate, issuerCertificate);
+        final CertificateID certificateId = getCertificateId(subjectCertificate, issuerCertificate);
+        final URI ocspResponderUri = ocspService.getAccessLocation();
+        final OCSPReq request = getOcspRequest(certificateId, ocspService);
+
+        if (!ocspService.doesSupportNonce()) {
+            LOG.debug("Disabling OCSP nonce extension");
+        }
+
         try {
-            OcspService ocspService = ocspServiceProvider.getService(subjectCertificate, issuerCertificate);
-            ocspResponderUri = requireNonNull(ocspService.getAccessLocation(), "ocspResponderUri");
-
-            final CertificateID certificateId = getCertificateId(subjectCertificate, issuerCertificate);
-
-            final OCSPReq request = new OcspRequestBuilder()
-                .withCertificateId(certificateId)
-                .enableOcspNonce(ocspService.doesSupportNonce())
-                .build();
-
-            if (!ocspService.doesSupportNonce()) {
-                LOG.debug("Disabling OCSP nonce extension");
-            }
-
             LOG.debug("Sending OCSP request");
             final OCSPResp response = requireNonNull(ocspClient.request(ocspResponderUri, request), "OCSPResp");
             if (response.getStatus() != OCSPResponseStatus.SUCCESSFUL) {
@@ -113,7 +106,7 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
             }
             LOG.debug("OCSP response received successfully");
 
-            verifyOcspResponse(basicResponse, ocspService, certificateId, issuerCertificate, maxOcspResponseThisUpdateAge);
+            verifyOcspResponse(basicResponse, ocspService, certificateId, issuerCertificate);
             if (ocspService.doesSupportNonce()) {
                 checkNonce(request, basicResponse, ocspResponderUri);
             }
@@ -121,12 +114,25 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
 
             return List.of(new RevocationInfo(ocspResponderUri, Map.of(RevocationInfo.KEY_OCSP_RESPONSE, response)));
 
-        } catch (OCSPException | CertificateException | OperatorCreationException | IOException | OCSPClientException e) {
+        } catch (OCSPException | CertificateException | OperatorCreationException | OCSPClientException e) {
             throw new UserCertificateOCSPCheckFailedException(e, ocspResponderUri);
         }
     }
 
-    protected void verifyOcspResponse(BasicOCSPResp basicResponse, OcspService ocspService, CertificateID requestCertificateId, X509Certificate issuerCertificate, Duration maxOcspResponseThisUpdateAge) throws AuthTokenException, OCSPException, CertificateException, OperatorCreationException {
+    protected static OCSPReq getOcspRequest(CertificateID certificateId, OcspService ocspService) throws UserCertificateOCSPException {
+        final OCSPReq request;
+        try {
+            request = new OcspRequestBuilder()
+                .withCertificateId(certificateId)
+                .enableOcspNonce(ocspService.doesSupportNonce())
+                .build();
+        } catch (OCSPException e) {
+            throw new UserCertificateOCSPException("Unable to create OCSP request", e);
+        }
+        return request;
+    }
+
+    protected void verifyOcspResponse(BasicOCSPResp basicResponse, OcspService ocspService, CertificateID requestCertificateId, X509Certificate issuerCertificate) throws AuthTokenException, OCSPException, CertificateException, OperatorCreationException {
         // The verification algorithm follows RFC 2560, https://www.ietf.org/rfc/rfc2560.txt.
         //
         // 3.2.  Signed Response Acceptance Requirements
@@ -182,7 +188,7 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
         //      be available about the status of the certificate (nextUpdate) is
         //      greater than the current time.
 
-        OcspResponseValidator.validateCertificateStatusUpdateTime(certStatusResponse, allowedOcspResponseTimeSkew, maxOcspResponseThisUpdateAge, ocspService.getAccessLocation());
+        OcspResponseValidator.validateCertificateStatusUpdateTime(certStatusResponse, allowedOcspResponseTimeSkew, ocspService.getMaxThisUpdateAge(), ocspService.getMaxNextUpdateAge(), ocspService.getAccessLocation());
 
         // Now we can accept the signed response as valid and validate the certificate status.
         OcspResponseValidator.validateSubjectCertificateStatus(certStatusResponse, ocspService.getAccessLocation());
@@ -202,11 +208,15 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
         }
     }
 
-    protected static CertificateID getCertificateId(X509Certificate subjectCertificate, X509Certificate issuerCertificate) throws CertificateEncodingException, IOException, OCSPException {
-        final BigInteger serial = subjectCertificate.getSerialNumber();
-        final DigestCalculator digestCalculator = DigestCalculatorImpl.sha1();
-        return new CertificateID(digestCalculator,
-            new X509CertificateHolder(issuerCertificate.getEncoded()), serial);
+    protected static CertificateID getCertificateId(X509Certificate subjectCertificate, X509Certificate issuerCertificate) throws UserCertificateOCSPException {
+        try {
+            final BigInteger serial = subjectCertificate.getSerialNumber();
+            final DigestCalculator digestCalculator = DigestCalculatorImpl.sha1();
+            return new CertificateID(digestCalculator,
+                new X509CertificateHolder(issuerCertificate.getEncoded()), serial);
+        } catch (CertificateEncodingException | IOException | OCSPException e) {
+            throw new UserCertificateOCSPException("Unable to compute certificateId for subject certificate", e);
+        }
     }
 
     protected static String ocspStatusToString(int status) {
@@ -226,9 +236,5 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
 
     protected OcspServiceProvider getOcspServiceProvider() {
         return ocspServiceProvider;
-    }
-
-    protected Duration getMaxOcspResponseThisUpdateAge() {
-        return maxOcspResponseThisUpdateAge;
     }
 }
