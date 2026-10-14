@@ -5,8 +5,6 @@ package eu.webeid.security.certificate;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 
-import java.util.Set;
-
 public final class SubjectCertificatePolicies {
 
     private static final String ESTEID_SK_2015_MOBILE_ID_POLICY_PREFIX = "1.3.6.1.4.1.10015.1.3";
@@ -21,31 +19,34 @@ public final class SubjectCertificatePolicies {
         new ASN1ObjectIdentifier(ESTEID_SK_2015_MOBILE_ID_POLICY_PREFIX + ".3");
 
     /**
-     * Production document policies for Estonian ID cards, digital ID cards, residence permit cards and diplomatic
-     * identity cards issued under the ESTEID2018 and eID certificate-policy generations.
+     * Production document policies for Estonian and European Union citizen ID cards issued under the ESTEID2018
+     * and eID certificate-policy generations.
      *
-     * @see <a href="https://www.id.ee/artikkel/id-kaardi-digi-id-elamisloakaardi-ja-diplomaadikaardi-sertifitseerimispoliitika/">
-     *     Estonian identity-document certificate policies</a>
+     * @see <a href="https://www.id.ee/en/article/certificate-policy-for-identity-card-digital-identity-card-residence-permit-card-and-diplomatic-identity-card-2/">
+     *     ID.ee certificate policy index for Estonian identity documents</a>
+     * @see <a href="https://www.id.ee/wp-content/uploads/2026/08/cp_esteid_v4.1_17.08.2026_allkirjastatud.pdf">
+     *     IDEMIA-generation certificate policy</a>
+     * @see <a href="https://www.skidsolutions.eu/resources/certificate-policies/">
+     *     SK ID Solutions certificate policies</a>
+     * @see <a href="https://www.skidsolutions.eu/resources/profiles/">
+     *     SK ID Solutions certificate profiles</a>
+     * @see <a href="https://www.skidsolutions.eu/upload/files/SK-CPR-ESTEID2018-EN-v1_3_20220217.pdf">
+     *     ESTEID2018 certificate profile</a>
+     * @see <a href="https://www.id.ee/wp-content/uploads/2026/06/eid-cp-v-2.0_04.06.2026_allkirjastatud.pdf">
+     *     Thales-generation certificate policy</a>
+     * @see <a href="https://repository.eidpki.ee/repository/">
+     *     Zetes Estonia trust-service repository</a>
+     * @see <a href="https://repository.eidpki.ee/static/documents/CertificateProfiles-20260520.pdf">
+     *     ESTEID2025 certificate profile</a>
      */
-    public static final Set<ASN1ObjectIdentifier> ESTEID_PRODUCTION_DOCUMENT_POLICIES = Set.of(
+    public static final ASN1ObjectIdentifier[] ESTEID_ID_CARD_POLICIES = {
         // ESTEID2018 / IDEMIA generation
         new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.1.1"),
         new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.1.2"),
-        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.1.3"),
-        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.1.4"),
-        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.1.5"),
-        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.1.6"),
-        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.1.7"),
-        new ASN1ObjectIdentifier("1.3.6.1.4.1.51455.1.1.1"),
         // eID / Thales generation
         new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.2.1.1"),
-        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.2.1.2"),
-        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.2.1.3"),
-        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.2.1.4"),
-        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.2.1.5"),
-        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.2.1.6"),
-        new ASN1ObjectIdentifier("1.3.6.1.4.1.51455.2.1.1")
-    );
+        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.2.1.2")
+    };
 
     private SubjectCertificatePolicies() {
         throw new IllegalStateException("Constants class");
