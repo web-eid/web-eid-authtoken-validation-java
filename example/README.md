@@ -43,7 +43,17 @@ The algorithm, which performs the validation of the Web eID authentication token
 
 In case you need to provide your own CA certificates, either add the `.cer` files to the `src/main/resources/certs/{dev,prod}` profile-specific directory or add the certificates to the truststore file.
 
-### 4. Choose either the `dev` or `prod` profile
+### 4. Configure allowed certificate policies
+
+Certificate policy validation is strict by default. The `prod` profile uses the library's built-in Estonian production
+identity-document policies, while the `dev` profile registers the Estonian test-card issuers and policies in
+`ValidationConfiguration.ESTEID_TEST_DOCUMENT_POLICIES`.
+
+To support an issuer that is not already listed, add it with
+`withAllowedCertificatePolicies(X500Principal issuer, ASN1ObjectIdentifier... policies)`. If policy validation must
+remain lenient for unlisted issuers, explicitly call `allowUnlistedIssuers(true)` instead.
+
+### 5. Choose either the `dev` or `prod` profile
 
 If you have a test eID card, use the `dev` profile. In this case access to paid services is not required, but you need to upload the authentication and signing certificates of the test card to the test OCSP responder database as described in section _[Using DigiDoc4j in test mode with the `dev` profile](#using-digidoc4j-in-test-mode-with-the-dev-profile)_ below. The `dev` profile is activated by default.
 
@@ -51,7 +61,7 @@ If you only have a production eID card, use the `prod` profile. You can still te
 
 You can specify the profile as a command-line argument to the Maven wrapper command `./mvnw`, for example `./mvnw -Pprod ...`.
 
-### 5. Run the application
+### 6. Run the application
 
 Spring Boot web applications can be run from the command-line. You need to have the Java Development Kit 17 installed for building the application package and running the application.
 
@@ -134,7 +144,7 @@ The `src/tests` directory contains the application test suite. The most importan
 
 ### Configuration
 
-As described in section [_4. Choose either the `dev` or `prod` profile_](#4-choose-either-the-dev-or-prod-profile) above, the application has two different configuration profiles: `dev` profile for running the application in development mode and `prod` profile for production mode. The `dev` profile is activated by default.
+As described in section [_5. Choose either the `dev` or `prod` profile_](#5-choose-either-the-dev-or-prod-profile) above, the application has two different configuration profiles: `dev` profile for running the application in development mode and `prod` profile for production mode. The `dev` profile is activated by default.
 
 The profile-specific configuration files `src/main/resources/application-{dev,prod}.yaml` contain the `web-eid-auth-token.validation.use-digidoc4j-prod-configuration` setting that configures DigiDoc4j either in test or production mode, and a setting for configuring the origin URL as described in section [_2. Configure the origin URL_](#2-configure-the-origin-url) above. Additionally, the `web-eid-auth-token.validation.truststore-password` setting specifies the truststore password used in the `prod` profile.
 
