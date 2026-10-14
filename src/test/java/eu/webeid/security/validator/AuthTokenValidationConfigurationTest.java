@@ -25,16 +25,42 @@ package eu.webeid.security.validator;
 import eu.webeid.security.testutil.Certificates;
 import eu.webeid.security.validator.revocationcheck.CertificateRevocationChecker;
 import eu.webeid.security.validator.revocationcheck.RevocationMode;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
 import java.security.cert.PKIXRevocationChecker;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 class AuthTokenValidationConfigurationTest {
+
+    private static final ASN1ObjectIdentifier ALLOWED_POLICY = new ASN1ObjectIdentifier("1.2.3");
+
+    @Test
+    void copyRetainsAllowedPoliciesIndependently() {
+        final AuthTokenValidationConfiguration configuration = new AuthTokenValidationConfiguration();
+        configuration.setAllowedSubjectCertificatePolicies(List.of(ALLOWED_POLICY));
+
+        final AuthTokenValidationConfiguration copy = configuration.copy();
+        configuration.getAllowedSubjectCertificatePolicies().clear();
+
+        assertThat(copy.getAllowedSubjectCertificatePolicies()).containsExactly(ALLOWED_POLICY);
+    }
+
+    @Test
+    void setAllowedPoliciesCopiesInputCollection() {
+        final List<ASN1ObjectIdentifier> policies = new ArrayList<>(List.of(ALLOWED_POLICY));
+        final AuthTokenValidationConfiguration configuration = new AuthTokenValidationConfiguration();
+
+        configuration.setAllowedSubjectCertificatePolicies(policies);
+        policies.clear();
+
+        assertThat(configuration.getAllowedSubjectCertificatePolicies()).containsExactly(ALLOWED_POLICY);
+    }
 
     @Test
     void whenNoCustomCheckerProvided_thenRevocationModeIsPlatformOcsp() throws Exception {

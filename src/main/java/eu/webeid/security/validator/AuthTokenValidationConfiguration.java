@@ -24,7 +24,9 @@ public final class AuthTokenValidationConfiguration {
 
     private URI siteOrigin;
     private Collection<X509Certificate> trustedCACertificates = new HashSet<>();
+    private Collection<ASN1ObjectIdentifier> allowedSubjectCertificatePolicies = new HashSet<>();
     // Don't allow Estonian Mobile-ID policy by default.
+    @Deprecated(since = "4.0.0")
     private Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies = new HashSet<>(Set.of(
         SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V1,
         SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V2,
@@ -43,6 +45,7 @@ public final class AuthTokenValidationConfiguration {
     private AuthTokenValidationConfiguration(AuthTokenValidationConfiguration other) {
         this.siteOrigin = other.siteOrigin;
         this.trustedCACertificates = Set.copyOf(other.trustedCACertificates);
+        this.allowedSubjectCertificatePolicies = Set.copyOf(other.allowedSubjectCertificatePolicies);
         this.disallowedSubjectCertificatePolicies = Set.copyOf(other.disallowedSubjectCertificatePolicies);
         this.isUserCertificateRevocationCheckEnabled = other.isUserCertificateRevocationCheckEnabled;
         this.platformOcspNonceEnabled = other.platformOcspNonceEnabled;
@@ -63,6 +66,18 @@ public final class AuthTokenValidationConfiguration {
         return trustedCACertificates;
     }
 
+    public Collection<ASN1ObjectIdentifier> getAllowedSubjectCertificatePolicies() {
+        return allowedSubjectCertificatePolicies;
+    }
+
+    void setAllowedSubjectCertificatePolicies(Collection<ASN1ObjectIdentifier> allowedSubjectCertificatePolicies) {
+        this.allowedSubjectCertificatePolicies = new HashSet<>(allowedSubjectCertificatePolicies);
+    }
+
+    /**
+     * @deprecated Configure allowed certificate policies instead.
+     */
+    @Deprecated(since = "4.0.0")
     public Collection<ASN1ObjectIdentifier> getDisallowedSubjectCertificatePolicies() {
         return disallowedSubjectCertificatePolicies;
     }

@@ -320,7 +320,23 @@ toTitleCase(CertificateData.getSubjectSurname(userCertificate).orElseThrow()); /
 
 The default validator uses the platform OCSP implementation to check certificate revocation. A revoked certificate or an unsuccessful revocation check causes authentication to fail.
 
-Use `withDisallowedCertificatePolicies(ASN1ObjectIdentifier... policies)` to add disallowed certificate policies. Estonian Mobile-ID policies are disallowed by default because smart-card authentication must not accept Mobile-ID certificates.
+Use `withAllowedCertificatePolicies(ASN1ObjectIdentifier... policies)` to require one of the configured certificate policies. A non-empty allow-list takes precedence over the deny-list. The deprecated `withDisallowedCertificatePolicies(ASN1ObjectIdentifier... policies)` method remains as a compatibility fallback when no allowed policies are configured. Estonian Mobile-ID policies are disallowed by default because smart-card authentication must not accept Mobile-ID certificates.
+
+For example, restrict authentication to production Estonian ID cards, digital ID cards, residence permit cards and diplomatic identity cards:
+
+```java
+import static eu.webeid.security.certificate.SubjectCertificatePolicies.ESTEID_PRODUCTION_DOCUMENT_POLICIES;
+
+...
+    AuthTokenValidator tokenValidator = new AuthTokenValidatorBuilder()
+            .withSiteOrigin(URI.create("https://example.org"))
+            .withTrustedCertificateAuthorities(trustedIntermediateCACertificates())
+            .withAllowedCertificatePolicies(ESTEID_PRODUCTION_DOCUMENT_POLICIES)
+            .build();
+...
+```
+
+See the [certificate policy allow-list guide](readme-policy.md) for an Estonian identity-document production whitelist and its rationale.
 
 For more advanced revocation requirements, supply a `CertificateRevocationChecker` with `withCertificateRevocationChecker(...)`. The [OCSP configuration guide](src/main/java/eu/webeid/ocsp/README.md) covers custom implementations, the bundled OCSP checker, custom PKIX checkers, responder selection, HTTP settings, and nonce policies.
 

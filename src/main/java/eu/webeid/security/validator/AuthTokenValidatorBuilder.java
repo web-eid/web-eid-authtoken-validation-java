@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.security.cert.PKIXRevocationChecker;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
 import java.util.Collections;
 
 /**
@@ -61,13 +62,29 @@ public class AuthTokenValidatorBuilder {
     }
 
     /**
+     * Sets the list of allowed user certificate policies.
+     * When this list is not empty, the user certificate must contain at least one allowed policy and the configured
+     * disallowed policies are ignored. When this list is empty, validation falls back to the disallowed policy list.
+     *
+     * @param policies allowed user certificate policies
+     * @return the builder instance for method chaining
+     */
+    public AuthTokenValidatorBuilder withAllowedCertificatePolicies(ASN1ObjectIdentifier... policies) {
+        configuration.setAllowedSubjectCertificatePolicies(Arrays.asList(policies));
+        LOG.debug("Allowed subject certificate policies set to {}", configuration.getAllowedSubjectCertificatePolicies());
+        return this;
+    }
+
+    /**
      * Adds the given policies to the list of disallowed user certificate policies.
      * In order for the user certificate to be considered valid, it must not contain any policies
      * present in this list.
      *
      * @param policies disallowed user certificate policies
      * @return the builder instance for method chaining
+     * @deprecated Use {@link #withAllowedCertificatePolicies(ASN1ObjectIdentifier...)} instead.
      */
+    @Deprecated(since = "4.0.0")
     public AuthTokenValidatorBuilder withDisallowedCertificatePolicies(ASN1ObjectIdentifier... policies) {
         Collections.addAll(configuration.getDisallowedSubjectCertificatePolicies(), policies);
         LOG.debug("Disallowed subject certificate policies set to {}", configuration.getDisallowedSubjectCertificatePolicies());

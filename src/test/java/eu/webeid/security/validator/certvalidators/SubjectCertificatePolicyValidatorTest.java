@@ -47,10 +47,42 @@ class SubjectCertificatePolicyValidatorTest {
     }
 
     @Test
+    void whenCertificateContainsAllowedPolicy_thenValidationSucceeds() throws Exception {
+        final SubjectCertificatePolicyValidator validator =
+            new SubjectCertificatePolicyValidator(List.of(ESTEID2018_POLICY), Set.of());
+        assertThatCode(() -> validator.validateCertificatePolicies(getJaakKristjanEsteid2018Cert()))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenCertificateDoesNotContainAllowedPolicy_thenValidationFails() throws Exception {
+        final SubjectCertificatePolicyValidator validator =
+            new SubjectCertificatePolicyValidator(List.of(UNRELATED_POLICY), Set.of());
+        assertThatExceptionOfType(UserCertificateDisallowedPolicyException.class)
+            .isThrownBy(() -> validator.validateCertificatePolicies(getJaakKristjanEsteid2018Cert()));
+    }
+
+    @Test
+    void whenPolicyIsBothAllowedAndDisallowed_thenAllowListTakesPrecedence() throws Exception {
+        final SubjectCertificatePolicyValidator validator =
+            new SubjectCertificatePolicyValidator(List.of(ESTEID2018_POLICY), List.of(ESTEID2018_POLICY));
+        assertThatCode(() -> validator.validateCertificatePolicies(getJaakKristjanEsteid2018Cert()))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
     void whenCertificateDoesNotContainCertificatePoliciesExtension_thenValidationSucceeds() throws Exception {
         final SubjectCertificatePolicyValidator validator = new SubjectCertificatePolicyValidator(List.of(ESTEID2018_POLICY));
         assertThatCode(() -> validator.validateCertificatePolicies(getCertificateWithoutCertificatePolicies()))
             .doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenAllowListIsConfiguredAndCertificatePoliciesExtensionIsMissing_thenValidationFails() throws Exception {
+        final SubjectCertificatePolicyValidator validator =
+            new SubjectCertificatePolicyValidator(List.of(ESTEID2018_POLICY), Set.of());
+        assertThatExceptionOfType(UserCertificateDisallowedPolicyException.class)
+            .isThrownBy(() -> validator.validateCertificatePolicies(getCertificateWithoutCertificatePolicies()));
     }
 
     @Test

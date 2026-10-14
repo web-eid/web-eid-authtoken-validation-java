@@ -54,7 +54,10 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         trustedCACertificateAnchors = CertificateValidator.buildTrustAnchorsFromCertificates(configuration.getTrustedCACertificates());
         trustedCACertificateCertStore = CertificateValidator.buildCertStoreFromCertificates(configuration.getTrustedCACertificates());
 
-        subjectCertificatePolicyValidator = new SubjectCertificatePolicyValidator(configuration.getDisallowedSubjectCertificatePolicies());
+        subjectCertificatePolicyValidator = new SubjectCertificatePolicyValidator(
+            this.configuration.getAllowedSubjectCertificatePolicies(),
+            this.configuration.getDisallowedSubjectCertificatePolicies()
+        );
 
         authTokenSignatureValidator = new AuthTokenSignatureValidator(configuration.getSiteOrigin());
     }

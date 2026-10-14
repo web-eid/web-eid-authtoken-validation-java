@@ -18,6 +18,7 @@ import eu.webeid.security.exceptions.UserCertificateWrongPurposeException;
 import eu.webeid.security.testutil.AbstractTestWithValidator;
 import eu.webeid.security.testutil.AuthTokenValidators;
 import eu.webeid.security.util.DateAndTime;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -34,6 +35,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mockStatic;
 
 class AuthTokenCertificateTest extends AbstractTestWithValidator {
+
+    private static final ASN1ObjectIdentifier ESTEID2018_TEST_POLICY =
+        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.2.1");
+    private static final ASN1ObjectIdentifier UNRELATED_POLICY = new ASN1ObjectIdentifier("1.2.3");
 
     private static final String AUTH_TOKEN = "{\"algorithm\":\"ES384\"," +
         "\"unverifiedCertificate\":\"X5C\"," +
@@ -175,6 +180,30 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
         final AuthTokenValidator validatorWithDisallowedESTEIDPolicy = AuthTokenValidators.getAuthTokenValidatorWithDisallowedESTEIDPolicy();
         assertThatThrownBy(() -> validatorWithDisallowedESTEIDPolicy
             .validate(validAuthToken, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(UserCertificateDisallowedPolicyException.class);
+    }
+
+    @Test
+    void whenCertificatePolicyIsAllowed_thenValidationSucceeds() throws Exception {
+        final AuthTokenValidator validatorWithAllowedESTEIDPolicy = AuthTokenValidators
+            .getDefaultAuthTokenValidatorBuilder()
+            .withAllowedCertificatePolicies(ESTEID2018_TEST_POLICY)
+            .withoutUserCertificateRevocationCheck()
+            .build();
+
+        assertThatCode(() -> validatorWithAllowedESTEIDPolicy.validate(validAuthToken, VALID_CHALLENGE_NONCE))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenCertificatePolicyIsNotAllowed_thenValidationFails() throws Exception {
+        final AuthTokenValidator validatorWithUnrelatedAllowedPolicy = AuthTokenValidators
+            .getDefaultAuthTokenValidatorBuilder()
+            .withAllowedCertificatePolicies(UNRELATED_POLICY)
+            .withoutUserCertificateRevocationCheck()
+            .build();
+
+        assertThatThrownBy(() -> validatorWithUnrelatedAllowedPolicy.validate(validAuthToken, VALID_CHALLENGE_NONCE))
             .isInstanceOf(UserCertificateDisallowedPolicyException.class);
     }
 
