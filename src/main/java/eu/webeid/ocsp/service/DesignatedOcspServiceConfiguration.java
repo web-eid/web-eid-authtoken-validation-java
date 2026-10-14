@@ -41,8 +41,7 @@ public class DesignatedOcspServiceConfiguration {
         this.responderCertificate = Objects.requireNonNull(responderCertificate, "OCSP responder certificate");
         this.supportedIssuers = Set.copyOf(Objects.requireNonNull(supportedCertificateIssuers, "supported issuers"));
         OcspResponseValidator.validateBasicConstraintsNotCA(responderCertificate);
-        OcspResponseValidator.validateKeyUsageDigitalSignature(responderCertificate, isKeyUsageRequired);
-        OcspResponseValidator.validateKeyUsageNotCertificateSigning(responderCertificate);
+        OcspResponseValidator.validateKeyUsageOcspSigning(responderCertificate, isKeyUsageRequired);
         OcspResponseValidator.validateExtendedKeyUsageOcspSigning(responderCertificate);
         this.doesSupportNonce = doesSupportNonce;
         this.maxThisUpdateAge = requirePositiveDuration(maxThisUpdateAge, "maxThisUpdateAge");

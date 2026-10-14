@@ -87,8 +87,7 @@ public class AiaOcspService implements OcspService {
             CertificateValidator.requireCertificateIsValidOnDate(certificate, now, "AIA OCSP responder");
             if (!certificate.equals(issuerCertificate)) {
                 OcspResponseValidator.validateBasicConstraintsNotCA(certificate);
-                OcspResponseValidator.validateKeyUsageDigitalSignature(certificate, isKeyUsageRequired);
-                OcspResponseValidator.validateKeyUsageNotCertificateSigning(certificate);
+                OcspResponseValidator.validateKeyUsageOcspSigning(certificate, isKeyUsageRequired);
                 OcspResponseValidator.validateExtendedKeyUsageOcspSigning(certificate);
                 // A delegated OCSP signer must be issued directly by the CA whose certificate status was requested.
                 if (!certificate.getIssuerX500Principal().equals(issuerCertificate.getSubjectX500Principal())) {

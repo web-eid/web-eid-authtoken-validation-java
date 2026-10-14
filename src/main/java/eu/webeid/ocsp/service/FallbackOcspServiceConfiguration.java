@@ -40,8 +40,7 @@ public class FallbackOcspServiceConfiguration {
         this.responderCertificate = responderCertificate;
         if (responderCertificate != null) {
             OcspResponseValidator.validateBasicConstraintsNotCA(responderCertificate);
-            OcspResponseValidator.validateKeyUsageDigitalSignature(responderCertificate, isKeyUsageRequired);
-            OcspResponseValidator.validateKeyUsageNotCertificateSigning(responderCertificate);
+            OcspResponseValidator.validateKeyUsageOcspSigning(responderCertificate, isKeyUsageRequired);
             OcspResponseValidator.validateExtendedKeyUsageOcspSigning(responderCertificate);
         }
         this.doesSupportNonce = doesSupportNonce;

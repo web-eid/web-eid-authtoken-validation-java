@@ -107,8 +107,7 @@ public class FallbackOcspService implements OcspService {
     private void validateResponderCertificateAgainstTrustedCa(X509Certificate responderCertificate, X509Certificate issuerCertificate, Date now) throws AuthTokenException, GeneralSecurityException {
         if (!responderCertificate.equals(issuerCertificate)) {
             OcspResponseValidator.validateBasicConstraintsNotCA(responderCertificate);
-            OcspResponseValidator.validateKeyUsageDigitalSignature(responderCertificate, isKeyUsageRequired);
-            OcspResponseValidator.validateKeyUsageNotCertificateSigning(responderCertificate);
+            OcspResponseValidator.validateKeyUsageOcspSigning(responderCertificate, isKeyUsageRequired);
             OcspResponseValidator.validateExtendedKeyUsageOcspSigning(responderCertificate);
             // A delegated OCSP signer must be issued directly by the CA whose certificate status was requested.
             if (!responderCertificate.getIssuerX500Principal().equals(issuerCertificate.getSubjectX500Principal())) {

@@ -54,9 +54,9 @@ public final class OcspResponseValidator {
 
     /**
      * The flag controls whether Key Usage must be present. If present, Key Usage must include
-     * Digital Signature or Non Repudiation.
+     * Digital Signature or Non Repudiation and must not include Certificate Signing.
      */
-    public static void validateKeyUsageDigitalSignature(X509Certificate certificate, boolean isKeyUsageRequired) throws OCSPCertificateException {
+    public static void validateKeyUsageOcspSigning(X509Certificate certificate, boolean isKeyUsageRequired) throws OCSPCertificateException {
         Objects.requireNonNull(certificate, "certificate");
         final boolean[] keyUsage = certificate.getKeyUsage();
         if (keyUsage == null) {
@@ -74,14 +74,6 @@ public final class OcspResponseValidator {
         if (!hasDigitalSignature && !hasNonRepudiation) {
             throw new OCSPCertificateException("Certificate " + certificate.getSubjectX500Principal() +
                 " Key Usage extension does not contain Digital Signature or Non Repudiation, which is required for OCSP response signing");
-        }
-    }
-
-    public static void validateKeyUsageNotCertificateSigning(X509Certificate certificate) throws OCSPCertificateException {
-        Objects.requireNonNull(certificate, "certificate");
-        final boolean[] keyUsage = certificate.getKeyUsage();
-        if (keyUsage == null) {
-            return;
         }
         if (keyUsage.length > KEY_USAGE_KEY_CERT_SIGN_BIT_INDEX && keyUsage[KEY_USAGE_KEY_CERT_SIGN_BIT_INDEX]) {
             throw new OCSPCertificateException("Certificate " + certificate.getSubjectX500Principal() +
