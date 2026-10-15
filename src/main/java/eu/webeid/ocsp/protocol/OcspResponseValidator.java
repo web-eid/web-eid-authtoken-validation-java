@@ -53,8 +53,17 @@ public final class OcspResponseValidator {
     }
 
     /**
-     * The flag controls whether Key Usage must be present. If present, Key Usage must include
-     * Digital Signature or Non Repudiation and must not include Certificate Signing.
+     * Validates that the Key Usage extension permits OCSP response signing.
+     *
+     * <p>When present, the extension must include Digital Signature or Non Repudiation,
+     * consistent with RFC 5280 section 4.2.1.12.
+     *
+     * @param certificate the OCSP responder certificate whose Key Usage is checked
+     * @param isKeyUsageRequired whether the Key Usage extension must be present;
+     *                           if false, an absent extension is accepted, but a present extension is still validated
+     * @throws OCSPCertificateException if the required extension is absent or its usages fail these checks
+     * @throws NullPointerException if {@code certificate} is null
+     * @see <a href="https://www.rfc-editor.org/rfc/rfc5280.html#section-4.2.1.12">RFC 5280, section 4.2.1.12</a>
      */
     public static void validateKeyUsageOcspSigning(X509Certificate certificate, boolean isKeyUsageRequired) throws OCSPCertificateException {
         Objects.requireNonNull(certificate, "certificate");
