@@ -68,7 +68,6 @@ public final class OcspResponseValidator {
         }
         final boolean hasDigitalSignature = keyUsage.length > KEY_USAGE_DIGITAL_SIGNATURE_BIT_INDEX
             && keyUsage[KEY_USAGE_DIGITAL_SIGNATURE_BIT_INDEX];
-        // RFC 5280 section 4.2.1.12 also permits Non Repudiation for OCSP signing.
         final boolean hasNonRepudiation = keyUsage.length > KEY_USAGE_NON_REPUDIATION_BIT_INDEX
             && keyUsage[KEY_USAGE_NON_REPUDIATION_BIT_INDEX];
         if (!hasDigitalSignature && !hasNonRepudiation) {
