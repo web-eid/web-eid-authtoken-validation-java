@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
+import javax.security.auth.x500.X500Principal;
 import java.security.cert.CertificateException;
 import java.util.Base64;
 
@@ -39,6 +40,9 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     private static final ASN1ObjectIdentifier ESTEID2018_TEST_POLICY =
         new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.2.1");
     private static final ASN1ObjectIdentifier UNRELATED_POLICY = new ASN1ObjectIdentifier("1.2.3");
+    private static final X500Principal ESTEID2018_TEST_ISSUER = new X500Principal(
+        "CN=TEST of ESTEID2018,2.5.4.97=#0c0e4e545245452d3130373437303133,O=SK ID Solutions AS,C=EE"
+    );
 
     private static final String AUTH_TOKEN = "{\"algorithm\":\"ES384\"," +
         "\"unverifiedCertificate\":\"X5C\"," +
@@ -187,7 +191,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     void whenCertificatePolicyIsAllowed_thenValidationSucceeds() throws Exception {
         final AuthTokenValidator validatorWithAllowedESTEIDPolicy = AuthTokenValidators
             .getDefaultAuthTokenValidatorBuilder()
-            .withAllowedCertificatePolicies(ESTEID2018_TEST_POLICY)
+            .withAllowedCertificatePolicies(ESTEID2018_TEST_ISSUER, ESTEID2018_TEST_POLICY)
             .withoutUserCertificateRevocationCheck()
             .build();
 
@@ -199,7 +203,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
     void whenCertificatePolicyIsNotAllowed_thenValidationFails() throws Exception {
         final AuthTokenValidator validatorWithUnrelatedAllowedPolicy = AuthTokenValidators
             .getDefaultAuthTokenValidatorBuilder()
-            .withAllowedCertificatePolicies(UNRELATED_POLICY)
+            .withAllowedCertificatePolicies(ESTEID2018_TEST_ISSUER, UNRELATED_POLICY)
             .withoutUserCertificateRevocationCheck()
             .build();
 

@@ -22,33 +22,47 @@
 
 package eu.webeid.security.validator;
 
+import eu.webeid.security.certificate.SubjectCertificatePolicies;
 import eu.webeid.security.testutil.Certificates;
 import eu.webeid.security.validator.revocationcheck.CertificateRevocationChecker;
 import eu.webeid.security.validator.revocationcheck.RevocationMode;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.junit.jupiter.api.Test;
 
+import javax.security.auth.x500.X500Principal;
 import java.net.URI;
 import java.security.cert.PKIXRevocationChecker;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.Mockito.mock;
 
 class AuthTokenValidationConfigurationTest {
 
     private static final ASN1ObjectIdentifier ALLOWED_POLICY = new ASN1ObjectIdentifier("1.2.3");
+    private static final X500Principal ISSUER = new X500Principal("CN=Example CA");
+
+    @Test
+    void allowedPoliciesAreEmptyByDefault() {
+        final AuthTokenValidationConfiguration configuration = new AuthTokenValidationConfiguration();
+
+        assertThat(configuration.getAllowedSubjectCertificatePolicies())
+            .isEmpty();
+    }
 
     @Test
     void copyRetainsAllowedPoliciesIndependently() {
         final AuthTokenValidationConfiguration configuration = new AuthTokenValidationConfiguration();
-        configuration.setAllowedSubjectCertificatePolicies(List.of(ALLOWED_POLICY));
+        configuration.setAllowedSubjectCertificatePolicies(ISSUER, List.of(ALLOWED_POLICY));
 
         final AuthTokenValidationConfiguration copy = configuration.copy();
         configuration.getAllowedSubjectCertificatePolicies().clear();
 
-        assertThat(copy.getAllowedSubjectCertificatePolicies()).containsExactly(ALLOWED_POLICY);
+        assertThat(copy.getAllowedSubjectCertificatePolicies())
+            .containsEntry(ISSUER, Set.of(ALLOWED_POLICY));
     }
 
     @Test
@@ -56,10 +70,39 @@ class AuthTokenValidationConfigurationTest {
         final List<ASN1ObjectIdentifier> policies = new ArrayList<>(List.of(ALLOWED_POLICY));
         final AuthTokenValidationConfiguration configuration = new AuthTokenValidationConfiguration();
 
-        configuration.setAllowedSubjectCertificatePolicies(policies);
+        configuration.setAllowedSubjectCertificatePolicies(ISSUER, policies);
         policies.clear();
 
-        assertThat(configuration.getAllowedSubjectCertificatePolicies()).containsExactly(ALLOWED_POLICY);
+        assertThat(configuration.getAllowedSubjectCertificatePolicies())
+            .containsOnly(entry(ISSUER, Set.of(ALLOWED_POLICY)));
+    }
+
+    @Test
+    void subsequentAllowedPolicyConfigurationAddsAnotherIssuer() {
+        final X500Principal anotherIssuer = new X500Principal("CN=Another CA");
+        final ASN1ObjectIdentifier anotherPolicy = new ASN1ObjectIdentifier("1.2.4");
+        final AuthTokenValidationConfiguration configuration = new AuthTokenValidationConfiguration();
+
+        configuration.setAllowedSubjectCertificatePolicies(ISSUER, List.of(ALLOWED_POLICY));
+        configuration.setAllowedSubjectCertificatePolicies(anotherIssuer, List.of(anotherPolicy));
+
+        assertThat(configuration.getAllowedSubjectCertificatePolicies())
+            .containsOnly(
+                entry(ISSUER, Set.of(ALLOWED_POLICY)),
+                entry(anotherIssuer, Set.of(anotherPolicy))
+            );
+    }
+
+    @Test
+    void settingNoAllowedPoliciesRemovesIssuerEntry() {
+        final X500Principal defaultIssuer = SubjectCertificatePolicies.ESTEID_ID_CARD_POLICIES
+            .keySet().iterator().next();
+        final AuthTokenValidationConfiguration configuration = new AuthTokenValidationConfiguration();
+
+        configuration.setAllowedSubjectCertificatePolicies(defaultIssuer, List.of());
+
+        assertThat(configuration.getAllowedSubjectCertificatePolicies())
+            .doesNotContainKey(defaultIssuer);
     }
 
     @Test

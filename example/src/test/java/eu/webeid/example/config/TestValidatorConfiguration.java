@@ -6,10 +6,12 @@ package eu.webeid.example.config;
 import eu.webeid.security.exceptions.JceException;
 import eu.webeid.security.validator.AuthTokenValidator;
 import eu.webeid.security.validator.AuthTokenValidatorBuilder;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 
+import javax.security.auth.x500.X500Principal;
 import java.net.URI;
 import java.util.List;
 
@@ -30,6 +32,13 @@ public class TestValidatorConfiguration {
             .withSiteOrigin(URI.create(yamlConfig.getLocalOrigin()))
             .withTrustedCertificateAuthorities(validationConfiguration.loadTrustedCACertificatesFromCerFiles())
             .withTrustedCertificateAuthorities(validationConfiguration.loadTrustedCACertificatesFromTrustStore(yamlConfig))
+            .withAllowedCertificatePolicies(
+                new X500Principal(
+                    "CN=TEST of ESTEID2018,2.5.4.97=#0c0e4e545245452d3130373437303133," +
+                        "O=SK ID Solutions AS,C=EE"
+                ),
+                new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.2.1")
+            )
             // Do not call the real OCSP service in tests.
             .withCertificateRevocationChecker((subjectCertificate, issuerCertificate) -> List.of())
             .build();

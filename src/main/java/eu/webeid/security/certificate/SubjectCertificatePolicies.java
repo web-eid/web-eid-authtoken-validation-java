@@ -5,6 +5,10 @@ package eu.webeid.security.certificate;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 
+import javax.security.auth.x500.X500Principal;
+import java.util.Map;
+import java.util.Set;
+
 public final class SubjectCertificatePolicies {
 
     private static final String ESTEID_SK_2015_MOBILE_ID_POLICY_PREFIX = "1.3.6.1.4.1.10015.1.3";
@@ -20,7 +24,7 @@ public final class SubjectCertificatePolicies {
 
     /**
      * Production document policies for Estonian and European Union citizen ID cards issued under the ESTEID2018
-     * and eID certificate-policy generations.
+     * and eID certificate-policy generations, grouped by issuer distinguished name.
      *
      * @see <a href="https://www.id.ee/en/article/certificate-policy-for-identity-card-digital-identity-card-residence-permit-card-and-diplomatic-identity-card-2/">
      *     ID.ee certificate policy index for Estonian identity documents</a>
@@ -39,14 +43,22 @@ public final class SubjectCertificatePolicies {
      * @see <a href="https://repository.eidpki.ee/static/documents/CertificateProfiles-20260520.pdf">
      *     ESTEID2025 certificate profile</a>
      */
-    public static final ASN1ObjectIdentifier[] ESTEID_ID_CARD_POLICIES = {
-        // ESTEID2018 / IDEMIA generation
-        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.1.1"),
-        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.1.2"),
-        // eID / Thales generation
-        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.2.1.1"),
-        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.2.1.2")
-    };
+    public static final Map<X500Principal, Set<ASN1ObjectIdentifier>> ESTEID_ID_CARD_POLICIES = Map.of(
+        new X500Principal(
+            "CN=ESTEID2018,2.5.4.97=#0c0e4e545245452d3130373437303133,O=SK ID Solutions AS,C=EE"
+        ), Set.of(
+            // ESTEID2018 / IDEMIA generation
+            new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.1.1"),
+            new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.1.2")
+        ),
+        new X500Principal(
+            "C=EE,O=Zetes Estonia OÜ,2.5.4.97=#0c0e4e545245452d3137303636303439,CN=ESTEID2025"
+        ), Set.of(
+            // eID / Thales generation
+            new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.2.1.1"),
+            new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.2.1.2")
+        )
+    );
 
     private SubjectCertificatePolicies() {
         throw new IllegalStateException("Constants class");

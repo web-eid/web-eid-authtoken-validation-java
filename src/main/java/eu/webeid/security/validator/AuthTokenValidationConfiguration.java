@@ -8,13 +8,17 @@ import eu.webeid.security.validator.revocationcheck.CertificateRevocationChecker
 import eu.webeid.security.validator.revocationcheck.RevocationMode;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 
+import javax.security.auth.x500.X500Principal;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.cert.PKIXRevocationChecker;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -24,7 +28,7 @@ public final class AuthTokenValidationConfiguration {
 
     private URI siteOrigin;
     private Collection<X509Certificate> trustedCACertificates = new HashSet<>();
-    private Collection<ASN1ObjectIdentifier> allowedSubjectCertificatePolicies = new HashSet<>();
+    private Map<X500Principal, Set<ASN1ObjectIdentifier>> allowedSubjectCertificatePolicies = new HashMap<>();
     // Don't allow Estonian Mobile-ID policy by default.
     @Deprecated(since = "4.0.0")
     private Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies = new HashSet<>(Set.of(
@@ -45,7 +49,8 @@ public final class AuthTokenValidationConfiguration {
     private AuthTokenValidationConfiguration(AuthTokenValidationConfiguration other) {
         this.siteOrigin = other.siteOrigin;
         this.trustedCACertificates = Set.copyOf(other.trustedCACertificates);
-        this.allowedSubjectCertificatePolicies = Set.copyOf(other.allowedSubjectCertificatePolicies);
+        this.allowedSubjectCertificatePolicies =
+            copyAllowedSubjectCertificatePolicies(other.allowedSubjectCertificatePolicies);
         this.disallowedSubjectCertificatePolicies = Set.copyOf(other.disallowedSubjectCertificatePolicies);
         this.isUserCertificateRevocationCheckEnabled = other.isUserCertificateRevocationCheckEnabled;
         this.platformOcspNonceEnabled = other.platformOcspNonceEnabled;
@@ -66,12 +71,22 @@ public final class AuthTokenValidationConfiguration {
         return trustedCACertificates;
     }
 
-    public Collection<ASN1ObjectIdentifier> getAllowedSubjectCertificatePolicies() {
+    public Map<X500Principal, Set<ASN1ObjectIdentifier>> getAllowedSubjectCertificatePolicies() {
         return allowedSubjectCertificatePolicies;
     }
 
-    void setAllowedSubjectCertificatePolicies(Collection<ASN1ObjectIdentifier> allowedSubjectCertificatePolicies) {
-        this.allowedSubjectCertificatePolicies = new HashSet<>(allowedSubjectCertificatePolicies);
+    void setAllowedSubjectCertificatePolicies(
+            X500Principal issuer, Collection<ASN1ObjectIdentifier> allowedSubjectCertificatePolicies) {
+        Objects.requireNonNull(issuer, "Issuer must not be null");
+        final Set<ASN1ObjectIdentifier> policies = Set.copyOf(Objects.requireNonNull(
+            allowedSubjectCertificatePolicies,
+            "Allowed certificate policies must not be null"
+        ));
+        if (policies.isEmpty()) {
+            this.allowedSubjectCertificatePolicies.remove(issuer);
+        } else {
+            this.allowedSubjectCertificatePolicies.put(issuer, policies);
+        }
     }
 
     /**
@@ -133,6 +148,16 @@ public final class AuthTokenValidationConfiguration {
 
     AuthTokenValidationConfiguration copy() {
         return new AuthTokenValidationConfiguration(this);
+    }
+
+    private static Map<X500Principal, Set<ASN1ObjectIdentifier>> copyAllowedSubjectCertificatePolicies(
+            Map<X500Principal, ? extends Collection<ASN1ObjectIdentifier>> policiesByIssuer) {
+        final Map<X500Principal, Set<ASN1ObjectIdentifier>> copy = new HashMap<>();
+        policiesByIssuer.forEach((issuer, policies) -> copy.put(
+            Objects.requireNonNull(issuer, "Issuer must not be null"),
+            Set.copyOf(Objects.requireNonNull(policies, "Allowed certificate policies must not be null"))
+        ));
+        return copy;
     }
 
     /**
