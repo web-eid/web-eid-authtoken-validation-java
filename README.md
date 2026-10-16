@@ -101,7 +101,7 @@ import eu.webeid.security.challenge.ChallengeNonceStore;
 
 You must explicitly specify which **intermediate** certificate authorities (CAs) are trusted to issue the eID authentication and OCSP responder certificates. CA certificates can be loaded from either the truststore file, resources or any stream source. We use the [`CertificateLoader`](src/main/java/eu/webeid/security/certificate/CertificateLoader.java) helper class to load CA certificates from resources here, but consider using [the truststore file](example/src/main/java/eu/webeid/example/config/ValidationConfiguration.java) instead.
 
-First, copy the trusted certificates, for example `ESTEID2018.cer`, to `resources/cacerts/`, then load the certificates as follows:
+To accept both ID-card generations that are currently in use, copy the `ESTEID2018` intermediate certificate from [SK ID Solutions](https://www.skidsolutions.eu/resources/certificates/) and the `ESTEID2025` intermediate certificate from [Zetes](https://repository.eidpki.ee/crt/) to `resources/cacerts/`, then load both certificates as follows:
 
 ```java
 import java.io.IOException;
@@ -111,7 +111,10 @@ import eu.webeid.security.certificate.CertificateLoader;
 
 ...
     private X509Certificate[] trustedIntermediateCACertificates() throws CertificateException, IOException {
-         return CertificateLoader.loadCertificatesFromResources("cacerts/ESTEID2018.cer");
+         return CertificateLoader.loadCertificatesFromResources(
+                 "cacerts/ESTEID2018.cer",
+                 "cacerts/ESTEID2025.crt"
+         );
     }
 ...
 ```
@@ -320,7 +323,44 @@ toTitleCase(CertificateData.getSubjectSurname(userCertificate).orElseThrow()); /
 
 The default validator uses the platform OCSP implementation to check certificate revocation. A revoked certificate or an unsuccessful revocation check causes authentication to fail.
 
-Use `withDisallowedCertificatePolicies(ASN1ObjectIdentifier... policies)` to add disallowed certificate policies. Estonian Mobile-ID policies are disallowed by default because smart-card authentication must not accept Mobile-ID certificates.
+Certificate policy allow-lists are selected by the subject certificate's exact issuer `X500Principal`. At build time, production Estonian ID-card policies from `ESTEID_ID_CARD_POLICIES` are used when the configured allow-list is empty. When one or more issuer entries are configured, only those entries are used. A matching issuer must contain one of its configured policy OIDs; other issuers fall back to the deprecated deny-list, which is empty by default. Calling `withAllowedCertificatePolicies(issuer)` without policy OIDs removes that issuer's entry. If no entries remain, the Estonian defaults are used.
+
+Use `withAllowedCertificatePolicies(X500Principal issuer, ASN1ObjectIdentifier... policies)` to define a custom allow-list. Repeated calls configure all supported issuers on the same validator. The following example explicitly configures both Estonian ID-card generations in one builder chain.
+
+```java
+AuthTokenValidator tokenValidator = new AuthTokenValidatorBuilder()
+    .withSiteOrigin(URI.create("https://example.org"))
+    .withTrustedCertificateAuthorities(trustedIntermediateCACertificates())
+    .withAllowedCertificatePolicies(
+        new X500Principal("CN=ESTEID2018,2.5.4.97=#0c0e4e545245452d3130373437303133,O=SK ID Solutions AS,C=EE"),
+        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.1.1"),
+        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.1.2")
+    )
+    .withAllowedCertificatePolicies(
+        new X500Principal("C=EE,O=Zetes Estonia OÜ,2.5.4.97=#0c0e4e545245452d3137303636303439,CN=ESTEID2025"),
+        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.2.1.1"),
+        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.2.1.2")
+    )
+    .build();
+```
+
+For another country, add each supported issuer and its policy OIDs to the same builder chain and provide the corresponding trusted intermediate CAs.
+
+To restore old behaviour of deny list, use 
+```java
+AuthTokenValidator tokenValidator = new AuthTokenValidatorBuilder()
+    .withSiteOrigin(URI.create("https://example.org"))
+    .withTrustedCertificateAuthorities(trustedIntermediateCACertificates())
+    .withDisallowedCertificatePolicies(
+        SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V1,
+        SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V2,
+        SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V3,
+        SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY
+    )
+    .build();
+```
+
+See the [certificate policy allow-list guide](readme-policy.md) for the Estonian ID-card whitelist and its rationale.
 
 For more advanced revocation requirements, supply a `CertificateRevocationChecker` with `withCertificateRevocationChecker(...)`. The [OCSP configuration guide](src/main/java/eu/webeid/ocsp/README.md) covers custom implementations, the bundled OCSP checker, custom PKIX checkers, responder selection, HTTP settings, and nonce policies.
 
