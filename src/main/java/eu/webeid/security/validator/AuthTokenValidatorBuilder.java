@@ -82,7 +82,7 @@ public class AuthTokenValidatorBuilder {
     }
 
     /**
-     * Adds the given policies to the list of disallowed user certificate policies.
+     * Sets the list of disallowed user certificate policies.
      * In order for the user certificate to be considered valid, it must not contain any policies
      * present in this list.
      *
@@ -92,7 +92,7 @@ public class AuthTokenValidatorBuilder {
      */
     @Deprecated(since = "4.0.0")
     public AuthTokenValidatorBuilder withDisallowedCertificatePolicies(ASN1ObjectIdentifier... policies) {
-        Collections.addAll(configuration.getDisallowedSubjectCertificatePolicies(), policies);
+        configuration.setDisallowedSubjectCertificatePolicies(Arrays.asList(policies));
         LOG.debug("Disallowed subject certificate policies set to {}", configuration.getDisallowedSubjectCertificatePolicies());
         return this;
     }

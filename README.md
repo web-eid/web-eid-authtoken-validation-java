@@ -323,7 +323,7 @@ toTitleCase(CertificateData.getSubjectSurname(userCertificate).orElseThrow()); /
 
 The default validator uses the platform OCSP implementation to check certificate revocation. A revoked certificate or an unsuccessful revocation check causes authentication to fail.
 
-Certificate policy allow-lists are selected by the subject certificate's exact issuer `X500Principal`. At build time, production Estonian ID-card policies from `ESTEID_ID_CARD_POLICIES` are used when the configured allow-list is empty. When one or more issuer entries are configured, only those entries are used. A matching issuer must contain one of its configured policy OIDs; other issuers fall back to the deprecated deny-list, which disallows Estonian Mobile-ID policies by default. Calling `withAllowedCertificatePolicies(issuer)` without policy OIDs removes that issuer's entry. If no entries remain, the Estonian defaults are used.
+Certificate policy allow-lists are selected by the subject certificate's exact issuer `X500Principal`. At build time, production Estonian ID-card policies from `ESTEID_ID_CARD_POLICIES` are used when the configured allow-list is empty. When one or more issuer entries are configured, only those entries are used. A matching issuer must contain one of its configured policy OIDs; other issuers fall back to the deprecated deny-list, which is empty by default. Calling `withAllowedCertificatePolicies(issuer)` without policy OIDs removes that issuer's entry. If no entries remain, the Estonian defaults are used.
 
 Use `withAllowedCertificatePolicies(X500Principal issuer, ASN1ObjectIdentifier... policies)` to define a custom allow-list. Repeated calls configure all supported issuers on the same validator. The following example explicitly configures both Estonian ID-card generations in one builder chain.
 
@@ -345,6 +345,20 @@ AuthTokenValidator tokenValidator = new AuthTokenValidatorBuilder()
 ```
 
 For another country, add each supported issuer and its policy OIDs to the same builder chain and provide the corresponding trusted intermediate CAs.
+
+To restore old behaviour of deny list, use 
+```java
+AuthTokenValidator tokenValidator = new AuthTokenValidatorBuilder()
+    .withSiteOrigin(URI.create("https://example.org"))
+    .withTrustedCertificateAuthorities(trustedIntermediateCACertificates())
+    .withDisallowedCertificatePolicies(
+        SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V1,
+        SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V2,
+        SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V3,
+        SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY
+    )
+    .build();
+```
 
 See the [certificate policy allow-list guide](readme-policy.md) for the Estonian ID-card whitelist and its rationale.
 

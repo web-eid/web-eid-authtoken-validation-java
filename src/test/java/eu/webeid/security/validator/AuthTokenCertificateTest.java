@@ -5,6 +5,7 @@ package eu.webeid.security.validator;
 
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import eu.webeid.security.authtoken.WebEidAuthToken;
+import eu.webeid.security.certificate.SubjectCertificatePolicies;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.exceptions.AuthTokenParseException;
 import eu.webeid.security.exceptions.CertificateDecodingException;
@@ -217,6 +218,25 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", OLD_MOBILE_ID_CERT);
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(CertificateNotTrustedException.class);
+    }
+
+    @Test
+    void whenUsingOldMobileIdCertificateWithLegacyDenyList_thenPolicyValidationFails() throws Exception {
+        mockDate("2021-03-01", mockedClock);
+        final AuthTokenValidator validatorWithLegacyDenyList = AuthTokenValidators
+            .getDefaultAuthTokenValidatorBuilder()
+            .withDisallowedCertificatePolicies(
+                SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V1,
+                SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V2,
+                SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V3,
+                SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY
+            )
+            .withoutUserCertificateRevocationCheck()
+            .build();
+        final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", OLD_MOBILE_ID_CERT);
+
+        assertThatThrownBy(() -> validatorWithLegacyDenyList.validate(token, VALID_CHALLENGE_NONCE))
             .isInstanceOf(UserCertificateDisallowedPolicyException.class);
     }
 
@@ -225,6 +245,24 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
         final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", NEW_MOBILE_ID_CERT);
         assertThatThrownBy(() -> validator
             .validate(token, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(CertificateNotTrustedException.class);
+    }
+
+    @Test
+    void whenUsingNewMobileIdCertificateWithLegacyDenyList_thenPolicyValidationFails() throws Exception {
+        final AuthTokenValidator validatorWithLegacyDenyList = AuthTokenValidators
+            .getDefaultAuthTokenValidatorBuilder()
+            .withDisallowedCertificatePolicies(
+                SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V1,
+                SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V2,
+                SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V3,
+                SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY
+            )
+            .withoutUserCertificateRevocationCheck()
+            .build();
+        final WebEidAuthToken token = replaceTokenField(AUTH_TOKEN, "X5C", NEW_MOBILE_ID_CERT);
+
+        assertThatThrownBy(() -> validatorWithLegacyDenyList.validate(token, VALID_CHALLENGE_NONCE))
             .isInstanceOf(UserCertificateDisallowedPolicyException.class);
     }
 

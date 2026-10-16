@@ -3,7 +3,6 @@
 
 package eu.webeid.security.validator;
 
-import eu.webeid.security.certificate.SubjectCertificatePolicies;
 import eu.webeid.security.validator.revocationcheck.CertificateRevocationChecker;
 import eu.webeid.security.validator.revocationcheck.RevocationMode;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
@@ -29,14 +28,8 @@ public final class AuthTokenValidationConfiguration {
     private URI siteOrigin;
     private Collection<X509Certificate> trustedCACertificates = new HashSet<>();
     private Map<X500Principal, Set<ASN1ObjectIdentifier>> allowedSubjectCertificatePolicies = new HashMap<>();
-    // Don't allow Estonian Mobile-ID policy by default.
     @Deprecated(since = "4.0.0")
-    private Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies = new HashSet<>(Set.of(
-        SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V1,
-        SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V2,
-        SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V3,
-        SubjectCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY
-    ));
+    private Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies = new HashSet<>();
     private boolean isUserCertificateRevocationCheckEnabled = true;
     private boolean platformOcspNonceEnabled = true;
     private CertificateRevocationChecker certificateRevocationChecker;
@@ -95,6 +88,15 @@ public final class AuthTokenValidationConfiguration {
     @Deprecated(since = "4.0.0")
     public Collection<ASN1ObjectIdentifier> getDisallowedSubjectCertificatePolicies() {
         return disallowedSubjectCertificatePolicies;
+    }
+
+    /**
+     * @deprecated Configure allowed certificate policies instead.
+     */
+    @Deprecated(since = "4.0.0")
+    void setDisallowedSubjectCertificatePolicies(
+            Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies) {
+        this.disallowedSubjectCertificatePolicies = new HashSet<>(disallowedSubjectCertificatePolicies);
     }
 
     boolean isUserCertificateRevocationCheckEnabled() {
