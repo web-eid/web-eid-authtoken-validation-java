@@ -3,8 +3,12 @@
 
 package eu.webeid.example.web.rest;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import eu.webeid.example.security.ajax.AjaxAuthenticationSuccessHandler.AuthSuccessDTO;
 import eu.webeid.example.service.dto.ChallengeDTO;
 import eu.webeid.security.challenge.ChallengeNonceGenerator;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,5 +28,11 @@ public class ChallengeController {
         final ChallengeDTO challenge = new ChallengeDTO();
         challenge.setNonce(challengeNonceGenerator.generateAndStoreNonce().getBase64EncodedNonce());
         return challenge;
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("user")
+    public String user(Authentication authentication) throws JsonProcessingException {
+        return AuthSuccessDTO.asJson(authentication);
     }
 }
