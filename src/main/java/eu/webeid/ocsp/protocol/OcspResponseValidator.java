@@ -41,6 +41,17 @@ public final class OcspResponseValidator {
     private static final int KEY_USAGE_KEY_CERT_SIGN_BIT_INDEX = 5;
     private static final String ERROR_PREFIX = "Certificate status update time check failed: ";
 
+    /**
+     * Validates that the responder certificate is not a CA and does not include Certificate Signing.
+     *
+     * <p>For a non-CA certificate, RFC 5280 section 4.2.1.9 prohibits the Certificate Signing
+     * bit in Key Usage, including when the Basic Constraints extension is absent.
+     *
+     * @param certificate the OCSP responder certificate to validate
+     * @throws OCSPCertificateException if the certificate is a CA or asserts Certificate Signing
+     * @throws NullPointerException if {@code certificate} is null
+     * @see <a href="https://www.rfc-editor.org/rfc/rfc5280.html#section-4.2.1.9">RFC 5280, section 4.2.1.9</a>
+     */
     public static void validateBasicConstraintsNotCA(X509Certificate certificate) throws OCSPCertificateException {
         Objects.requireNonNull(certificate, "certificate");
         // X509Certificate.getBasicConstraints() returns -1 when the Basic Constraints extension is absent
