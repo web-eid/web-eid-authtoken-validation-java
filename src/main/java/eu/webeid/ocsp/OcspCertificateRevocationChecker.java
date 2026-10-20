@@ -153,7 +153,11 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
                     ocspService.getAccessLocation());
         }
 
-        //   2. The signature on the response is valid.
+        //   3. The identity of the signer matches the intended recipient of the
+        //      request.
+        //
+        //   4. The signer is currently authorized to provide a response for the
+        //      certificate in question.
 
         // We assume that the responder includes its certificate in the certs field of the response
         // that helps us to verify it. According to RFC 2560 this field is optional, but including it
@@ -164,13 +168,6 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
         }
         // The first certificate is the responder certificate, other certificates, if given, are the certificate's chain.
         final X509CertificateHolder responderCert = basicResponse.getCerts()[0];
-        OcspResponseValidator.validateResponseSignature(basicResponse, responderCert, ocspService.getAccessLocation());
-
-        //   3. The identity of the signer matches the intended recipient of the
-        //      request.
-        //
-        //   4. The signer is currently authorized to provide a response for the
-        //      certificate in question.
 
         // Use the clock instance so that the date can be mocked in tests.
         final Date now = DateAndTime.DefaultClock.getInstance().now();
@@ -180,6 +177,10 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
             // An invalid responder certificate prevents establishing the user certificate's revocation status.
             throw new UserCertificateOCSPCheckFailedException(e, ocspService.getAccessLocation());
         }
+
+        //   2. The signature on the response is valid.
+
+        OcspResponseValidator.validateResponseSignature(basicResponse, responderCert, ocspService.getAccessLocation());
 
         //   5. The time at which the status being indicated is known to be
         //      correct (thisUpdate) is sufficiently recent.
