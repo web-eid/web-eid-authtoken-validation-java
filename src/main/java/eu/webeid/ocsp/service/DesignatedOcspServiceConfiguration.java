@@ -33,7 +33,7 @@ public class DesignatedOcspServiceConfiguration {
      * @param doesSupportNonce true if the service supports the OCSP protocol nonce extension
      * @param maxThisUpdateAge the maximum age of the OCSP response's {@code thisUpdate} time, must be greater than zero
      * @param maxNextUpdateAge the maximum age of the OCSP response's {@code nextUpdate} time, must be greater than zero
-     * @param isKeyUsageRequired true if the responder certificate must have the Key Usage extension with Digital Signature
+     * @param isKeyUsageRequired true if the responder certificate must have the Key Usage extension
      * @throws OCSPCertificateException when the responder certificate lacks OCSP signing usage
      */
     public DesignatedOcspServiceConfiguration(URI ocspServiceAccessLocation, X509Certificate responderCertificate, Collection<X509Certificate> supportedCertificateIssuers, boolean doesSupportNonce, Duration maxThisUpdateAge, Duration maxNextUpdateAge, boolean isKeyUsageRequired) throws OCSPCertificateException {
