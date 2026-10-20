@@ -9,6 +9,7 @@ Use `withCertificateRevocationChecker(...)` to supply your own implementation or
 ## Contents
 
 - [Choosing a revocation checker](#choosing-a-revocation-checker)
+- [OCSP responder revocation check limitation](#ocsp-responder-revocation-check-limitation)
 - [Implementing CertificateRevocationChecker](#implementing-certificaterevocationchecker)
 - [Custom OCSP checker](#custom-ocsp-checker)
 - [Custom PKIX revocation checker](#custom-pkix-revocation-checker)
@@ -34,6 +35,10 @@ The following additional configuration options are available in `AuthTokenValida
 The two custom checker options and `withoutUserCertificateRevocationCheck()` are mutually exclusive. Combining them causes `build()` to throw `IllegalArgumentException`. Custom checker implementations must support concurrent validation calls.
 
 Platform OCSP networking and response freshness are controlled by the JDK provider; see [Platform OCSP timeouts](#platform-ocsp-timeouts). The v3 API builder-level OCSP client, timeout, designated-service and response-age options are no longer available; use the custom OCSP checker below when those controls are needed. Its timing constants do not configure the platform checker.
+
+## OCSP responder revocation check limitation
+
+The bundled custom OCSP checker and OpenJDK 17's OCSP implementation do not check delegated responder certificate revocation, even when `id-pkix-ocsp-nocheck` is absent. A revoked responder with a compromised key can therefore produce signed responses that are accepted. Applications requiring responder revocation checking must enforce it separately or supply a `CertificateRevocationChecker` that does so.
 
 ## Implementing CertificateRevocationChecker
 
