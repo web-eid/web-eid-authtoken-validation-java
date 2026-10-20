@@ -4,7 +4,7 @@
 package eu.webeid.security.exceptions;
 
 /**
- * Thrown when any of the configured disallowed policies is present in the user certificate.
+ * Thrown when the user certificate does not satisfy the configured allowed or disallowed policy restrictions.
  */
 public class UserCertificateDisallowedPolicyException extends AuthTokenException {
     public UserCertificateDisallowedPolicyException() {
