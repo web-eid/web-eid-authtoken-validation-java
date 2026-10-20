@@ -153,6 +153,11 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
                     ocspService.getAccessLocation());
         }
 
+        // Steps 3 and 4 are performed BEFORE step 2. The responder certificate is
+        // attacker-controlled until validated; verifying the response signature first lets
+        // an untrusted key drive expensive or unsafe crypto (e.g., a huge RSA public exponent)
+        // that later rejection can't undo.
+
         //   3. The identity of the signer matches the intended recipient of the
         //      request.
         //
