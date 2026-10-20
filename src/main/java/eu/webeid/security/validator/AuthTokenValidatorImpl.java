@@ -121,6 +121,10 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
         // Use the clock instance so that the date can be mocked in tests.
         final Date now = DateAndTime.DefaultClock.getInstance().now();
 
+        // Validate the certificate chain, validity, and revocation BEFORE verifying the
+        // token signature. The certificate is attacker-controlled until validated;
+        // verifying first lets an untrusted key drive expensive or unsafe crypto
+        // (e.g., a huge RSA public exponent) that later rejection can't undo.
         final List<RevocationInfo> revocationInfoList = CertificateValidator.validateCertificateTrustAndRevocation(
                 subjectCertificate,
                 trustedCACertificateAnchors,
