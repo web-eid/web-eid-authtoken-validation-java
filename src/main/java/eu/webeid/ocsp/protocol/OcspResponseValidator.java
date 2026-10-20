@@ -61,6 +61,12 @@ public final class OcspResponseValidator {
             throw new OCSPCertificateException("Certificate " + certificate.getSubjectX500Principal() +
                 " must not be a CA certificate (Basic Constraints CA:TRUE is not allowed for OCSP responder)");
         }
+        final boolean[] keyUsage = certificate.getKeyUsage();
+        if (keyUsage != null && keyUsage.length > KEY_USAGE_KEY_CERT_SIGN_BIT_INDEX
+                && keyUsage[KEY_USAGE_KEY_CERT_SIGN_BIT_INDEX]) {
+            throw new OCSPCertificateException("Certificate " + certificate.getSubjectX500Principal() +
+                " Key Usage extension contains Certificate Signing, which is not allowed for a non-CA OCSP responder certificate");
+        }
     }
 
     /**
@@ -93,10 +99,6 @@ public final class OcspResponseValidator {
         if (!hasDigitalSignature && !hasNonRepudiation) {
             throw new OCSPCertificateException("Certificate " + certificate.getSubjectX500Principal() +
                 " Key Usage extension does not contain Digital Signature or Non Repudiation, which is required for OCSP response signing");
-        }
-        if (keyUsage.length > KEY_USAGE_KEY_CERT_SIGN_BIT_INDEX && keyUsage[KEY_USAGE_KEY_CERT_SIGN_BIT_INDEX]) {
-            throw new OCSPCertificateException("Certificate " + certificate.getSubjectX500Principal() +
-                " Key Usage extension contains Certificate Signing, which is not allowed for OCSP responder");
         }
     }
 
