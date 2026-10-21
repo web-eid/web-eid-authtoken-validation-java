@@ -60,7 +60,7 @@ class OcspServiceConfigurationTest {
         assertThatExceptionOfType(OCSPCertificateException.class)
             .isThrownBy(() -> newDesignatedOcspServiceConfiguration(responder))
             .withMessage("Certificate " + responder.getSubjectX500Principal() +
-                " Key Usage extension contains Certificate Signing, which is not allowed for OCSP responder");
+                " Key Usage extension contains Certificate Signing, which is not allowed for a non-CA OCSP responder certificate");
     }
 
     @Test
@@ -105,7 +105,7 @@ class OcspServiceConfigurationTest {
         assertThatExceptionOfType(OCSPCertificateException.class)
             .isThrownBy(() -> newFallbackOcspServiceConfiguration(responder))
             .withMessage("Certificate " + responder.getSubjectX500Principal() +
-                " Key Usage extension contains Certificate Signing, which is not allowed for OCSP responder");
+                " Key Usage extension contains Certificate Signing, which is not allowed for a non-CA OCSP responder certificate");
     }
 
     @Test

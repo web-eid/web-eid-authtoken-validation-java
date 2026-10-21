@@ -18,7 +18,6 @@ import eu.webeid.ocsp.client.OcspClientImpl;
 import eu.webeid.ocsp.service.OcspServiceProvider;
 import eu.webeid.security.validator.AuthTokenValidator;
 import org.bouncycastle.asn1.ocsp.OCSPResponseStatus;
-import org.bouncycastle.cert.CertIOException;
 import org.bouncycastle.cert.ocsp.OCSPException;
 import org.bouncycastle.cert.ocsp.OCSPResp;
 import org.junit.jupiter.api.BeforeEach;
@@ -181,7 +180,8 @@ class OcspCertificateRevocationCheckerTest extends AbstractTestWithValidator {
             validator.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
             .isInstanceOf(UserCertificateOCSPCheckFailedException.class)
             .cause()
-            .isExactlyInstanceOf(OCSPException.class);
+            .isExactlyInstanceOf(OCSPCertificateException.class)
+            .hasMessage("Invalid responder certificate");
     }
 
     @Test

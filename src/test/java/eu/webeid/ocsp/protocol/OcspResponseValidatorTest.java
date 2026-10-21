@@ -279,36 +279,50 @@ class OcspResponseValidatorTest {
     }
 
     @Test
-    void whenCertHasKeyUsageKeyCertSignCombinedWithDigitalSignature_thenKeyUsageValidationThrows() throws Exception {
+    void whenCertHasKeyUsageKeyCertSignCombinedWithDigitalSignature_thenBasicConstraintsValidationThrows() throws Exception {
         final X509Certificate cert = buildCertificate(
             new Extension(Extension.keyUsage, true,
                 new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyCertSign).getEncoded()));
         assertThatExceptionOfType(OCSPCertificateException.class)
-            .isThrownBy(() -> validateKeyUsageOcspSigning(cert, true))
+            .isThrownBy(() -> validateBasicConstraintsNotCA(cert))
             .withMessage("Certificate " + cert.getSubjectX500Principal() +
-                " Key Usage extension contains Certificate Signing, which is not allowed for OCSP responder");
+                " Key Usage extension contains Certificate Signing, which is not allowed for a non-CA OCSP responder certificate");
     }
 
     @Test
-    void whenCertHasKeyUsageKeyCertSignCombinedWithNonRepudiation_thenKeyUsageValidationThrows() throws Exception {
+    void whenCertHasKeyUsageKeyCertSignCombinedWithNonRepudiation_thenBasicConstraintsValidationThrows() throws Exception {
         final X509Certificate cert = buildCertificate(
             new Extension(Extension.keyUsage, true,
                 new KeyUsage(KeyUsage.nonRepudiation | KeyUsage.keyCertSign).getEncoded()));
         assertThatExceptionOfType(OCSPCertificateException.class)
-            .isThrownBy(() -> validateKeyUsageOcspSigning(cert, true))
+            .isThrownBy(() -> validateBasicConstraintsNotCA(cert))
             .withMessage("Certificate " + cert.getSubjectX500Principal() +
-                " Key Usage extension contains Certificate Signing, which is not allowed for OCSP responder");
+                " Key Usage extension contains Certificate Signing, which is not allowed for a non-CA OCSP responder certificate");
     }
 
     @Test
-    void whenKeyUsageNotRequiredAndCertHasKeyUsageKeyCertSignCombinedWithDigitalSignature_thenKeyUsageValidationThrows() throws Exception {
+    void whenCertIsNotCAAndHasKeyUsageKeyCertSign_thenBasicConstraintsValidationThrows() throws Exception {
         final X509Certificate cert = buildCertificate(
-            new Extension(Extension.keyUsage, true,
-                new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyCertSign).getEncoded()));
+            new Extension(Extension.basicConstraints, true, new BasicConstraints(false).getEncoded()),
+            new Extension(Extension.keyUsage, true, new KeyUsage(KeyUsage.keyCertSign).getEncoded()));
         assertThatExceptionOfType(OCSPCertificateException.class)
-            .isThrownBy(() -> validateKeyUsageOcspSigning(cert, false))
+            .isThrownBy(() -> validateBasicConstraintsNotCA(cert))
             .withMessage("Certificate " + cert.getSubjectX500Principal() +
-                " Key Usage extension contains Certificate Signing, which is not allowed for OCSP responder");
+                " Key Usage extension contains Certificate Signing, which is not allowed for a non-CA OCSP responder certificate");
+    }
+
+    @Test
+    void whenCertHasKeyUsageWithoutKeyCertSign_thenBasicConstraintsValidationSucceeds() throws Exception {
+        final X509Certificate cert = buildCertificate(
+            new Extension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature).getEncoded()));
+        assertThatCode(() -> validateBasicConstraintsNotCA(cert)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void whenCertKeyUsageBitStringEmpty_thenBasicConstraintsValidationSucceeds() throws Exception {
+        final X509Certificate cert = buildCertificate(
+            new Extension(Extension.keyUsage, true, new DLBitString(new byte[0]).getEncoded()));
+        assertThatCode(() -> validateBasicConstraintsNotCA(cert)).doesNotThrowAnyException();
     }
 
     @Test

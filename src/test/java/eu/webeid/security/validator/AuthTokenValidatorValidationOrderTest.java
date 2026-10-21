@@ -3,9 +3,9 @@
 
 package eu.webeid.security.validator;
 
+import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.certificate.CertificateData;
-import eu.webeid.security.exceptions.AuthTokenSignatureValidationException;
 import eu.webeid.security.testutil.AuthTokenValidators;
 import eu.webeid.security.util.DateAndTime;
 import eu.webeid.security.validator.revocationcheck.CertificateRevocationChecker;
@@ -28,7 +28,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -49,16 +48,18 @@ class AuthTokenValidatorValidationOrderTest {
     }
 
     @Test
-    void whenSignatureIsInvalid_thenRevocationCheckerIsNotInvoked() throws Exception {
+    void whenRevocationCheckFails_thenSignatureIsNotValidated() throws Exception {
         CertificateRevocationChecker checker = mock(CertificateRevocationChecker.class);
+        when(checker.validateCertificateNotRevoked(any(), any())).thenThrow(new UserCertificateRevokedException());
         AuthTokenValidator validator = AuthTokenValidators.getDefaultAuthTokenValidatorBuilder()
             .withCertificateRevocationChecker(checker)
             .build();
         WebEidAuthToken token = validator.parse(VALID_AUTH_TOKEN);
 
+        // An invalid challenge nonce would fail signature validation, so getting the revocation
+        // failure instead shows that revocation is checked first.
         assertThatThrownBy(() -> validator.validate(token, "invalidToken"))
-            .isInstanceOf(AuthTokenSignatureValidationException.class);
-        verify(checker, never()).validateCertificateNotRevoked(any(), any());
+            .isInstanceOf(UserCertificateRevokedException.class);
     }
 
     @Test
