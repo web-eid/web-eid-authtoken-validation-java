@@ -8,12 +8,14 @@ package eu.webeid.security.exceptions;
  */
 public class AuthTokenSignatureValidationException extends AuthTokenException {
 
+    private static final String MESSAGE = "Token signature validation has failed. Check that the origin and nonce are correct.";
+
     public AuthTokenSignatureValidationException() {
-        super("Token signature validation has failed. Check that the origin and nonce are correct.");
+        super(MESSAGE);
     }
 
     public AuthTokenSignatureValidationException(Throwable cause) {
-        super("Token signature validation has failed", cause);
+        super(MESSAGE, cause);
     }
 
 }

@@ -9,6 +9,7 @@ Use `withCertificateRevocationChecker(...)` to supply your own implementation or
 ## Contents
 
 - [Choosing a revocation checker](#choosing-a-revocation-checker)
+- [OCSP responder revocation check limitation](#ocsp-responder-revocation-check-limitation)
 - [Implementing CertificateRevocationChecker](#implementing-certificaterevocationchecker)
 - [Custom OCSP checker](#custom-ocsp-checker)
 - [Custom PKIX revocation checker](#custom-pkix-revocation-checker)
@@ -34,6 +35,10 @@ The following additional configuration options are available in `AuthTokenValida
 The two custom checker options and `withoutUserCertificateRevocationCheck()` are mutually exclusive. Combining them causes `build()` to throw `IllegalArgumentException`. Custom checker implementations must support concurrent validation calls.
 
 Platform OCSP networking and response freshness are controlled by the JDK provider; see [Platform OCSP timeouts](#platform-ocsp-timeouts). The v3 API builder-level OCSP client, timeout, designated-service and response-age options are no longer available; use the custom OCSP checker below when those controls are needed. Its timing constants do not configure the platform checker.
+
+## OCSP responder revocation check limitation
+
+The bundled custom OCSP checker and OpenJDK 17's OCSP implementation do not check delegated responder certificate revocation, even when `id-pkix-ocsp-nocheck` is absent. A revoked responder with a compromised key can therefore produce signed responses that are accepted. Applications requiring responder revocation checking must enforce it separately or supply a `CertificateRevocationChecker` that does so.
 
 ## Implementing CertificateRevocationChecker
 
@@ -75,14 +80,16 @@ List<X509Certificate> trustedCAs = List.of(trustedIntermediateCACertificates());
 AiaOcspServiceConfiguration aiaConfiguration = new AiaOcspServiceConfiguration(
     Set.of(), // AIA responder URLs for which request and response nonce checks are disabled.
     CertificateValidator.buildTrustAnchorsFromCertificates(trustedCAs),
-    CertificateValidator.buildCertStoreFromCertificates(trustedCAs)
+    CertificateValidator.buildCertStoreFromCertificates(trustedCAs),
+    OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
+    OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE,
+    true // Require the Key Usage extension in responder certificates.
 );
 OcspServiceProvider services = new OcspServiceProvider(null, aiaConfiguration);
 OcspCertificateRevocationChecker checker = new OcspCertificateRevocationChecker(
     OcspClientImpl.build(Duration.ofSeconds(5)),
     services,
-    OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW,
-    OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE
+    OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW
 );
 
 AuthTokenValidator validator = new AuthTokenValidatorBuilder()
@@ -94,7 +101,16 @@ AuthTokenValidator validator = new AuthTokenValidatorBuilder()
 
 The five-second connection and response timeout above is an explicit example setting. For a custom Java `HttpClient`, use `new OcspClientImpl(httpClient, responseTimeout)` and configure the connection timeout on that client. Alternatively, supply your own `OcspClient` implementation. See [OcspClientOverrideTest](../../../../../test/java/eu/webeid/ocsp/client/OcspClientOverrideTest.java).
 
-The custom checker's suggested constants are 15 minutes for clock/update skew and 2 minutes for maximum `thisUpdate` age; pass different positive durations to its constructor to change them. These checks are implemented by [OcspResponseValidator](protocol/OcspResponseValidator.java).
+The custom checker's suggested constant for clock/update skew is 15 minutes; pass a different positive duration to its constructor to change it.
+
+The maximum ages of the OCSP response's `thisUpdate` and `nextUpdate` times are configured per OCSP service, via the constructor of `AiaOcspServiceConfiguration`, `DesignatedOcspServiceConfiguration` or `FallbackOcspServiceConfiguration`:
+
+- `maxThisUpdateAge` – the maximum age of the OCSP response's `thisUpdate` time before the response is too old to rely on. `OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE` is 2 minutes.
+- `maxNextUpdateAge` – the maximum age of the OCSP response's `nextUpdate` time before the response is too old to rely on. `OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE` is 15 minutes, which is equal to the default allowed time skew.
+
+These checks are implemented by [OcspResponseValidator](protocol/OcspResponseValidator.java).
+
+The examples require OCSP responder certificates to have the Key Usage extension. To accept responder certificates that lack the Key Usage extension, pass `false` as the last `isKeyUsageRequired` argument of the `AiaOcspServiceConfiguration`, `DesignatedOcspServiceConfiguration` or `FallbackOcspServiceConfiguration` constructor. If the Key Usage extension is present, it must contain Digital Signature or Non Repudiation and must not contain Certificate Signing. The Extended Key Usage extension must still contain OCSP Signing, and the certificate must still not be a CA certificate. For AIA services, the setting applies only to delegated responder certificates, not to the issuer CA signing its own responses. The setting of a fallback configuration does not propagate to its `nextFallbackConfiguration`.
 
 For a designated responder, replace the `services` definition above with the following configuration. `responderCertificate` must be the service's trusted signing certificate and `supportedIssuers` the collection of issuer certificates served by it:
 
@@ -106,7 +122,10 @@ DesignatedOcspServiceConfiguration designated = new DesignatedOcspServiceConfigu
     URI.create("https://ocsp.example.org"),
     responderCertificate,
     supportedIssuers,
-    true // This service supports nonces.
+    true, // This service supports nonces.
+    OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
+    OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE,
+    true // Require the Key Usage extension in responder certificates.
 );
 OcspServiceProvider services = new OcspServiceProvider(designated, aiaConfiguration);
 ```
