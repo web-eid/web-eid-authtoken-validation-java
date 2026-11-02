@@ -4,25 +4,35 @@
 package eu.webeid.security.validator;
 
 import eu.webeid.security.certificate.CertificateValidator;
+import eu.webeid.security.certificate.SubjectCertificatePolicies;
 import eu.webeid.security.testutil.AuthTokenValidators;
 import eu.webeid.security.validator.revocationcheck.CertificateRevocationChecker;
 import eu.webeid.security.validator.revocationcheck.RevocationMode;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 
+import javax.security.auth.x500.X500Principal;
 import java.net.URI;
 import java.security.cert.PKIXRevocationChecker;
+import java.security.cert.X509Certificate;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static eu.webeid.security.testutil.AbstractTestWithValidator.VALID_AUTH_TOKEN;
 import static eu.webeid.security.testutil.AbstractTestWithValidator.VALID_CHALLENGE_NONCE;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
 
@@ -135,6 +145,62 @@ public class AuthTokenValidatorBuilderTest {
                     any(), anySet(), any(), any(), eq(RevocationMode.PLATFORM_OCSP), isNull(), isNull(), eq(false)
             ));
         }
+    }
+
+    @Test
+    void whenAllowedPoliciesAreEmpty_thenBuildUsesEsteidDefaults() throws Exception {
+        final AuthTokenValidationConfiguration builtConfiguration = captureBuiltConfiguration(validBuilder());
+
+        assertThat(builtConfiguration.getAllowedSubjectCertificatePolicies())
+            .isEqualTo(SubjectCertificatePolicies.ESTEID_PRODUCTION_DOCUMENT_POLICIES);
+    }
+
+    @Test
+    void whenAllowedPoliciesAreConfigured_thenBuildUsesOnlyConfiguredPolicies() throws Exception {
+        final X500Principal issuer = new X500Principal("CN=Example CA");
+        final ASN1ObjectIdentifier policy = new ASN1ObjectIdentifier("1.2.3");
+
+        final AuthTokenValidationConfiguration builtConfiguration = captureBuiltConfiguration(
+            validBuilder().withAllowedCertificatePolicies(issuer, policy)
+        );
+
+        assertThat(builtConfiguration.getAllowedSubjectCertificatePolicies())
+            .containsOnly(entry(issuer, Set.of(policy)));
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    void whenDisallowedPoliciesAreConfiguredInMultipleCalls_thenPoliciesAreAdded() throws Exception {
+        final ASN1ObjectIdentifier firstPolicy = new ASN1ObjectIdentifier("1.2.3");
+        final ASN1ObjectIdentifier secondPolicy = new ASN1ObjectIdentifier("1.2.4");
+
+        final AuthTokenValidationConfiguration builtConfiguration = captureBuiltConfiguration(
+            validBuilder()
+                .withDisallowedCertificatePolicies(firstPolicy)
+                .withDisallowedCertificatePolicies(secondPolicy)
+        );
+
+        assertThat(builtConfiguration.getDisallowedSubjectCertificatePolicies())
+            .containsExactlyInAnyOrder(firstPolicy, secondPolicy);
+    }
+
+    private static AuthTokenValidationConfiguration captureBuiltConfiguration(
+            AuthTokenValidatorBuilder builder) throws Exception {
+        final AtomicReference<AuthTokenValidationConfiguration> capturedConfiguration = new AtomicReference<>();
+        try (MockedConstruction<AuthTokenValidatorImpl> ignored = mockConstruction(
+                AuthTokenValidatorImpl.class,
+                (mock, context) -> capturedConfiguration.set(
+                    (AuthTokenValidationConfiguration) context.arguments().get(0)
+                ))) {
+            builder.build();
+        }
+        return capturedConfiguration.get();
+    }
+
+    private static AuthTokenValidatorBuilder validBuilder() {
+        return new AuthTokenValidatorBuilder()
+            .withSiteOrigin(URI.create("https://ria.ee"))
+            .withTrustedCertificateAuthorities(mock(X509Certificate.class));
     }
 
     private static CertificateRevocationChecker getNoopChecker() {
