@@ -8,8 +8,13 @@ import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
 import eu.webeid.ocsp.exceptions.UserCertificateUnknownStatusException;
 import eu.webeid.security.util.DateAndTime;
+import org.bouncycastle.asn1.ASN1Encodable;
+import org.bouncycastle.asn1.DERNull;
+import org.bouncycastle.asn1.ocsp.CertID;
+import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.ocsp.BasicOCSPResp;
+import org.bouncycastle.cert.ocsp.CertificateID;
 import org.bouncycastle.cert.ocsp.CertificateStatus;
 import org.bouncycastle.cert.ocsp.OCSPException;
 import org.bouncycastle.cert.ocsp.RevokedStatus;
@@ -120,6 +125,35 @@ public final class OcspResponseValidator {
         }
     }
 
+    /**
+     * Validates that the certificate ID in the OCSP response identifies the same certificate as the request.
+     *
+     * <p>The hash algorithm, issuer name hash, issuer key hash and serial number must all match. The hash
+     * algorithm parameters are compared leniently: absent and NULL parameters are treated as equal, because
+     * both are valid encodings of the same algorithm identifier and responders differ in which one they use
+     * when rebuilding the certificate ID (e.g. OpenSSL encodes NULL). {@link CertificateID#equals(Object)} is
+     * not used, as it compares the encodings and would reject such a response.
+     *
+     * @param requestCertificateId the certificate ID sent in the OCSP request
+     * @param responseCertificateId the certificate ID received in the OCSP response
+     * @param ocspResponderUri the OCSP responder URI, used in the exception message
+     * @throws UserCertificateOCSPCheckFailedException if the certificate IDs differ
+     * @throws NullPointerException if {@code requestCertificateId} or {@code responseCertificateId} is null
+     */
+    public static void validateCertificateId(CertificateID requestCertificateId, CertificateID responseCertificateId, URI ocspResponderUri) throws UserCertificateOCSPCheckFailedException {
+        Objects.requireNonNull(requestCertificateId, "requestCertificateId");
+        Objects.requireNonNull(responseCertificateId, "responseCertificateId");
+        final CertID requestId = requestCertificateId.toASN1Primitive();
+        final CertID responseId = responseCertificateId.toASN1Primitive();
+        if (!isSameHashAlgorithm(requestId.getHashAlgorithm(), responseId.getHashAlgorithm())
+                || !requestId.getIssuerNameHash().equals(responseId.getIssuerNameHash())
+                || !requestId.getIssuerKeyHash().equals(responseId.getIssuerKeyHash())
+                || !requestId.getSerialNumber().equals(responseId.getSerialNumber())) {
+            throw new UserCertificateOCSPCheckFailedException("OCSP responded with certificate ID that differs from the requested ID",
+                ocspResponderUri);
+        }
+    }
+
     public static void validateResponseSignature(BasicOCSPResp basicResponse, X509CertificateHolder responderCert, URI ocspResponderUri) throws CertificateException, OperatorCreationException, OCSPException, UserCertificateOCSPCheckFailedException {
         final ContentVerifierProvider verifierProvider = new JcaContentVerifierProviderBuilder()
             .setProvider(BouncyCastleProvider.PROVIDER_NAME)
@@ -186,6 +220,16 @@ public final class OcspResponseValidator {
         } else {
             throw new UserCertificateOCSPCheckFailedException("Status is neither good, revoked nor unknown", ocspResponderUri);
         }
+    }
+
+    private static boolean isSameHashAlgorithm(AlgorithmIdentifier requestAlgorithm, AlgorithmIdentifier responseAlgorithm) {
+        return requestAlgorithm.getAlgorithm().equals(responseAlgorithm.getAlgorithm())
+            && Objects.equals(nullParametersAsAbsent(requestAlgorithm.getParameters()),
+                nullParametersAsAbsent(responseAlgorithm.getParameters()));
+    }
+
+    private static ASN1Encodable nullParametersAsAbsent(ASN1Encodable parameters) {
+        return DERNull.INSTANCE.equals(parameters) ? null : parameters;
     }
 
     private OcspResponseValidator() {

@@ -8,28 +8,42 @@ import eu.webeid.ocsp.exceptions.OCSPCertificateException;
 import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
 import eu.webeid.ocsp.exceptions.UserCertificateUnknownStatusException;
+import org.bouncycastle.asn1.ASN1Integer;
+import org.bouncycastle.asn1.DERNull;
+import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.DLBitString;
+import org.bouncycastle.asn1.nist.NISTObjectIdentifiers;
+import org.bouncycastle.asn1.ocsp.CertID;
+import org.bouncycastle.asn1.oiw.OIWObjectIdentifiers;
+import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.KeyPurposeId;
 import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.cert.ocsp.BasicOCSPResp;
+import org.bouncycastle.cert.ocsp.CertificateID;
 import org.bouncycastle.cert.ocsp.CertificateStatus;
 import org.bouncycastle.cert.ocsp.OCSPResp;
 import org.bouncycastle.cert.ocsp.RevokedStatus;
 import org.bouncycastle.cert.ocsp.SingleResp;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
+import java.math.BigInteger;
 import java.net.URI;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.stream.Stream;
 
 import static eu.webeid.ocsp.protocol.OcspResponseValidator.validateBasicConstraintsNotCA;
 import static eu.webeid.security.testutil.ResourceUtil.bytesFromResource;
+import static eu.webeid.ocsp.protocol.OcspResponseValidator.validateCertificateId;
 import static eu.webeid.ocsp.protocol.OcspResponseValidator.validateCertificateStatusUpdateTime;
 import static eu.webeid.ocsp.protocol.OcspResponseValidator.validateExtendedKeyUsageOcspSigning;
 import static eu.webeid.ocsp.protocol.OcspResponseValidator.validateKeyUsageOcspSigning;
@@ -38,6 +52,7 @@ import static eu.webeid.security.testutil.TestCertificateBuilder.buildCertificat
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
+import static org.junit.jupiter.params.provider.Arguments.argumentSet;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -51,6 +66,41 @@ class OcspResponseValidatorTest {
     /** Shorter than {@link #TIME_SKEW}, to show that the nextUpdate age check is independent of the time skew. */
     private static final Duration SHORT_NEXT_UPDATE_AGE = Duration.ofMinutes(2);
     private static final URI OCSP_URL = URI.create("https://example.org");
+    private static final AlgorithmIdentifier SHA1_ABSENT_PARAMETERS = new AlgorithmIdentifier(OIWObjectIdentifiers.idSHA1);
+    private static final AlgorithmIdentifier SHA1_NULL_PARAMETERS = new AlgorithmIdentifier(OIWObjectIdentifiers.idSHA1, DERNull.INSTANCE);
+    private static final byte[] ISSUER_NAME_HASH = new byte[]{1, 2, 3};
+    private static final byte[] ISSUER_KEY_HASH = new byte[]{4, 5, 6};
+    private static final BigInteger SERIAL_NUMBER = BigInteger.valueOf(42);
+
+    @ParameterizedTest
+    @MethodSource("matchingCertificateIds")
+    void whenCertificateIdsMatch_thenCertificateIdValidationSucceeds(CertificateID requestCertificateId, CertificateID responseCertificateId) {
+        assertThatCode(() -> validateCertificateId(requestCertificateId, responseCertificateId, OCSP_URL))
+            .doesNotThrowAnyException();
+    }
+
+    @ParameterizedTest
+    @MethodSource("differingCertificateIds")
+    void whenCertificateIdsDiffer_thenCertificateIdValidationThrows(CertificateID requestCertificateId, CertificateID responseCertificateId) {
+        assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
+            .isThrownBy(() -> validateCertificateId(requestCertificateId, responseCertificateId, OCSP_URL))
+            .withMessage("User certificate revocation check has failed: "
+                + "OCSP responded with certificate ID that differs from the requested ID (OCSP responder: https://example.org)");
+    }
+
+    @Test
+    void whenRequestCertificateIdIsNull_thenCertificateIdValidationThrowsNullPointerException() {
+        assertThatNullPointerException()
+            .isThrownBy(() -> validateCertificateId(null, certificateId(SHA1_ABSENT_PARAMETERS), OCSP_URL))
+            .withMessage("requestCertificateId");
+    }
+
+    @Test
+    void whenResponseCertificateIdIsNull_thenCertificateIdValidationThrowsNullPointerException() {
+        assertThatNullPointerException()
+            .isThrownBy(() -> validateCertificateId(certificateId(SHA1_ABSENT_PARAMETERS), null, OCSP_URL))
+            .withMessage("responseCertificateId");
+    }
 
     @Test
     void whenThisAndNextUpdateWithinAgeLimits_thenValidationSucceeds() {
@@ -378,6 +428,40 @@ class OcspResponseValidatorTest {
             .isThrownBy(() ->
                 validateSubjectCertificateStatus(mockResponse, OCSP_URL))
             .withMessage("User certificate revocation check has failed: Status is neither good, revoked nor unknown (OCSP responder: https://example.org)");
+    }
+
+    private static Stream<Arguments> matchingCertificateIds() {
+        return Stream.of(
+            argumentSet("equal", certificateId(SHA1_ABSENT_PARAMETERS), certificateId(SHA1_ABSENT_PARAMETERS)),
+            argumentSet("hash algorithm parameters absent in request and NULL in response",
+                certificateId(SHA1_ABSENT_PARAMETERS), certificateId(SHA1_NULL_PARAMETERS)),
+            argumentSet("hash algorithm parameters NULL in request and absent in response",
+                certificateId(SHA1_NULL_PARAMETERS), certificateId(SHA1_ABSENT_PARAMETERS))
+        );
+    }
+
+    private static Stream<Arguments> differingCertificateIds() {
+        return Stream.of(
+            argumentSet("hash algorithm differs",
+                certificateId(SHA1_ABSENT_PARAMETERS), certificateId(new AlgorithmIdentifier(NISTObjectIdentifiers.id_sha256))),
+            argumentSet("hash algorithm has non-NULL parameters",
+                certificateId(SHA1_NULL_PARAMETERS), certificateId(new AlgorithmIdentifier(OIWObjectIdentifiers.idSHA1, new DEROctetString(new byte[0])))),
+            argumentSet("issuer name hash differs",
+                certificateId(SHA1_ABSENT_PARAMETERS), certificateId(SHA1_NULL_PARAMETERS, new byte[]{9, 9, 9}, ISSUER_KEY_HASH, SERIAL_NUMBER)),
+            argumentSet("issuer key hash differs",
+                certificateId(SHA1_ABSENT_PARAMETERS), certificateId(SHA1_NULL_PARAMETERS, ISSUER_NAME_HASH, new byte[]{9, 9, 9}, SERIAL_NUMBER)),
+            argumentSet("serial number differs",
+                certificateId(SHA1_ABSENT_PARAMETERS), certificateId(SHA1_NULL_PARAMETERS, ISSUER_NAME_HASH, ISSUER_KEY_HASH, SERIAL_NUMBER.add(BigInteger.ONE)))
+        );
+    }
+
+    private static CertificateID certificateId(AlgorithmIdentifier hashAlgorithm) {
+        return certificateId(hashAlgorithm, ISSUER_NAME_HASH, ISSUER_KEY_HASH, SERIAL_NUMBER);
+    }
+
+    private static CertificateID certificateId(AlgorithmIdentifier hashAlgorithm, byte[] issuerNameHash, byte[] issuerKeyHash, BigInteger serialNumber) {
+        return new CertificateID(new CertID(hashAlgorithm, new DEROctetString(issuerNameHash),
+            new DEROctetString(issuerKeyHash), new ASN1Integer(serialNumber)));
     }
 
     private static Date getThisUpdateWithinAgeLimit(Instant now) {

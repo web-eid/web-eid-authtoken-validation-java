@@ -148,10 +148,7 @@ public class OcspCertificateRevocationChecker implements CertificateRevocationCh
                 + "received " + basicResponse.getResponses().length + " responses instead", ocspService.getAccessLocation());
         }
         final SingleResp certStatusResponse = basicResponse.getResponses()[0];
-        if (!requestCertificateId.equals(certStatusResponse.getCertID())) {
-            throw new UserCertificateOCSPCheckFailedException("OCSP responded with certificate ID that differs from the requested ID",
-                    ocspService.getAccessLocation());
-        }
+        OcspResponseValidator.validateCertificateId(requestCertificateId, certStatusResponse.getCertID(), ocspService.getAccessLocation());
 
         // Steps 3 and 4 are performed BEFORE step 2. The responder certificate is
         // attacker-controlled until validated; verifying the response signature first lets
