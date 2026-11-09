@@ -7,6 +7,7 @@ import eu.webeid.ocsp.OcspCertificateRevocationChecker;
 import eu.webeid.ocsp.exceptions.OCSPCertificateException;
 import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
+import eu.webeid.ocsp.exceptions.UserCertificateUnknownStatusException;
 import org.bouncycastle.asn1.DLBitString;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
@@ -163,9 +164,9 @@ class OcspResponseValidatorTest {
     }
 
     @Test
-    void whenOcspResponseStatusIsUnknown_ThenThrowsUserCertificateOCSPCheckFailedException() throws Exception {
+    void whenOcspResponseStatusIsUnknown_ThenThrowsUserCertificateUnknownStatusException() throws Exception {
         SingleResp unknownCertStatus = getUnknownCertStatusResponse();
-        assertThatExceptionOfType(UserCertificateOCSPCheckFailedException.class)
+        assertThatExceptionOfType(UserCertificateUnknownStatusException.class)
             .isThrownBy(() ->
                 validateSubjectCertificateStatus(unknownCertStatus, OCSP_URL))
             .withMessage("User certificate revocation check has failed: Unknown status (OCSP responder: https://example.org)");

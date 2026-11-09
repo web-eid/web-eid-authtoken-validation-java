@@ -7,6 +7,7 @@ import eu.webeid.ocsp.OcspCertificateRevocationChecker;
 import eu.webeid.ocsp.client.OcspClient;
 import eu.webeid.ocsp.exceptions.OCSPClientException;
 import eu.webeid.ocsp.exceptions.UserCertificateOCSPException;
+import eu.webeid.ocsp.exceptions.UserCertificateUnknownStatusException;
 import eu.webeid.ocsp.service.FallbackOcspService;
 import eu.webeid.ocsp.service.OcspService;
 import eu.webeid.security.util.DateAndTime;
@@ -14,6 +15,7 @@ import eu.webeid.ocsp.service.OcspServiceProvider;
 import eu.webeid.resilientocsp.ResilientOcspCertificateRevocationChecker.CircuitBreakerStatistics;
 import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateOCSPCheckFailedException;
 import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateRevokedException;
+import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateUnknownStatusException;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.util.DateAndTime;
 import eu.webeid.security.validator.AuthTokenValidator;
@@ -27,6 +29,7 @@ import org.bouncycastle.cert.ocsp.CertificateStatus;
 import org.bouncycastle.cert.ocsp.OCSPResp;
 import org.bouncycastle.cert.ocsp.RevokedStatus;
 import org.bouncycastle.cert.ocsp.SingleResp;
+import org.bouncycastle.cert.ocsp.UnknownStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -424,17 +427,221 @@ class ResilientOcspCertificateRevocationCheckerTest {
     }
 
     @Test
-    void whenPrimaryReturnsUnknown_thenFallbackHandlesTheCall() throws Exception {
+    void whenPrimaryReturnsUnknown_thenUnknownStatusIsFinalAndFallbackIsNotCalled() throws Exception {
         OcspClient ocspClient = mock(OcspClient.class);
         when(ocspClient.request(eq(PRIMARY_URI), any())).thenReturn(ocspRespUnknown);
         when(ocspClient.request(eq(FALLBACK_URI), any())).thenReturn(ocspRespGood);
         ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient).build();
 
+        try (var ignored = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
+            assertThatExceptionOfType(ResilientUserCertificateUnknownStatusException.class)
+                .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
+                .withMessage("User certificate revocation check has failed: Unknown status (OCSP responder: " + PRIMARY_URI + ")")
+                .satisfies(ex -> {
+                    List<RevocationInfo> revocationInfoList = ex.getValidationInfo().revocationInfoList();
+                    assertThat(revocationInfoList).hasSize(1);
+                    assertThat(revocationInfoList.get(0).ocspResponderUri()).isEqualTo(PRIMARY_URI);
+                    assertThat(revocationInfoList.get(0).ocspResponseAttributes().get(RevocationInfo.KEY_OCSP_ERROR))
+                        .isInstanceOf(UserCertificateUnknownStatusException.class);
+                    assertThat(getCertificateStatus(revocationInfoList.get(0))).isInstanceOf(UnknownStatus.class);
+                    assertThat(getCircuitBreakerStatistics(revocationInfoList.get(0))).isNotNull();
+                });
+        }
+        verify(ocspClient, never()).request(eq(FALLBACK_URI), any());
+        verify(ocspClient, never()).request(eq(SECOND_FALLBACK_URI), any());
+    }
+
+    @Test
+    void whenPrimaryReturnsUnknown_thenNotRetried() throws Exception {
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any())).thenReturn(ocspRespUnknown);
+        RetryConfig retryConfig = RetryConfig.custom().maxAttempts(2).waitDuration(Duration.ZERO).build();
+        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient).withRetryConfig(retryConfig).build();
+
+        try (var ignored = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
+            assertThatExceptionOfType(ResilientUserCertificateUnknownStatusException.class)
+                .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA));
+        }
+        verify(ocspClient, times(1)).request(eq(PRIMARY_URI), any());
+        verify(ocspClient, never()).request(eq(FALLBACK_URI), any());
+    }
+
+    @Test
+    void whenPrimaryFailsAndRetryReturnsUnknown_thenUnknownStatusIsFinalAndFallbackIsNotCalled() throws Exception {
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any()))
+            .thenThrow(new OCSPClientException("Primary OCSP service unavailable"))
+            .thenReturn(ocspRespUnknown);
+        when(ocspClient.request(eq(FALLBACK_URI), any())).thenReturn(ocspRespGood);
+        RetryConfig retryConfig = RetryConfig.custom().maxAttempts(2).waitDuration(Duration.ZERO).build();
+        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient).withRetryConfig(retryConfig).build();
+
+        try (var ignored = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
+            assertThatExceptionOfType(ResilientUserCertificateUnknownStatusException.class)
+                .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
+                .satisfies(ex -> {
+                    List<RevocationInfo> revocationInfoList = ex.getValidationInfo().revocationInfoList();
+                    assertThat(revocationInfoList).extracting(RevocationInfo::ocspResponderUri)
+                        .containsExactly(PRIMARY_URI, PRIMARY_URI);
+                    assertThat(revocationInfoList.get(0).ocspResponseAttributes().get(RevocationInfo.KEY_OCSP_ERROR))
+                        .isInstanceOf(OCSPClientException.class);
+                    assertThat(getCertificateStatus(revocationInfoList.get(1))).isInstanceOf(UnknownStatus.class);
+                });
+        }
+        verify(ocspClient, times(2)).request(eq(PRIMARY_URI), any());
+        verify(ocspClient, never()).request(eq(FALLBACK_URI), any());
+    }
+
+    @Test
+    void whenPrimaryReturnsUnknown_thenCircuitBreakerDoesNotOpen() throws Exception {
+        // With a config that would trip after two real failures, the primary is still queried on the third call.
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any())).thenReturn(ocspRespUnknown);
+        CircuitBreakerConfig tightCircuitBreakerConfig = CircuitBreakerConfig.custom()
+            .recordExceptions(Throwable.class)
+            .slidingWindowSize(2)
+            .minimumNumberOfCalls(2)
+            .failureRateThreshold(50)
+            .permittedNumberOfCallsInHalfOpenState(1)
+            .build();
+        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient)
+            .withFallbacks(FALLBACK_URI)
+            .withCircuitBreakerConfig(tightCircuitBreakerConfig)
+            .build();
+
+        try (var ignored = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
+            for (int i = 0; i < 3; i++) {
+                assertThatExceptionOfType(ResilientUserCertificateUnknownStatusException.class)
+                    .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
+                    .satisfies(ex -> assertThat(getCircuitBreakerStatistics(ex.getValidationInfo().revocationInfoList().get(0)).state())
+                        .isEqualTo(CircuitBreaker.State.CLOSED));
+            }
+        }
+        verify(ocspClient, times(3)).request(eq(PRIMARY_URI), any());
+        verify(ocspClient, never()).request(eq(FALLBACK_URI), any());
+    }
+
+    @Test
+    void whenPrimaryFailsAndFirstFallbackReturnsUnknown_thenSecondFallbackIsNotCalled() throws Exception {
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any())).thenThrow(new OCSPClientException("Primary OCSP service unavailable"));
+        when(ocspClient.request(eq(FALLBACK_URI), any())).thenReturn(ocspRespUnknown);
+        when(ocspClient.request(eq(SECOND_FALLBACK_URI), any())).thenReturn(ocspRespGood);
+        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient).build();
+
+        try (var ignored = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
+            assertThatExceptionOfType(ResilientUserCertificateUnknownStatusException.class)
+                .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
+                .satisfies(ex -> {
+                    List<RevocationInfo> revocationInfoList = ex.getValidationInfo().revocationInfoList();
+                    assertThat(revocationInfoList).extracting(RevocationInfo::ocspResponderUri)
+                        .containsExactly(PRIMARY_URI, FALLBACK_URI);
+                    assertThat(getCertificateStatus(revocationInfoList.get(1))).isInstanceOf(UnknownStatus.class);
+                });
+        }
+        verify(ocspClient, never()).request(eq(SECOND_FALLBACK_URI), any());
+    }
+
+    @Test
+    void whenFallbackOnUnknownStatusEnabledAndPrimaryReturnsUnknown_thenFallbackHandlesTheCall() throws Exception {
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any())).thenReturn(ocspRespUnknown);
+        when(ocspClient.request(eq(FALLBACK_URI), any())).thenReturn(ocspRespGood);
+        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient).withFallbackOnUnknownStatus().build();
+
         try (var mockedClock = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
             List<RevocationInfo> revocationInfoList = checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
 
             assertThat(revocationInfoList).hasSize(2);
+            assertThat(revocationInfoList.get(0).ocspResponseAttributes().get(RevocationInfo.KEY_OCSP_ERROR))
+                .isInstanceOf(UserCertificateUnknownStatusException.class);
             verify(ocspClient).request(eq(FALLBACK_URI), any());
+        }
+    }
+
+    @Test
+    void whenFallbackOnUnknownStatusEnabledAndFirstFallbackReturnsUnknown_thenSecondFallbackHandlesTheCall() throws Exception {
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any())).thenThrow(new OCSPClientException("Primary OCSP service unavailable"));
+        when(ocspClient.request(eq(FALLBACK_URI), any())).thenReturn(ocspRespUnknown);
+        when(ocspClient.request(eq(SECOND_FALLBACK_URI), any())).thenReturn(ocspRespGood);
+        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient).withFallbackOnUnknownStatus().build();
+
+        try (var ignored = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
+            List<RevocationInfo> revocationInfoList = checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
+
+            assertThat(revocationInfoList).extracting(RevocationInfo::ocspResponderUri)
+                .containsExactly(PRIMARY_URI, FALLBACK_URI, SECOND_FALLBACK_URI);
+            assertThat(getCertificateStatus(revocationInfoList.get(2))).isEqualTo(CertificateStatus.GOOD);
+        }
+    }
+
+    @Test
+    void whenFallbackOnUnknownStatusEnabledAndPrimaryReturnsUnknown_thenRetriedAndCountedByCircuitBreaker() throws Exception {
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any())).thenReturn(ocspRespUnknown);
+        when(ocspClient.request(eq(FALLBACK_URI), any())).thenReturn(ocspRespGood);
+        RetryConfig retryConfig = RetryConfig.custom().maxAttempts(2).waitDuration(Duration.ZERO).build();
+        CircuitBreakerConfig tightCircuitBreakerConfig = CircuitBreakerConfig.custom()
+            .slidingWindowSize(2)
+            .minimumNumberOfCalls(2)
+            .failureRateThreshold(50)
+            .permittedNumberOfCallsInHalfOpenState(1)
+            .waitDurationInOpenState(Duration.ofMinutes(10))
+            .build();
+        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient)
+            .withFallbacks(FALLBACK_URI)
+            .withFallbackOnUnknownStatus()
+            .withRetryConfig(retryConfig)
+            .withCircuitBreakerConfig(tightCircuitBreakerConfig)
+            .build();
+
+        try (var ignored = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
+            // First call: primary answers unknown twice (retried), then the fallback answers good.
+            List<RevocationInfo> firstResult = checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
+            assertThat(firstResult).extracting(RevocationInfo::ocspResponderUri)
+                .containsExactly(PRIMARY_URI, PRIMARY_URI, FALLBACK_URI);
+            // Both primary attempts failed because of the unknown status, not for an unrelated reason.
+            assertThat(firstResult.subList(0, 2))
+                .extracting(revocationInfo -> revocationInfo.ocspResponseAttributes().get(RevocationInfo.KEY_OCSP_ERROR))
+                .allSatisfy(error -> assertThat(error).isInstanceOf(UserCertificateUnknownStatusException.class));
+            verify(ocspClient, times(2)).request(eq(PRIMARY_URI), any());
+
+            // Second call: the retried call counted as one failure; after this call the breaker has two failures.
+            checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
+            verify(ocspClient, times(4)).request(eq(PRIMARY_URI), any());
+
+            // Third call: the breaker is open, the primary is not queried and the fallback handles the call.
+            List<RevocationInfo> thirdResult = checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
+            assertThat(thirdResult).extracting(RevocationInfo::ocspResponderUri).containsExactly(FALLBACK_URI);
+            assertThat(getCircuitBreakerStatistics(thirdResult.get(0)).state()).isEqualTo(CircuitBreaker.State.OPEN);
+            verify(ocspClient, times(4)).request(eq(PRIMARY_URI), any());
+        }
+    }
+
+    @Test
+    void whenFallbackOnUnknownStatusEnabledAndRetryConfigRetriesOnlyCheckFailedException_thenUnknownStatusIsRetried() throws Exception {
+        // With fallback on unknown status enabled, the unknown status is a ResilientUserCertificateOCSPCheckFailedException,
+        // so a retry configuration that names this exception type applies to it.
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any())).thenReturn(ocspRespUnknown);
+        when(ocspClient.request(eq(FALLBACK_URI), any())).thenReturn(ocspRespGood);
+        RetryConfig retryConfig = RetryConfig.custom()
+            .maxAttempts(3)
+            .waitDuration(Duration.ZERO)
+            .retryExceptions(ResilientUserCertificateOCSPCheckFailedException.class)
+            .build();
+        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient)
+            .withFallbacks(FALLBACK_URI)
+            .withFallbackOnUnknownStatus()
+            .withRetryConfig(retryConfig)
+            .build();
+
+        try (var ignored = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
+            List<RevocationInfo> result = checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
+            assertThat(result).extracting(RevocationInfo::ocspResponderUri)
+                .containsExactly(PRIMARY_URI, PRIMARY_URI, PRIMARY_URI, FALLBACK_URI);
+            verify(ocspClient, times(3)).request(eq(PRIMARY_URI), any());
         }
     }
 
@@ -584,6 +791,57 @@ class ResilientOcspCertificateRevocationCheckerTest {
         assertThat(getCircuitBreakerStatistics(reopenedRevocationInfoList.get(0)).state())
             .isEqualTo(CircuitBreaker.State.OPEN);
         verify(ocspClient, times(3)).request(eq(PRIMARY_URI), any());
+    }
+
+    @Test
+    void whenPrimaryReturnsUnknownInHalfOpenState_thenUnknownStatusIsFinalAndCircuitBreakerCloses() throws Exception {
+        // A final unknown status is a definitive answer from a healthy service: in half open state it counts
+        // as a success, so the breaker closes instead of re-opening, and no fallback is consulted.
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any()))
+            .thenThrow(new OCSPClientException("Primary OCSP service unavailable"))
+            .thenThrow(new OCSPClientException("Primary OCSP service unavailable"))
+            .thenReturn(ocspRespUnknown);
+        when(ocspClient.request(eq(FALLBACK_URI), any())).thenReturn(ocspRespGood);
+        CircuitBreakerConfig recoverableCircuitBreakerConfig = CircuitBreakerConfig.custom()
+            .slidingWindowSize(2)
+            .minimumNumberOfCalls(2)
+            .failureRateThreshold(50)
+            .waitDurationInOpenState(Duration.ofSeconds(1))
+            .permittedNumberOfCallsInHalfOpenState(1)
+            .build();
+        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient)
+            .withFallbacks(FALLBACK_URI)
+            .withCircuitBreakerConfig(recoverableCircuitBreakerConfig)
+            .build();
+        // The first two calls fail on the primary and trip the breaker.
+        checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
+        checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA);
+        // Let the open state expire without calling the checker, so that the next call is the one that the
+        // circuit breaker permits in half open state.
+        await().pollDelay(waitLongerThan(Duration.ofSeconds(1)))
+            .atMost(Duration.ofSeconds(10))
+            .until(() -> true);
+
+        try (var ignored = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
+            assertThatExceptionOfType(ResilientUserCertificateUnknownStatusException.class)
+                .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
+                .satisfies(ex -> {
+                    List<RevocationInfo> revocationInfoList = ex.getValidationInfo().revocationInfoList();
+                    assertThat(revocationInfoList).extracting(RevocationInfo::ocspResponderUri).containsExactly(PRIMARY_URI);
+                    assertThat(getCircuitBreakerStatistics(revocationInfoList.get(0)).state())
+                        .isEqualTo(CircuitBreaker.State.HALF_OPEN);
+                });
+            // The half open call counted as a success and closed the breaker: the primary is queried again.
+            // Had it counted as a failure, the breaker would have re-opened and the fallback would answer.
+            assertThatExceptionOfType(ResilientUserCertificateUnknownStatusException.class)
+                .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
+                .satisfies(ex -> assertThat(getCircuitBreakerStatistics(ex.getValidationInfo().revocationInfoList().get(0)).state())
+                    .isEqualTo(CircuitBreaker.State.CLOSED));
+        }
+        verify(ocspClient, times(4)).request(eq(PRIMARY_URI), any());
+        // Only the two calls that tripped the breaker reached the fallback.
+        verify(ocspClient, times(2)).request(eq(FALLBACK_URI), any());
     }
 
     @Test
@@ -901,16 +1159,39 @@ class ResilientOcspCertificateRevocationCheckerTest {
     }
 
     @Test
-    void whenNoFallbackConfiguredAndPrimaryReturnsUnknown_thenCheckFailedPropagates() throws Exception {
+    void whenNoFallbackConfiguredAndPrimaryReturnsUnknown_thenUnknownStatusPropagates() throws Exception {
         // The unknown status fails the OCSP check.
         OcspClient ocspClient = mock(OcspClient.class);
         when(ocspClient.request(eq(PRIMARY_URI), any())).thenReturn(ocspRespUnknown);
         ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient).withoutFallbacks().build();
 
         try (var ignored = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
-            assertThatExceptionOfType(ResilientUserCertificateOCSPCheckFailedException.class)
+            assertThatExceptionOfType(ResilientUserCertificateUnknownStatusException.class)
                 .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
                 .satisfies(ex -> assertThat(ex.getValidationInfo().revocationInfoList()).hasSize(1));
+        }
+    }
+
+    @Test
+    void whenNoFallbackConfiguredAndFallbackOnUnknownStatusEnabledAndPrimaryReturnsUnknown_thenCheckFailedPropagates() throws Exception {
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any())).thenReturn(ocspRespUnknown);
+        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient)
+            .withoutFallbacks()
+            .withFallbackOnUnknownStatus()
+            .build();
+
+        try (var ignored = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
+            assertThatExceptionOfType(ResilientUserCertificateOCSPCheckFailedException.class)
+                .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
+                .withMessage("User certificate revocation check has failed")
+                .satisfies(ex -> {
+                    assertThat(ex).isExactlyInstanceOf(ResilientUserCertificateOCSPCheckFailedException.class);
+                    List<RevocationInfo> revocationInfoList = ex.getValidationInfo().revocationInfoList();
+                    assertThat(revocationInfoList).hasSize(1);
+                    assertThat(revocationInfoList.get(0).ocspResponseAttributes().get(RevocationInfo.KEY_OCSP_ERROR))
+                        .isInstanceOf(UserCertificateUnknownStatusException.class);
+                });
         }
     }
 
@@ -954,6 +1235,93 @@ class ResilientOcspCertificateRevocationCheckerTest {
                     .containsExactly(PRIMARY_URI, FALLBACK_URI, SECOND_FALLBACK_URI);
                 assertThat(getCertificateStatus(revocationInfoList.get(2))).isInstanceOf(RevokedStatus.class);
             });
+    }
+
+    @Test
+    void whenPrimaryAndFirstFallbackFailAndSecondFallbackReturnsUnknown_thenUnknownStatusPropagates() throws Exception {
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any())).thenThrow(new OCSPClientException("Primary OCSP service unavailable"));
+        when(ocspClient.request(eq(FALLBACK_URI), any())).thenThrow(new OCSPClientException("Fallback OCSP service unavailable"));
+        when(ocspClient.request(eq(SECOND_FALLBACK_URI), any())).thenReturn(ocspRespUnknown);
+        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient).build();
+
+        try (var ignored = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
+            assertThatExceptionOfType(ResilientUserCertificateUnknownStatusException.class)
+                .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
+                .satisfies(ex -> {
+                    List<RevocationInfo> revocationInfoList = ex.getValidationInfo().revocationInfoList();
+                    assertThat(revocationInfoList).extracting(RevocationInfo::ocspResponderUri)
+                        .containsExactly(PRIMARY_URI, FALLBACK_URI, SECOND_FALLBACK_URI);
+                    assertThat(getCertificateStatus(revocationInfoList.get(2))).isInstanceOf(UnknownStatus.class);
+                });
+        }
+    }
+
+    @Test
+    void whenFallbackOnUnknownStatusEnabledAndSecondFallbackReturnsUnknown_thenCheckFailedPropagates() throws Exception {
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any())).thenThrow(new OCSPClientException("Primary OCSP service unavailable"));
+        when(ocspClient.request(eq(FALLBACK_URI), any())).thenThrow(new OCSPClientException("Fallback OCSP service unavailable"));
+        when(ocspClient.request(eq(SECOND_FALLBACK_URI), any())).thenReturn(ocspRespUnknown);
+        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient).withFallbackOnUnknownStatus().build();
+
+        try (var ignored = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
+            assertThatExceptionOfType(ResilientUserCertificateOCSPCheckFailedException.class)
+                .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
+                .satisfies(ex -> {
+                    assertThat(ex).isExactlyInstanceOf(ResilientUserCertificateOCSPCheckFailedException.class);
+                    List<RevocationInfo> revocationInfoList = ex.getValidationInfo().revocationInfoList();
+                    assertThat(revocationInfoList).extracting(RevocationInfo::ocspResponderUri)
+                        .containsExactly(PRIMARY_URI, FALLBACK_URI, SECOND_FALLBACK_URI);
+                    assertThat(getCertificateStatus(revocationInfoList.get(2))).isInstanceOf(UnknownStatus.class);
+                });
+        }
+    }
+
+    @Test
+    void whenFallbackOnUnknownStatusEnabledAndAllServicesReturnUnknown_thenCheckFailedPropagates() throws Exception {
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(any(), any())).thenReturn(ocspRespUnknown);
+        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient).withFallbackOnUnknownStatus().build();
+
+        try (var ignored = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
+            assertThatExceptionOfType(ResilientUserCertificateOCSPCheckFailedException.class)
+                .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
+                .withMessage("User certificate revocation check has failed")
+                .satisfies(ex -> {
+                    assertThat(ex).isExactlyInstanceOf(ResilientUserCertificateOCSPCheckFailedException.class);
+                    List<RevocationInfo> revocationInfoList = ex.getValidationInfo().revocationInfoList();
+                    assertThat(revocationInfoList).extracting(RevocationInfo::ocspResponderUri)
+                        .containsExactly(PRIMARY_URI, FALLBACK_URI, SECOND_FALLBACK_URI);
+                    assertThat(revocationInfoList)
+                        .extracting(revocationInfo -> revocationInfo.ocspResponseAttributes().get(RevocationInfo.KEY_OCSP_ERROR))
+                        .allSatisfy(error -> assertThat(error).isInstanceOf(UserCertificateUnknownStatusException.class));
+                });
+        }
+    }
+
+    @Test
+    void whenFallbackOnUnknownStatusEnabledAndPrimaryReturnsUnknownAndFallbackFails_thenCheckFailedPropagates() throws Exception {
+        OcspClient ocspClient = mock(OcspClient.class);
+        when(ocspClient.request(eq(PRIMARY_URI), any())).thenReturn(ocspRespUnknown);
+        when(ocspClient.request(eq(FALLBACK_URI), any())).thenThrow(new OCSPClientException("Fallback OCSP service unavailable"));
+        ResilientOcspCertificateRevocationChecker checker = checkerBuilder(ocspClient)
+            .withFallbacks(FALLBACK_URI)
+            .withFallbackOnUnknownStatus()
+            .build();
+
+        try (var ignored = mockStaticClockAt(WITHIN_RESPONDER_CERT_VALIDITY)) {
+            assertThatExceptionOfType(ResilientUserCertificateOCSPCheckFailedException.class)
+                .isThrownBy(() -> checker.validateCertificateNotRevoked(estEid2018Cert, testEsteid2018CA))
+                .satisfies(ex -> {
+                    assertThat(ex).isExactlyInstanceOf(ResilientUserCertificateOCSPCheckFailedException.class);
+                    List<RevocationInfo> revocationInfoList = ex.getValidationInfo().revocationInfoList();
+                    assertThat(revocationInfoList).extracting(RevocationInfo::ocspResponderUri)
+                        .containsExactly(PRIMARY_URI, FALLBACK_URI);
+                    assertThat(revocationInfoList.get(0).ocspResponseAttributes().get(RevocationInfo.KEY_OCSP_ERROR))
+                        .isInstanceOf(UserCertificateUnknownStatusException.class);
+                });
+        }
     }
 
     @Test
@@ -1001,6 +1369,7 @@ class ResilientOcspCertificateRevocationCheckerTest {
         private RetryConfig retryConfig;
         private Duration primaryMaxThisUpdateAge = LONG_THIS_UPDATE_AGE;
         private Duration fallbackMaxThisUpdateAge = LONG_THIS_UPDATE_AGE;
+        private boolean fallbackOnUnknownStatus;
 
         private CheckerBuilder(OcspClient ocspClient) {
             this.ocspClient = ocspClient;
@@ -1045,6 +1414,11 @@ class ResilientOcspCertificateRevocationCheckerTest {
             return this;
         }
 
+        private CheckerBuilder withFallbackOnUnknownStatus() {
+            this.fallbackOnUnknownStatus = true;
+            return this;
+        }
+
         private ResilientOcspCertificateRevocationChecker build() throws Exception {
             OcspServiceProvider serviceProvider = ocspServiceProvider != null ? ocspServiceProvider : buildMockServiceProvider();
             return new ResilientOcspCertificateRevocationChecker(
@@ -1052,7 +1426,8 @@ class ResilientOcspCertificateRevocationCheckerTest {
                 serviceProvider,
                 circuitBreakerConfig,
                 retryConfig,
-                OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW
+                OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW,
+                fallbackOnUnknownStatus
             );
         }
 

@@ -9,11 +9,13 @@ import eu.webeid.ocsp.exceptions.OCSPClientException;
 import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.ocsp.exceptions.UserCertificateOCSPException;
 import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
+import eu.webeid.ocsp.exceptions.UserCertificateUnknownStatusException;
 import eu.webeid.ocsp.service.FallbackOcspService;
 import eu.webeid.ocsp.service.OcspService;
 import eu.webeid.ocsp.service.OcspServiceProvider;
 import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateOCSPCheckFailedException;
 import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateRevokedException;
+import eu.webeid.resilientocsp.exceptions.ResilientUserCertificateUnknownStatusException;
 import eu.webeid.security.exceptions.AuthTokenException;
 import eu.webeid.security.validator.ValidationInfo;
 import eu.webeid.security.validator.revocationcheck.RevocationInfo;
@@ -52,6 +54,12 @@ import static java.util.Objects.requireNonNull;
  *
  * <p>Retry and circuit breaker handling are applied only when a fallback OCSP service is configured for the
  * certificate issuer. If no fallback is configured, validation is handled by the primary OCSP service directly.
+ *
+ * <p>A revoked status is a definitive answer: it is not retried, does not count as a circuit breaker failure
+ * and does not initiate a fallback. By default, the unknown status is final in the same way and fails the check
+ * with {@link ResilientUserCertificateUnknownStatusException}. See {@code fallbackOnUnknownStatus} of
+ * {@link #ResilientOcspCertificateRevocationChecker(OcspClient, OcspServiceProvider, CircuitBreakerConfig, RetryConfig, Duration, boolean)}
+ * to handle it as an OCSP service failure instead.
  */
 public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRevocationChecker {
 
@@ -59,13 +67,37 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
 
     private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final RetryRegistry retryRegistry;
+    private final boolean fallbackOnUnknownStatus;
 
+    /**
+     * Creates a checker in which the unknown status is final.
+     */
     public ResilientOcspCertificateRevocationChecker(OcspClient ocspClient,
                                                      OcspServiceProvider ocspServiceProvider,
                                                      CircuitBreakerConfig circuitBreakerConfig,
                                                      RetryConfig retryConfig,
                                                      Duration allowedOcspResponseTimeSkew) {
+        this(ocspClient, ocspServiceProvider, circuitBreakerConfig, retryConfig, allowedOcspResponseTimeSkew, false);
+    }
+
+    /**
+     * @param fallbackOnUnknownStatus if {@code false}, the unknown status is final: it is not retried, does not count
+     *                                as a circuit breaker failure and does not initiate a fallback, and the check
+     *                                fails with {@link ResilientUserCertificateUnknownStatusException}. If
+     *                                {@code true}, the unknown status is handled like any other OCSP service
+     *                                failure: when a fallback OCSP service is configured for the certificate
+     *                                issuer, it is retried, counts as a circuit breaker failure and initiates a
+     *                                fallback. If no service establishes the status, the check fails with
+     *                                {@link ResilientUserCertificateOCSPCheckFailedException}.
+     */
+    public ResilientOcspCertificateRevocationChecker(OcspClient ocspClient,
+                                                     OcspServiceProvider ocspServiceProvider,
+                                                     CircuitBreakerConfig circuitBreakerConfig,
+                                                     RetryConfig retryConfig,
+                                                     Duration allowedOcspResponseTimeSkew,
+                                                     boolean fallbackOnUnknownStatus) {
         super(ocspClient, ocspServiceProvider, allowedOcspResponseTimeSkew);
+        this.fallbackOnUnknownStatus = fallbackOnUnknownStatus;
         this.circuitBreakerRegistry = CircuitBreakerRegistry.custom()
             .withCircuitBreakerConfig(getCircuitBreakerConfig(circuitBreakerConfig))
             .build();
@@ -160,10 +192,10 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         return () -> {
             try {
                 return firstFallbackSupplier.get();
-            } catch (ResilientUserCertificateRevokedException e) {
-                // NOTE: ResilientUserCertificateRevokedException must be re-thrown before the generic
-                // catch (Exception) block. Without this, a "revoked" verdict from the first fallback would
-                // be swallowed, and the second fallback could silently override it with a "good" response.
+            } catch (ResilientUserCertificateRevokedException | ResilientUserCertificateUnknownStatusException e) {
+                // NOTE: Final verdicts must be re-thrown before the generic catch (Exception) block. Without this,
+                // a "revoked" or final "unknown" verdict from the first fallback would be swallowed, and the second
+                // fallback could silently override it with a "good" response.
                 throw e;
             } catch (Exception e) {
                 return secondFallbackSupplier.get();
@@ -228,6 +260,10 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
             exception.setValidationInfo(new ValidationInfo(subjectCertificate, revocationInfoList));
             throw exception;
         }
+        if (throwable instanceof ResilientUserCertificateUnknownStatusException exception) {
+            exception.setValidationInfo(new ValidationInfo(subjectCertificate, revocationInfoList));
+            throw exception;
+        }
         throw new ResilientUserCertificateOCSPCheckFailedException(new ValidationInfo(subjectCertificate, revocationInfoList));
     }
 
@@ -243,6 +279,10 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
             return;
         }
         if (throwable instanceof ResilientUserCertificateRevokedException exception) {
+            revocationInfoList.addAll((exception.getValidationInfo().revocationInfoList()));
+            return;
+        }
+        if (throwable instanceof ResilientUserCertificateUnknownStatusException exception) {
             revocationInfoList.addAll((exception.getValidationInfo().revocationInfoList()));
             return;
         }
@@ -300,17 +340,17 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         } catch (ResilientUserCertificateOCSPCheckFailedException e) {
             throw e;
         } catch (UserCertificateRevokedException e) {
-            // NOTE: unknown status does not throw UserCertificateRevokedException, it throws
-            // UserCertificateOCSPCheckFailedException instead (see OcspResponseValidator.validateSubjectCertificateStatus),
-            // so it falls through to the generic catch (Exception) block below, gets wrapped as
-            // ResilientUserCertificateOCSPCheckFailedException, and triggers the circuit breaker fallback.
-            // Here, wrapping as ResilientUserCertificateRevokedException ensures the circuit breaker ignores it
+            // Wrapping as ResilientUserCertificateRevokedException ensures the circuit breaker ignores it
             // (a definitive OCSP answer, not a transient failure) and no fallback is attempted.
             RevocationInfo revocationInfo = getRevocationInfo(ocspResponderUri, e, request, response, requestDuration, responseTime);
             throw new ResilientUserCertificateRevokedException(new ValidationInfo(subjectCertificate, List.of(revocationInfo)));
         } catch (Exception e) {
             RevocationInfo revocationInfo = getRevocationInfo(ocspResponderUri, e, request, response, requestDuration, responseTime);
-            throw new ResilientUserCertificateOCSPCheckFailedException(new ValidationInfo(subjectCertificate, List.of(revocationInfo)));
+            ValidationInfo validationInfo = new ValidationInfo(subjectCertificate, List.of(revocationInfo));
+            if (e instanceof UserCertificateUnknownStatusException && !fallbackOnUnknownStatus) {
+                throw new ResilientUserCertificateUnknownStatusException(ocspResponderUri, validationInfo);
+            }
+            throw new ResilientUserCertificateOCSPCheckFailedException(validationInfo);
         }
     }
 
@@ -349,8 +389,9 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
         return CircuitBreakerConfig.from(circuitBreakerConfig)
             // Users must not be able to modify this value.
             // Only ResilientUserCertificateOCSPCheckFailedException counts as a failure.
-            // ResilientUserCertificateRevokedException is counted as a SUCCESS because it represents
-            // a definitive OCSP answer (the service is healthy), not a transient failure.
+            // ResilientUserCertificateRevokedException and ResilientUserCertificateUnknownStatusException are
+            // counted as a SUCCESS because they represent a definitive OCSP answer (the service is healthy),
+            // not a transient failure.
             // Clear any recordExceptions list of the given configuration first, because it is combined
             // with the predicate below by OR and would otherwise widen what counts as a failure.
             .recordExceptions()
@@ -361,7 +402,7 @@ public class ResilientOcspCertificateRevocationChecker extends OcspCertificateRe
     private static RetryConfig getRetryConfig(RetryConfig retryConfig) {
         return RetryConfig.from(retryConfig)
             // Users must not be able to modify this value.
-            .ignoreExceptions(ResilientUserCertificateRevokedException.class)
+            .ignoreExceptions(ResilientUserCertificateRevokedException.class, ResilientUserCertificateUnknownStatusException.class)
             .build();
     }
 

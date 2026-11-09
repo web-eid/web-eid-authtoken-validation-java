@@ -12,6 +12,7 @@ Use `withCertificateRevocationChecker(...)` to supply your own implementation or
 - [OCSP responder revocation check limitation](#ocsp-responder-revocation-check-limitation)
 - [Implementing CertificateRevocationChecker](#implementing-certificaterevocationchecker)
 - [Custom OCSP checker](#custom-ocsp-checker)
+- [Resilient OCSP checker](#resilient-ocsp-checker)
 - [Custom PKIX revocation checker](#custom-pkix-revocation-checker)
 - [Platform OCSP timeouts](#platform-ocsp-timeouts)
 - [Platform OCSP nonce configuration](#platform-ocsp-nonce-configuration)
@@ -136,6 +137,52 @@ The AIA configuration is always required, so a designated service is always comb
 
 For AIA services, the response may be signed by the certificate's direct issuer CA itself, or by a delegated responder certificate signed directly by that CA with the OCSP-signing extended key usage. Nonce support is enabled unless the URL appears in the first argument of `AiaOcspServiceConfiguration`. When nonce support is enabled, this custom checker requires a matching response nonce and rejects its absence. Its nonce policy is independent of the platform builder setting and JVM nonce property.
 
+## Resilient OCSP checker
+
+`ResilientOcspCertificateRevocationChecker` in `eu.webeid.resilientocsp` extends the custom OCSP checker with retry, circuit breaker and fallback handling, built on [Resilience4j](https://resilience4j.readme.io/). When the primary OCSP service fails, the request is handed over to the fallback OCSP services configured for the issuer in `OcspServiceProvider`. Retry and circuit breaker handling apply only when a fallback is configured for the issuer; otherwise the primary service is used directly.
+
+Fallback OCSP services are configured per issuer with `FallbackOcspServiceConfiguration` and passed as the third `OcspServiceProvider` constructor argument. Pass at most one configuration per issuer: this is not checked, and if several are passed for the same issuer, only the last one in the collection's iteration order is used. In the example below, `issuerCertificate` must be the issuer CA certificate whose user certificates the fallback serves, and `trustedCAs` and `aiaConfiguration` are defined as in the [custom OCSP checker](#custom-ocsp-checker) example:
+
+```java
+import eu.webeid.ocsp.service.FallbackOcspServiceConfiguration;
+import eu.webeid.resilientocsp.ResilientOcspCertificateRevocationChecker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.retry.RetryConfig;
+
+...
+FallbackOcspServiceConfiguration fallback = new FallbackOcspServiceConfiguration(
+    URI.create("https://fallback.ocsp.example.org"),
+    null, // No pinned responder certificate.
+    true, // This service supports nonces.
+    null, // No next fallback.
+    issuerCertificate,
+    CertificateValidator.buildTrustAnchorsFromCertificates(trustedCAs),
+    CertificateValidator.buildCertStoreFromCertificates(trustedCAs),
+    OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
+    OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE,
+    true // Require the Key Usage extension in responder certificates.
+);
+OcspServiceProvider services = new OcspServiceProvider(null, aiaConfiguration, List.of(fallback));
+ResilientOcspCertificateRevocationChecker checker = new ResilientOcspCertificateRevocationChecker(
+    OcspClientImpl.build(Duration.ofSeconds(5)),
+    services,
+    CircuitBreakerConfig.ofDefaults(),
+    RetryConfig.custom().maxAttempts(2).build(), // Or null to disable retries.
+    OcspCertificateRevocationChecker.DEFAULT_TIME_SKEW,
+    false // An unknown certificate status is final; pass true to retry it and use the fallback instead.
+);
+```
+
+The fallback is used only when the validated direct issuer certificate equals its `issuerCertificate`. When the second `responderCertificate` argument is `null`, the fallback response must be signed by the issuer CA itself or by a delegated responder certificate issued directly by that CA with the OCSP-signing extended key usage. To pin the responder instead, pass its trusted signing certificate; the response must then be signed by exactly that certificate.
+
+To chain a second fallback, pass its configuration as the fourth `nextFallbackConfiguration` argument of the first one. It must be configured for the same `issuerCertificate`. At most two fallbacks per issuer are used: the configured one and its next fallback. Any further chained configurations are ignored.
+
+A *revoked* certificate status is always a final answer: it is not retried, it does not count as a failure for the circuit breaker, and no fallback is consulted.
+
+An *unknown* certificate status is final by default as well: no retry, circuit breaker failure accounting or fallback takes place. Passing `true` as the last `fallbackOnUnknownStatus` constructor argument treats an unknown status like any other failed check instead: it is retried according to the retry configuration, recorded as a circuit breaker failure, and handed over to the fallback OCSP services. The five-argument constructor is equivalent to passing `false`.
+
+A final unknown status fails the check with `ResilientUserCertificateUnknownStatusException`. It is a subclass of `UserCertificateUnknownStatusException`, so it can be caught the same way as with the custom OCSP checker, but it is not a `ResilientUserCertificateOCSPCheckFailedException`. Its message names the responder that returned the unknown status, and `getValidationInfo()` returns the revocation information of every OCSP request attempt that was made, so a retried service appears once per attempt. With `fallbackOnUnknownStatus` enabled, `ResilientUserCertificateUnknownStatusException` is never thrown: if no service establishes the status, the check fails with `ResilientUserCertificateOCSPCheckFailedException`, also when no fallback is configured for the issuer. In both modes, the revocation information of each responder that returned the unknown status contains `UserCertificateUnknownStatusException` under `RevocationInfo.KEY_OCSP_ERROR`.
+
 ## Custom PKIX revocation checker
 
 Configure the checker explicitly, including its fallback policy. For example, to use a fixed responder while retaining OCSP-only checking of the subject certificate:
@@ -226,7 +273,7 @@ The `validate()` method returns `ValidationInfo` on success. Certificate and tok
 | `CertificateRevokedException` | The checker reported that the certificate is revoked. |
 | `CertificateRevocationCheckFailedException` | The revocation status could not be established, for example because of an OCSP service or network failure. |
 
-These classes are in `eu.webeid.security.exceptions`. The bundled custom checker's `UserCertificateRevokedException` and `UserCertificateOCSPCheckFailedException` extend the corresponding common classes. Other validation errors, including expired certificates and invalid token signatures, are documented in the [exception classes](../security/exceptions).
+These classes are in `eu.webeid.security.exceptions`. The bundled custom checker's `UserCertificateRevokedException` and `UserCertificateOCSPCheckFailedException` extend the corresponding common classes. An *unknown* certificate status is reported as `UserCertificateUnknownStatusException`, a subclass of `UserCertificateOCSPCheckFailedException`. The resilient checker reports a final unknown status as `ResilientUserCertificateUnknownStatusException`, a subclass of `UserCertificateUnknownStatusException`; see [Resilient OCSP checker](#resilient-ocsp-checker). Other validation errors, including expired certificates and invalid token signatures, are documented in the [exception classes](../security/exceptions).
 
 During revocation checking, invalid responder certificates (including an unexpected designated responder, missing OCSP signing usage, expiry, or untrusted certificates) produce `UserCertificateOCSPCheckFailedException`, with the detailed certificate error retained as its cause. Invalid certificates supplied during designated-service configuration can instead throw `OCSPCertificateException` at application startup, before any revocation check runs.
 

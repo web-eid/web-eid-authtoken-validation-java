@@ -6,6 +6,7 @@ package eu.webeid.ocsp.protocol;
 import eu.webeid.ocsp.exceptions.OCSPCertificateException;
 import eu.webeid.ocsp.exceptions.UserCertificateOCSPCheckFailedException;
 import eu.webeid.ocsp.exceptions.UserCertificateRevokedException;
+import eu.webeid.ocsp.exceptions.UserCertificateUnknownStatusException;
 import eu.webeid.security.util.DateAndTime;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.ocsp.BasicOCSPResp;
@@ -181,7 +182,7 @@ public final class OcspResponseValidator {
                 new UserCertificateRevokedException("Revocation reason: " + revokedStatus.getRevocationReason(), ocspResponderUri) :
                 new UserCertificateRevokedException(ocspResponderUri));
         } else if (status instanceof UnknownStatus) {
-            throw new UserCertificateOCSPCheckFailedException("Unknown status", ocspResponderUri);
+            throw new UserCertificateUnknownStatusException(ocspResponderUri);
         } else {
             throw new UserCertificateOCSPCheckFailedException("Status is neither good, revoked nor unknown", ocspResponderUri);
         }
