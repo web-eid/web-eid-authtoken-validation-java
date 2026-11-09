@@ -174,6 +174,21 @@ public class AuthTokenValidatorBuilderTest {
     }
 
     @Test
+    void whenAllowingIssuersNotInWhitelistIsConfigured_thenBuildRetainsSetting() throws Exception {
+        final AuthTokenValidationConfiguration defaultConfiguration = captureBuiltConfiguration(validBuilder());
+        final AuthTokenValidationConfiguration allowedConfiguration = captureBuiltConfiguration(
+            validBuilder().allowIssuersNotInWhitelist(true)
+        );
+        final AuthTokenValidationConfiguration rejectedConfiguration = captureBuiltConfiguration(
+            validBuilder().allowIssuersNotInWhitelist(false)
+        );
+
+        assertThat(defaultConfiguration.isAllowIssuersNotInWhitelist()).isFalse();
+        assertThat(allowedConfiguration.isAllowIssuersNotInWhitelist()).isTrue();
+        assertThat(rejectedConfiguration.isAllowIssuersNotInWhitelist()).isFalse();
+    }
+
+    @Test
     void whenOnlyEstonianAndEuCitizenIdCardsAreSupported_thenOnlyTheirPoliciesAreAllowed() throws Exception {
         final AuthTokenValidationConfiguration builtConfiguration = captureBuiltConfiguration(
             validBuilder()
@@ -206,6 +221,23 @@ public class AuthTokenValidatorBuilderTest {
                     )
                 )
             );
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    void whenNoDisallowedPoliciesAreProvidedBeforeAllowedPolicies_thenBuildUsesAllowedPolicies() throws Exception {
+        final X500Principal issuer = new X500Principal("CN=Example CA");
+        final ASN1ObjectIdentifier policy = new ASN1ObjectIdentifier("1.2.3");
+
+        final AuthTokenValidationConfiguration builtConfiguration = captureBuiltConfiguration(
+            validBuilder()
+                .withDisallowedCertificatePolicies()
+                .withAllowedCertificatePolicies(issuer, policy)
+        );
+
+        assertThat(builtConfiguration.getAllowedSubjectCertificatePolicies())
+            .containsOnly(entry(issuer, Set.of(policy)));
+        assertThat(builtConfiguration.getDisallowedSubjectCertificatePolicies()).isEmpty();
     }
 
     @Test

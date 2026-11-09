@@ -65,11 +65,12 @@ public class AuthTokenValidatorBuilder {
     }
 
     /**
-     * Adds or replaces the allowed user certificate policies for the given issuer. When no policies are configured,
-     * {@link SubjectCertificatePolicies#ESTEID_PRODUCTION_DOCUMENT_POLICIES} is used by default.
+     * Adds or replaces the allowed user certificate policies for the given issuer. When neither allowed nor disallowed
+     * policies are configured, {@link SubjectCertificatePolicies#ESTEID_PRODUCTION_DOCUMENT_POLICIES} is used by default.
      * When the subject certificate's issuer matches a configured issuer, the certificate must contain at least one
-     * of that issuer's allowed policies and the configured disallowed policies are ignored. Otherwise, validation
-     * falls back to the disallowed policy list. Passing no policies removes the issuer's allow-list entry.
+     * of that issuer's allowed policies. Passing no policies removes the issuer's allow-list entry.
+     * By default, a certificate is rejected when its issuer has no entry in an active allow-list.
+     * Allowed and disallowed certificate policies cannot be configured together.
      *
      * @param issuer exact subject certificate issuer distinguished name
      * @param policies allowed user certificate policies for the issuer
@@ -83,9 +84,22 @@ public class AuthTokenValidatorBuilder {
     }
 
     /**
-     * Adds the given policies to the fallback list of disallowed user certificate policies.
-     * This list is evaluated only when the subject certificate's issuer has no configured allowed policies.
-     * In that case, the certificate must not contain any policy present in this list.
+     * Allows certificates from issuers that have no entry in the active certificate policy allow-list.
+     * By default, certificates from issuers without an allow-list entry are rejected.
+     *
+     * @param allow whether to allow certificates from issuers without an allow-list entry
+     * @return the builder instance for method chaining
+     */
+    public AuthTokenValidatorBuilder allowIssuersNotInWhitelist(boolean allow) {
+        configuration.setAllowIssuersNotInWhitelist(allow);
+        return this;
+    }
+
+    /**
+     * Adds the given policies to the list of disallowed user certificate policies.
+     * The certificate must not contain any policy present in this list. Configuring a disallowed policy prevents
+     * the default allowed policies from being applied. Allowed and disallowed certificate policies cannot be
+     * configured together.
      *
      * @param policies disallowed user certificate policies
      * @return the builder instance for method chaining
@@ -172,7 +186,8 @@ public class AuthTokenValidatorBuilder {
      */
     public AuthTokenValidator build() throws IllegalArgumentException, JceException {
         final AuthTokenValidationConfiguration configurationSnapshot = configuration.copy();
-        if (configurationSnapshot.getAllowedSubjectCertificatePolicies().isEmpty()) {
+        if (configurationSnapshot.getAllowedSubjectCertificatePolicies().isEmpty()
+                && configurationSnapshot.getDisallowedSubjectCertificatePolicies().isEmpty()) {
             SubjectCertificatePolicies.ESTEID_PRODUCTION_DOCUMENT_POLICIES
                 .forEach((x500Principal, asn1ObjectIdentifiers) -> configurationSnapshot.getAllowedSubjectCertificatePolicies().put(x500Principal, Set.of(asn1ObjectIdentifiers)));
         }

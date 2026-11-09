@@ -86,10 +86,23 @@ class SubjectCertificatePolicyValidatorTest {
     }
 
     @Test
-    void whenIssuerHasNoAllowListEntry_thenValidationFallsBackToDisallowedPolicies() throws Exception {
+    void whenIssuerHasNoAllowListEntryAndValidationIsStrict_thenValidationFails() {
         final SubjectCertificatePolicyValidator validator = new SubjectCertificatePolicyValidator(
             Map.of(new X500Principal("CN=Another CA"), Set.of(ESTEID2018_POLICY)),
-            List.of(ESTEID2018_POLICY)
+            Set.of()
+        );
+
+        assertThatExceptionOfType(UserCertificateDisallowedPolicyException.class)
+            .isThrownBy(() -> validator.validateCertificatePolicies(getJaakKristjanEsteid2018Cert()));
+    }
+
+    @Test
+    void whenIssuerHasNoAllowListEntryAndValidationIsLenient_thenValidationFallsBackToDisallowedPolicies()
+            throws Exception {
+        final SubjectCertificatePolicyValidator validator = new SubjectCertificatePolicyValidator(
+            Map.of(new X500Principal("CN=Another CA"), Set.of(ESTEID2018_POLICY)),
+            List.of(ESTEID2018_POLICY),
+            true
         );
 
         assertThatExceptionOfType(UserCertificateDisallowedPolicyException.class)

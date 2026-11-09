@@ -30,6 +30,7 @@ public final class AuthTokenValidationConfiguration {
     private Map<X500Principal, Set<ASN1ObjectIdentifier>> allowedSubjectCertificatePolicies = new HashMap<>();
     @Deprecated(since = "4.0.0")
     private Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies = new HashSet<>();
+    private boolean allowIssuersNotInWhitelist = false;
     private boolean isUserCertificateRevocationCheckEnabled = true;
     private boolean platformOcspNonceEnabled = true;
     private CertificateRevocationChecker certificateRevocationChecker;
@@ -45,6 +46,7 @@ public final class AuthTokenValidationConfiguration {
         this.allowedSubjectCertificatePolicies =
             copyAllowedSubjectCertificatePolicies(other.allowedSubjectCertificatePolicies);
         this.disallowedSubjectCertificatePolicies = Set.copyOf(other.disallowedSubjectCertificatePolicies);
+        this.allowIssuersNotInWhitelist = other.allowIssuersNotInWhitelist;
         this.isUserCertificateRevocationCheckEnabled = other.isUserCertificateRevocationCheckEnabled;
         this.platformOcspNonceEnabled = other.platformOcspNonceEnabled;
         this.certificateRevocationChecker = other.certificateRevocationChecker;
@@ -88,6 +90,14 @@ public final class AuthTokenValidationConfiguration {
     @Deprecated(since = "4.0.0")
     public Collection<ASN1ObjectIdentifier> getDisallowedSubjectCertificatePolicies() {
         return disallowedSubjectCertificatePolicies;
+    }
+
+    boolean isAllowIssuersNotInWhitelist() {
+        return allowIssuersNotInWhitelist;
+    }
+
+    void setAllowIssuersNotInWhitelist(boolean allowIssuersNotInWhitelist) {
+        this.allowIssuersNotInWhitelist = allowIssuersNotInWhitelist;
     }
 
     boolean isUserCertificateRevocationCheckEnabled() {

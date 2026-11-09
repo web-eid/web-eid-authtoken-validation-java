@@ -29,6 +29,7 @@ public final class SubjectCertificatePolicyValidator {
 
     private final Map<X500Principal, Set<ASN1ObjectIdentifier>> allowedSubjectCertificatePolicies;
     private final Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies;
+    private final boolean allowIssuersNotInWhitelist;
 
     /**
      * @deprecated Configure both allowed and fallback disallowed policies with
@@ -36,20 +37,41 @@ public final class SubjectCertificatePolicyValidator {
      */
     @Deprecated(since = "4.0.0")
     public SubjectCertificatePolicyValidator(Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies) {
-        this(Map.of(), disallowedSubjectCertificatePolicies);
-    }
-
-    public SubjectCertificatePolicyValidator(
-            Map<X500Principal, ? extends Collection<ASN1ObjectIdentifier>> allowedSubjectCertificatePolicies,
-            Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies) {
-        this.allowedSubjectCertificatePolicies = copyAllowedSubjectCertificatePolicies(allowedSubjectCertificatePolicies);
-        this.disallowedSubjectCertificatePolicies = Set.copyOf(disallowedSubjectCertificatePolicies);
+        this(Map.of(), disallowedSubjectCertificatePolicies, false);
     }
 
     /**
-     * Requires a configured allowed policy when the certificate issuer has an allow-list entry.
+     * Creates a validator with strict allow-list validation enabled.
+     *
+     * @param allowedSubjectCertificatePolicies allowed policies grouped by exact certificate issuer
+     * @param disallowedSubjectCertificatePolicies fallback disallowed policies
+     */
+    public SubjectCertificatePolicyValidator(
+            Map<X500Principal, ? extends Collection<ASN1ObjectIdentifier>> allowedSubjectCertificatePolicies,
+            Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies) {
+        this(allowedSubjectCertificatePolicies, disallowedSubjectCertificatePolicies, false);
+    }
+
+    /**
+     * @param allowedSubjectCertificatePolicies allowed policies grouped by exact certificate issuer
+     * @param disallowedSubjectCertificatePolicies fallback disallowed policies
+     * @param allowIssuersNotInWhitelist whether an active allow-list accepts unlisted issuers
+     */
+    public SubjectCertificatePolicyValidator(
+            Map<X500Principal, ? extends Collection<ASN1ObjectIdentifier>> allowedSubjectCertificatePolicies,
+            Collection<ASN1ObjectIdentifier> disallowedSubjectCertificatePolicies,
+            boolean allowIssuersNotInWhitelist) {
+        this.allowedSubjectCertificatePolicies = copyAllowedSubjectCertificatePolicies(allowedSubjectCertificatePolicies);
+        this.disallowedSubjectCertificatePolicies = Set.copyOf(disallowedSubjectCertificatePolicies);
+        this.allowIssuersNotInWhitelist = allowIssuersNotInWhitelist;
+    }
+
+    /**
+     * Requires a configured allowed policy when the certificate issuer has an allow-list entry. In strict mode,
+     * a certificate is also rejected when an allow-list exists but its issuer has no entry.
      * Otherwise, rejects any configured disallowed policy present in the certificate policies extension.
-     * A certificate without the certificate policies extension passes only when its issuer has no allow-list entry.
+     * A certificate without the certificate policies extension passes only when its issuer is not subject to
+     * allow-list validation.
      *
      * @param subjectCertificate user certificate to be validated
      * @throws UserCertificateDisallowedPolicyException when no allowed policy is present or a disallowed policy is present.
@@ -57,8 +79,14 @@ public final class SubjectCertificatePolicyValidator {
      */
     public void validateCertificatePolicies(X509Certificate subjectCertificate) throws AuthTokenException {
         final X500Principal issuer = subjectCertificate.getIssuerX500Principal();
-        final byte[] extensionValue = subjectCertificate.getExtensionValue(Extension.certificatePolicies.getId());
         final Collection<ASN1ObjectIdentifier> issuerAllowedPolicies = allowedSubjectCertificatePolicies.getOrDefault(issuer, Set.of());
+        if (!allowIssuersNotInWhitelist
+                && !allowedSubjectCertificatePolicies.isEmpty()
+                && !allowedSubjectCertificatePolicies.containsKey(issuer)) {
+            LOG.debug("User certificate issuer '{}' does not have an allow-list entry.", issuer);
+            throw new UserCertificateDisallowedPolicyException();
+        }
+        final byte[] extensionValue = subjectCertificate.getExtensionValue(Extension.certificatePolicies.getId());
 
         if (extensionValue == null) {
             if (!issuerAllowedPolicies.isEmpty()) {

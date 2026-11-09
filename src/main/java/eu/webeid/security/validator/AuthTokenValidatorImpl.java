@@ -56,7 +56,8 @@ final class AuthTokenValidatorImpl implements AuthTokenValidator {
 
         subjectCertificatePolicyValidator = new SubjectCertificatePolicyValidator(
             this.configuration.getAllowedSubjectCertificatePolicies(),
-            this.configuration.getDisallowedSubjectCertificatePolicies()
+            this.configuration.getDisallowedSubjectCertificatePolicies(),
+            this.configuration.isAllowIssuersNotInWhitelist()
         );
 
         authTokenSignatureValidator = new AuthTokenSignatureValidator(configuration.getSiteOrigin());

@@ -120,6 +120,7 @@ public class ValidationConfiguration {
     public AuthTokenValidator validator(YAMLConfig yamlConfig) {
         try {
             AuthTokenValidatorBuilder authTokenValidatorBuilder = new AuthTokenValidatorBuilder().withSiteOrigin(URI.create(yamlConfig.getLocalOrigin()))
+                .allowIssuersNotInWhitelist(true)
                 .withTrustedCertificateAuthorities(loadTrustedCACertificatesFromCerFiles())
                 .withTrustedCertificateAuthorities(loadTrustedCACertificatesFromTrustStore(yamlConfig));
 

@@ -29,9 +29,6 @@ import javax.security.auth.x500.X500Principal;
 import java.security.cert.CertificateException;
 import java.util.Base64;
 
-import static eu.webeid.security.certificate.SubjectCertificatePolicies.ESTEID2018_ISSUER;
-import static eu.webeid.security.certificate.SubjectCertificatePolicies.ESTEID2025_ISSUER;
-import static eu.webeid.security.certificate.SubjectCertificatePolicies.ESTEID_PRODUCTION_DOCUMENT_POLICIES;
 import static eu.webeid.security.testutil.Certificates.getCertificateWithoutCertificatePolicies;
 import static eu.webeid.security.testutil.DateMocker.mockDate;
 import static eu.webeid.security.testutil.LegacyMobileIdCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY;
@@ -51,6 +48,7 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
         new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.2.1");
 
     private static final ASN1ObjectIdentifier UNRELATED_POLICY = new ASN1ObjectIdentifier("1.2.3");
+    private static final X500Principal UNRELATED_ISSUER = new X500Principal("CN=Another CA");
 
     private static final String AUTH_TOKEN = "{\"algorithm\":\"ES384\"," +
         "\"unverifiedCertificate\":\"X5C\"," +
@@ -217,6 +215,31 @@ class AuthTokenCertificateTest extends AbstractTestWithValidator {
 
         assertThatThrownBy(() -> validatorWithUnrelatedAllowedPolicy.validate(validAuthToken, VALID_CHALLENGE_NONCE))
             .isInstanceOf(UserCertificateDisallowedPolicyException.class);
+    }
+
+    @Test
+    void whenCertificateIssuerIsNotAllowedAndValidationIsStrict_thenValidationFails() throws Exception {
+        final AuthTokenValidator validatorWithUnrelatedAllowedIssuer = AuthTokenValidators
+            .getAuthTokenValidatorBuilderWithoutConfiguredCertificatePolicies()
+            .withAllowedCertificatePolicies(UNRELATED_ISSUER, UNRELATED_POLICY)
+            .withoutUserCertificateRevocationCheck()
+            .build();
+
+        assertThatThrownBy(() -> validatorWithUnrelatedAllowedIssuer.validate(validAuthToken, VALID_CHALLENGE_NONCE))
+            .isInstanceOf(UserCertificateDisallowedPolicyException.class);
+    }
+
+    @Test
+    void whenCertificateIssuerIsNotAllowedAndValidationIsLenient_thenValidationSucceeds() throws Exception {
+        final AuthTokenValidator validatorWithUnrelatedAllowedIssuer = AuthTokenValidators
+            .getAuthTokenValidatorBuilderWithoutConfiguredCertificatePolicies()
+            .withAllowedCertificatePolicies(UNRELATED_ISSUER, UNRELATED_POLICY)
+            .allowIssuersNotInWhitelist(true)
+            .withoutUserCertificateRevocationCheck()
+            .build();
+
+        assertThatCode(() -> validatorWithUnrelatedAllowedIssuer.validate(validAuthToken, VALID_CHALLENGE_NONCE))
+            .doesNotThrowAnyException();
     }
 
     @Test

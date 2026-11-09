@@ -323,7 +323,7 @@ toTitleCase(CertificateData.getSubjectSurname(userCertificate).orElseThrow()); /
 
 The default validator uses the platform OCSP implementation to check certificate revocation. A revoked certificate or an unsuccessful revocation check causes authentication to fail.
 
-Certificate policy allow-lists are selected by the subject certificate's exact issuer `X500Principal`. At build time, production Estonian identity-document policies from `ESTEID_PRODUCTION_DOCUMENT_POLICIES` are used when both the configured allow-list and deny-list are empty. Allow-lists and deny-lists cannot be configured together. A matching issuer must contain one of its configured policy OIDs. An issuer without an allow-list entry is not restricted by certificate policy, so the trusted intermediate CAs must be configured consistently with the allow-list. Calling `withAllowedCertificatePolicies(issuer)` without policy OIDs removes that issuer's entry. If no allow-list or deny-list entries remain, the Estonian defaults are used.
+Certificate policy allow-lists are selected by the subject certificate's exact issuer `X500Principal`. At build time, production Estonian identity-document policies from `ESTEID_PRODUCTION_DOCUMENT_POLICIES` are used when both the configured allow-list and deny-list are empty. Allow-lists and deny-lists cannot be configured together. Strict certificate policy validation is enabled by default: a matching issuer must contain one of its configured policy OIDs, and an issuer without an allow-list entry is rejected. Calling `withAllowedCertificatePolicies(issuer)` without policy OIDs removes that issuer's entry. If no allow-list or deny-list entries remain, the Estonian defaults are used.
 
 Use `withAllowedCertificatePolicies(X500Principal issuer, ASN1ObjectIdentifier... policies)` to define a custom allow-list. Repeated calls configure all supported issuers on the same validator. The following example explicitly configures both Estonian ID-card generations in one builder chain.
 
@@ -355,9 +355,11 @@ AuthTokenValidator tokenValidator = new AuthTokenValidatorBuilder()
     .build();
 ```
 
-For this restriction, trust only the intermediate CAs that issue the supported Estonian ID cards. Other policies from the configured issuers, including digital identity cards, residence permit cards and diplomatic identity cards, are rejected. Certificates from an issuer without an allow-list entry fall back to the deprecated deny-list.
+For this restriction, trust only the intermediate CAs that issue the supported Estonian ID cards. Other policies from the configured issuers, including digital identity cards, residence permit cards and diplomatic identity cards, are rejected. Certificates from an issuer without an allow-list entry are also rejected.
 
 For another country, add each supported issuer and its policy OIDs to the same builder chain and provide the corresponding trusted intermediate CAs.
+
+To retain the previous lenient behaviour, call `allowIssuersNotInWhitelist(true)`. The allow-list then applies only to issuers with a configured entry; other issuers are not restricted by certificate policy.
 
 To restore the old deny-list behaviour, configure only disallowed policies. Configuring a deny-list prevents the default Estonian allow-list from being applied:
 ```java
