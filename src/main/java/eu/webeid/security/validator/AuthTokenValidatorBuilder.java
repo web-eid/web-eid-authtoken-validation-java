@@ -3,16 +3,20 @@
 
 package eu.webeid.security.validator;
 
+import eu.webeid.security.certificate.SubjectCertificatePolicies;
 import eu.webeid.security.exceptions.JceException;
 import eu.webeid.security.validator.revocationcheck.CertificateRevocationChecker;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.security.auth.x500.X500Principal;
 import java.net.URI;
 import java.security.cert.PKIXRevocationChecker;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Set;
 
 /**
  * Builder for constructing {@link AuthTokenValidator} instances.
@@ -61,13 +65,47 @@ public class AuthTokenValidatorBuilder {
     }
 
     /**
+     * Adds or replaces the allowed user certificate policies for the given issuer. When neither allowed nor disallowed
+     * policies are configured, {@link SubjectCertificatePolicies#ESTEID_PRODUCTION_DOCUMENT_POLICIES} is used by default.
+     * When the subject certificate's issuer matches a configured issuer, the certificate must contain at least one
+     * of that issuer's allowed policies. Passing no policies removes the issuer's allow-list entry.
+     * By default, a certificate is rejected when its issuer has no entry in an active allow-list.
+     * Allowed and disallowed certificate policies cannot be configured together.
+     *
+     * @param issuer exact subject certificate issuer distinguished name
+     * @param policies allowed user certificate policies for the issuer
+     * @return the builder instance for method chaining
+     */
+    public AuthTokenValidatorBuilder withAllowedCertificatePolicies(
+            X500Principal issuer, ASN1ObjectIdentifier... policies) {
+        configuration.setAllowedSubjectCertificatePolicies(issuer, Arrays.asList(policies));
+        LOG.debug("Allowed subject certificate policies set to {}", configuration.getAllowedSubjectCertificatePolicies());
+        return this;
+    }
+
+    /**
+     * Allows certificates from issuers that have no entry in the active certificate policy allow-list.
+     * By default, certificates from issuers without an allow-list entry are rejected.
+     *
+     * @param allow whether to allow certificates from issuers without an allow-list entry
+     * @return the builder instance for method chaining
+     */
+    public AuthTokenValidatorBuilder allowIssuersNotInWhitelist(boolean allow) {
+        configuration.setAllowIssuersNotInWhitelist(allow);
+        return this;
+    }
+
+    /**
      * Adds the given policies to the list of disallowed user certificate policies.
-     * In order for the user certificate to be considered valid, it must not contain any policies
-     * present in this list.
+     * The certificate must not contain any policy present in this list. Configuring a disallowed policy prevents
+     * the default allowed policies from being applied. Allowed and disallowed certificate policies cannot be
+     * configured together.
      *
      * @param policies disallowed user certificate policies
      * @return the builder instance for method chaining
+     * @deprecated Use {@link #withAllowedCertificatePolicies(X500Principal, ASN1ObjectIdentifier...)} instead.
      */
+    @Deprecated(since = "4.0.0")
     public AuthTokenValidatorBuilder withDisallowedCertificatePolicies(ASN1ObjectIdentifier... policies) {
         Collections.addAll(configuration.getDisallowedSubjectCertificatePolicies(), policies);
         LOG.debug("Disallowed subject certificate policies set to {}", configuration.getDisallowedSubjectCertificatePolicies());
@@ -147,8 +185,14 @@ public class AuthTokenValidatorBuilder {
      * @throws JceException             when JCE configuration is invalid
      */
     public AuthTokenValidator build() throws IllegalArgumentException, JceException {
-        configuration.validate();
-        return new AuthTokenValidatorImpl(configuration);
+        final AuthTokenValidationConfiguration configurationSnapshot = configuration.copy();
+        if (configurationSnapshot.getAllowedSubjectCertificatePolicies().isEmpty()
+                && configurationSnapshot.getDisallowedSubjectCertificatePolicies().isEmpty()) {
+            SubjectCertificatePolicies.ESTEID_PRODUCTION_DOCUMENT_POLICIES
+                .forEach((x500Principal, asn1ObjectIdentifiers) -> configurationSnapshot.getAllowedSubjectCertificatePolicies().put(x500Principal, Set.of(asn1ObjectIdentifiers)));
+        }
+        configurationSnapshot.validate();
+        return new AuthTokenValidatorImpl(configurationSnapshot);
     }
 
 }

@@ -14,10 +14,16 @@ import java.net.URI;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
+import static eu.webeid.security.testutil.LegacyMobileIdCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY;
+import static eu.webeid.security.testutil.LegacyMobileIdCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V1;
+import static eu.webeid.security.testutil.LegacyMobileIdCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V2;
+import static eu.webeid.security.testutil.LegacyMobileIdCertificatePolicies.ESTEID_SK_2015_MOBILE_ID_POLICY_V3;
+
 public final class AuthTokenValidators {
 
     private static final String TOKEN_ORIGIN_URL = "https://ria.ee";
-    private static final ASN1ObjectIdentifier EST_IDEMIA_POLICY = new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.2.1");
+    private static final ASN1ObjectIdentifier EST_IDEMIA_TEST_POLICY =
+        new ASN1ObjectIdentifier("1.3.6.1.4.1.51361.1.2.1");
 
     public static AuthTokenValidator getAuthTokenValidator() throws CertificateException, JceException, IOException {
         return getAuthTokenValidator(TOKEN_ORIGIN_URL);
@@ -49,8 +55,10 @@ public final class AuthTokenValidators {
     }
 
     public static AuthTokenValidator getAuthTokenValidatorWithDisallowedESTEIDPolicy() throws CertificateException, JceException, IOException {
-        return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, getCACertificates())
-            .withDisallowedCertificatePolicies(EST_IDEMIA_POLICY)
+        return new AuthTokenValidatorBuilder()
+            .withSiteOrigin(URI.create(TOKEN_ORIGIN_URL))
+            .withTrustedCertificateAuthorities(getCACertificates())
+            .withDisallowedCertificatePolicies(EST_IDEMIA_TEST_POLICY)
             .withoutUserCertificateRevocationCheck()
             .build();
     }
@@ -73,7 +81,23 @@ public final class AuthTokenValidators {
         return getAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, getCACertificates());
     }
 
+    public static AuthTokenValidatorBuilder getAuthTokenValidatorBuilderWithoutConfiguredCertificatePolicies()
+            throws CertificateException, IOException {
+        return getBaseAuthTokenValidatorBuilder(TOKEN_ORIGIN_URL, getCACertificates());
+    }
+
     private static AuthTokenValidatorBuilder getAuthTokenValidatorBuilder(String uri, X509Certificate[] certificates) {
+        return getBaseAuthTokenValidatorBuilder(uri, certificates)
+            .withDisallowedCertificatePolicies(
+                ESTEID_SK_2015_MOBILE_ID_POLICY_V1,
+                ESTEID_SK_2015_MOBILE_ID_POLICY_V2,
+                ESTEID_SK_2015_MOBILE_ID_POLICY_V3,
+                ESTEID_SK_2015_MOBILE_ID_POLICY
+            );
+    }
+
+    private static AuthTokenValidatorBuilder getBaseAuthTokenValidatorBuilder(
+            String uri, X509Certificate[] certificates) {
         return new AuthTokenValidatorBuilder()
             .withSiteOrigin(URI.create(uri))
             .withTrustedCertificateAuthorities(certificates);
