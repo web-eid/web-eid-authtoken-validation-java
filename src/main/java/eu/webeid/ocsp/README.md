@@ -132,6 +132,8 @@ OcspServiceProvider services = new OcspServiceProvider(designated, aiaConfigurat
 
 The provider selects the designated service only when the validated direct issuer certificate equals one of its configured `supportedIssuers`. Supply the same encoded issuer certificates that validation may select as direct issuers; a reissued CA certificate with the same name and key does not match. On a mismatch, the provider uses the certificate's AIA OCSP URL. The designated responder certificate is pinned locally and need not be issued by the CAs it serves.
 
+The AIA configuration is always required, so a designated service is always combined with AIA services: the designated service handles its `supportedIssuers` and AIA services handle all other issuers. Fallback OCSP services, passed as the third `OcspServiceProvider` constructor argument, are used only with AIA services. Configuring a fallback for an issuer that the designated service supports causes the `OcspServiceProvider` constructor to throw `IllegalArgumentException`.
+
 For AIA services, the response may be signed by the certificate's direct issuer CA itself, or by a delegated responder certificate signed directly by that CA with the OCSP-signing extended key usage. Nonce support is enabled unless the URL appears in the first argument of `AiaOcspServiceConfiguration`. When nonce support is enabled, this custom checker requires a matching response nonce and rejects its absence. Its nonce policy is independent of the platform builder setting and JVM nonce property.
 
 ## Custom PKIX revocation checker

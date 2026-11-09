@@ -371,8 +371,7 @@ class OcspServiceProviderTest {
     }
 
     @Test
-    void whenDesignatedServiceSupportsIssuer_thenDesignatedTakesPrecedenceOverFallback() throws Exception {
-        X509Certificate userCert = getJaakKristjanEsteid2018Cert();
+    void whenFallbackConfiguredForIssuerSupportedByDesignatedService_thenThrows() throws Exception {
         List<X509Certificate> trustedCertificates = List.of(getTestEsteid2018CA(), getTestEsteid2015CA());
         Set<java.security.cert.TrustAnchor> trustedAnchors =
             CertificateValidator.buildTrustAnchorsFromCertificates(trustedCertificates);
@@ -383,14 +382,40 @@ class OcspServiceProviderTest {
             null, getTestEsteid2018CA(), trustedAnchors, trustedStore,
             OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
             OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE, true);
+        DesignatedOcspServiceConfiguration designatedConfiguration = getDesignatedOcspServiceConfiguration();
+        AiaOcspServiceConfiguration aiaConfiguration = getAiaOcspServiceProvider2018Configuration();
 
-        OcspServiceProvider provider = new OcspServiceProvider(getDesignatedOcspServiceConfiguration(),
+        assertThatExceptionOfType(IllegalArgumentException.class)
+            .isThrownBy(() -> new OcspServiceProvider(designatedConfiguration, aiaConfiguration, List.of(fallbackConfiguration)))
+            .withMessage("Fallback OCSP service must not be configured for an issuer that is supported by the designated OCSP service");
+    }
+
+    @Test
+    void whenFallbackConfiguredForIssuerNotSupportedByDesignatedService_thenAiaServiceCarriesFallback() throws Exception {
+        X509Certificate userCert = getJaakKristjanEsteid2018Cert();
+        List<X509Certificate> trustedCertificates = List.of(getTestEsteid2018CA(), getTestEsteid2015CA());
+        Set<java.security.cert.TrustAnchor> trustedAnchors =
+            CertificateValidator.buildTrustAnchorsFromCertificates(trustedCertificates);
+        java.security.cert.CertStore trustedStore =
+            CertificateValidator.buildCertStoreFromCertificates(trustedCertificates);
+        URI fallbackUri = URI.create("http://fallback.test/ocsp");
+        FallbackOcspServiceConfiguration fallbackConfiguration = new FallbackOcspServiceConfiguration(
+            fallbackUri, getDemoEsteidSk2018AiaOcspResponder(), true,
+            null, getTestEsteid2018CA(), trustedAnchors, trustedStore,
+            OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
+            OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE, true);
+        DesignatedOcspServiceConfiguration designatedConfiguration = new DesignatedOcspServiceConfiguration(
+            URI.create("http://demo.sk.ee/ocsp"), getTestSelfSignedOcspResponder(), List.of(getTestEsteid2015CA()), true,
+            OcspCertificateRevocationChecker.DEFAULT_THIS_UPDATE_AGE,
+            OcspCertificateRevocationChecker.DEFAULT_NEXT_UPDATE_AGE, true);
+
+        OcspServiceProvider provider = new OcspServiceProvider(designatedConfiguration,
             getAiaOcspServiceProvider2018Configuration(), List.of(fallbackConfiguration));
         OcspService service = provider.getService(userCert, getTestEsteid2018CA());
 
-        assertThat(service).isInstanceOf(DesignatedOcspService.class);
-        assertThat(service.getAccessLocation()).isEqualTo(new URI("http://demo.sk.ee/ocsp"));
-        assertThat(service.getFallbackService()).isEmpty();
+        assertThat(service).isInstanceOf(AiaOcspService.class);
+        assertThat(service.getFallbackService()).isPresent();
+        assertThat(service.getFallbackService().get().getAccessLocation()).isEqualTo(fallbackUri);
     }
 
     @Test

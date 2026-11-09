@@ -26,13 +26,16 @@ public class OcspServiceProvider {
             new DesignatedOcspService(designatedOcspServiceConfiguration)
             : null;
         this.aiaOcspServiceConfiguration = Objects.requireNonNull(aiaOcspServiceConfiguration, "aiaOcspServiceConfiguration");
-        this.fallbackOcspServiceMap = buildFallbackOcspServiceMap(fallbackOcspServiceConfigurations);
+        this.fallbackOcspServiceMap = buildFallbackOcspServiceMap(designatedOcspServiceConfiguration, fallbackOcspServiceConfigurations);
     }
 
-    private static Map<X509Certificate, FallbackOcspService> buildFallbackOcspServiceMap(Collection<FallbackOcspServiceConfiguration> fallbackOcspServiceConfigurations) {
+    private static Map<X509Certificate, FallbackOcspService> buildFallbackOcspServiceMap(DesignatedOcspServiceConfiguration designatedOcspServiceConfiguration, Collection<FallbackOcspServiceConfiguration> fallbackOcspServiceConfigurations) {
         if (fallbackOcspServiceConfigurations != null) {
             Map<X509Certificate, FallbackOcspService> fallbackOcspServices = new HashMap<>();
             for (FallbackOcspServiceConfiguration configuration : fallbackOcspServiceConfigurations) {
+                if (designatedOcspServiceConfiguration != null && designatedOcspServiceConfiguration.supportsIssuer(configuration.getIssuerCertificate())) {
+                    throw new IllegalArgumentException("Fallback OCSP service must not be configured for an issuer that is supported by the designated OCSP service");
+                }
                 fallbackOcspServices.put(configuration.getIssuerCertificate(), new FallbackOcspService(configuration));
             }
             return Map.copyOf(fallbackOcspServices);
