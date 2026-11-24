@@ -7,8 +7,10 @@ import eu.webeid.example.security.dto.AuthTokenDTO;
 import eu.webeid.security.authtoken.WebEidAuthToken;
 import eu.webeid.security.challenge.ChallengeNonceStore;
 import eu.webeid.security.exceptions.AuthTokenException;
+import eu.webeid.security.exceptions.UserCertificateDisallowedPolicyException;
 import eu.webeid.security.validator.AuthTokenValidator;
 import eu.webeid.security.validator.ValidationInfo;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -20,6 +22,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
 import org.springframework.stereotype.Component;
 
+import javax.security.auth.x500.X500Principal;
 import java.security.cert.CertificateEncodingException;
 import java.util.List;
 
@@ -56,11 +59,29 @@ public class AuthTokenDTOAuthenticationProvider implements AuthenticationProvide
             final String nonce = challengeNonceStore.getAndRemove().getBase64EncodedNonce();
             final ValidationInfo validationInfo = tokenValidator.validate(authToken, nonce);
             return WebEidAuthentication.fromCertificate(validationInfo.subjectCertificate(), authorities);
+        } catch (UserCertificateDisallowedPolicyException e) {
+            logAllowedCertificatePolicyConfiguration(e);
+            throw new AuthenticationServiceException("Web eID token validation failed", e);
         } catch (AuthTokenException e) {
             throw new AuthenticationServiceException("Web eID token validation failed", e);
         } catch (CertificateEncodingException e) {
             throw new AuthenticationServiceException("Web eID token has incorrect certificate subject fields", e);
         }
+    }
+
+    private static void logAllowedCertificatePolicyConfiguration(
+            UserCertificateDisallowedPolicyException exception) {
+        exception.getCertificateIssuer().ifPresent(issuer -> LOG.warn(
+            "Certificate policy allow-list rejected an unverified certificate. " +
+                "If this issuer is intentionally supported and its CA is trusted, configure it with " +
+                "AuthTokenValidatorBuilder.withAllowedCertificatePolicies(...). " +
+                "issuerRFC2253='{}', certificatePolicyOids={}",
+            issuer.getName(X500Principal.RFC2253),
+            exception.getCertificatePolicies().stream()
+                .map(ASN1ObjectIdentifier::getId)
+                .sorted()
+                .toList()
+        ));
     }
 
     @Override
