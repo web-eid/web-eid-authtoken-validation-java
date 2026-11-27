@@ -61,8 +61,8 @@
                         <li>on <b>Ubuntu Linux</b>, for Firefox and Chrome, download and execute the<br>
                             <a href="/scripts/install-web-eid.sh"><code>install-web-eid.sh</code></a>
                             script from the console with<br>
-                            <code>wget -O - https://<span th:text="${serverName}"/>/scripts/install-web-eid.sh
-                                | bash</code><br>
+                            <code>wget -O install-web-eid.sh https://<span th:text="${serverName}"/>/scripts/install-web-eid.sh
+                                &amp;&amp; bash ./install-web-eid.sh</code><br>
                             Note: as of the 2.5 version, Web eID supports Firefox installed via Snap.
                         </li>
                         <li>on <b>macOS</b> 14 or later, for Firefox and Chrome from
