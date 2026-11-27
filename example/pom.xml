@@ -20,13 +20,16 @@
 
 	<properties>
 		<java.version>17</java.version>
-		<maven-surefire-plugin.version>3.6.0</maven-surefire-plugin.version>
-		<webeid.version>3.2.2</webeid.version>
+		<maven-surefire-plugin.version>3.6.1</maven-surefire-plugin.version>
+		<webeid.version>3.2.3</webeid.version>
 		<digidoc4j.version>6.2.0</digidoc4j.version>
-		<bouncycastle.version>1.86</bouncycastle.version> <!-- The explicit bcutil dependency can be removed once DigiDoc4j supports BC 1.86. -->
+		<!-- Align shared dependencies with authtoken-validation rather than Spring Boot's older defaults. -->
+		<jackson-bom.version>2.23.0</jackson-bom.version>
+		<slf4j.version>2.0.20</slf4j.version>
+		<bouncycastle.version>1.87</bouncycastle.version> <!-- The explicit bcutil dependency can be removed once DigiDoc4j supports BC 1.87. -->
 		<jmockit.version>1.44</jmockit.version> <!-- Keep version 1.44, otherwise mocking will fail. -->
 		<jib.version>3.5.2</jib.version>
-		<maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
+		<maven-enforcer-plugin.version>3.7.0</maven-enforcer-plugin.version>
 	</properties>
 
 	<dependencies>
@@ -57,10 +60,10 @@
 			<version>${webeid.version}</version>
 		</dependency>
 		<!--
-			DigiDoc4j 6.2.0 pins Bouncy Castle 1.84 because using BC 1.86 can make invalid PDF/PAdES signatures appear valid.
-			This example does not process PDF/PAdES, so we want to use BC 1.86 to include security fixes missing from 1.84;
-			keep authtoken-validation before digidoc4j and declare bcutil 1.86 directly so all BC modules use 1.86.
-			The explicit bcutil dependency can be removed once DigiDoc4j supports BC 1.86.
+			DigiDoc4j 6.2.0 pins Bouncy Castle 1.84 because newer BC versions can make invalid PDF/PAdES signatures appear valid.
+			This example does not process PDF/PAdES, so we want to use BC 1.87 to include security fixes missing from 1.84;
+			keep authtoken-validation before digidoc4j and declare bcutil 1.87 directly so all BC modules use 1.87.
+			The explicit bcutil dependency can be removed once DigiDoc4j supports BC 1.87.
 		-->
 		<dependency>
 			<groupId>org.bouncycastle</groupId>
